@@ -1,0 +1,49 @@
+{
+  "name": "draft-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "将棋のドラフト会議を1台のPCで進行・演出するアプリ",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "app": "electron .",
+    "css": "tailwindcss -c tailwind.config.js -i ui/control.src.css -o public/control.css --minify",
+    "check:ui": "npm run css && electron scripts/check-ui.js",
+    "test": "node test/core.test.js",
+    "dist": "npm run css && electron-builder --win"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "axe-core": "^4.11.1",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "melta-ds-mcp": "^1.9.1",
+    "tailwindcss": "^3.4.17"
+  },
+  "build": {
+    "appId": "jp.kumanohikage.draftapp",
+    "productName": "ドラフト会議アプリ",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "server.js",
+      "public/**/*",
+      "demo.js"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "DraftApp-${version}.exe"
+    }
+  },
+  "author": "熊乃ヒカゲ (kumanohikage)",
+  "license": "MIT",
+  "repository": "https://github.com/kumanohikage/shogi-draft-app"
+}

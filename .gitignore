@@ -1,0 +1,7 @@
+node_modules/
+dist/
+draft-data/
+ui-check/
+*.log
+# 企画メモ(公開しない)
+docs/要件.md
