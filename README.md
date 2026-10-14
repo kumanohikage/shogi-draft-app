@@ -133,3 +133,11 @@ npm run dist       # exe を作る(dist/)
 ## ライセンス
 
 [MIT](LICENSE)
+
+## クレジット
+
+- 制作: 熊乃ヒカゲ（[@kumanohikage](https://x.com/kumanohikage)） with Claude
+- 抽選ルーレット: [将棋ドラフト抽選ルーレットDX](https://github.com/kumanohikage/shogi-draft-roulette-dx)
+- 3D描画: [three.js](https://threejs.org/)（MIT License）
+- フォント: [Dela Gothic One](https://fonts.google.com/specimen/Dela+Gothic+One)、[Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP)（SIL Open Font License）
+- 管理画面のデザイン: [melta UI](https://github.com/tsubotax/melta-ui) のルールで検査
