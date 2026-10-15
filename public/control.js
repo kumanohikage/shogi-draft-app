@@ -487,7 +487,7 @@ document.addEventListener('change', (e) => {
     setOption({ roundModes: Array.from({ length: S.rounds }, (_, i) => m[i] || 'bid') });
   } else if (t.id === 'opt-order') setOption({ orderStyle: t.value });
   else if (t.id === 'opt-lottery') setOption({ lotteryStyle: t.value });
-  else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 120)) });
+  else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 300)) });
   else if (t.id === 'opt-timershow') setOption({ timerShow: t.checked });
 });
 // 待ち時間の画像: 巡ごとに追加(複数まとめて選べる)・外す
