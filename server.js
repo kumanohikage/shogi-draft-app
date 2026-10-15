@@ -18,13 +18,13 @@ const MIME = {
   '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.opus': 'audio/ogg', '.wav': 'audio/wav',
   '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac',
-  '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.woff2': 'font/woff2', '.woff': 'font/woff', '.webm': 'video/webm', '.mp4': 'video/mp4',
 };
 const HISTORY_MAX = 200;
 // 「戻す」の対象にしない操作と、戻しても変えない状態
 const NO_UNDO = new Set(['lotteryDone', 'setAudio', 'setOption', 'timer', 'waitShow']);
 const KEEP_ON_UNDO = ['audio', 'options', 'timer', 'lotteryLog'];
-const IMG_RE = /\.(png|jpe?g|gif|webp)$/i;
+const IMG_RE = /\.(png|jpe?g|gif|webp|webm|mp4)$/i; // 画像と、場面の切り替えの動画
 const AUDIO_RE = /\.(mp3|ogg|oga|opus|wav|m4a|aac|flac)$/i;
 // 抽選は暗号論的な乱数で(偏りなく)
 const fairRandom = () => crypto.randomInt(0, 2 ** 31) / 2 ** 31;
@@ -97,7 +97,7 @@ function start(opts = {}) {
   // 画像・BGM のアップロード(管理画面から)。同じ名前は上書き
   function upload(req, res, url, dir, re) {
     const name = path.basename(url.searchParams.get('name') || '').replace(/[^\w.\-぀-ヿ一-鿿]/g, '_');
-    if (!re.test(name)) { res.writeHead(400); return res.end(dir === BGM ? '音声ファイル(mp3 / ogg / wav / m4a)を選んでください' : '画像ファイルを選んでください'); }
+    if (!re.test(name)) { res.writeHead(400); return res.end(dir === BGM ? '音声ファイル(mp3 / ogg / wav / m4a)を選んでください' : '画像か動画のファイルを選んでください'); }
     const chunks = []; let size = 0;
     req.on('data', (c) => { size += c.length; if (size > 80e6) req.destroy(); else chunks.push(c); });
     req.on('end', () => {

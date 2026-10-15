@@ -474,6 +474,14 @@ function renderShow() {
   }
   if (document.activeElement !== $('opt-prefix')) $('opt-prefix').value = o.teamPrefix || '';
   if (document.activeElement !== $('in-title')) $('in-title').value = S.title;
+  // 場面の切り替え: 動画のときは動画と入れ替える秒数、ほかは長さ
+  $('opt-trans').value = o.transition;
+  $('trans-sec-f').classList.toggle('hidden', o.transition === 'none' || o.transition === 'video');
+  $('trans-video-f').classList.toggle('hidden', o.transition !== 'video');
+  $('trans-cut-f').classList.toggle('hidden', o.transition !== 'video');
+  if (document.activeElement !== $('opt-transsec')) $('opt-transsec').value = o.transSec;
+  if (document.activeElement !== $('opt-transcut')) $('opt-transcut').value = o.transCut || '';
+  $('trans-video-name').textContent = o.transVideo || 'まだありません';
   if (document.activeElement !== $('in-rounds')) $('in-rounds').value = S.rounds;
   for (const k of ['flowWait', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
   // 入力中は描き直さない
@@ -541,9 +549,21 @@ $('look-file').addEventListener('change', async (e) => {
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'opt-prefix') setOption({ teamPrefix: t.value });
+  else if (t.id === 'opt-trans') setOption({ transition: t.value });
+  else if (t.id === 'opt-transsec') setOption({ transSec: Math.max(0.2, Math.min(3, +t.value || 0.6)) });
+  else if (t.id === 'opt-transcut') setOption({ transCut: Math.max(0, +t.value || 0) });
   else if (/^opt-flow/.test(t.id)) setOption({ [t.id.slice(4)]: t.checked });
   else if (t.dataset.progLabel) act({ type: 'updateProgram', id: t.dataset.progLabel, patch: { label: t.value.trim() || '（名前なし）' } });
   else if (t.dataset.slide) act({ type: 'updateSlide', id: t.dataset.slide, patch: t.dataset.slideF === 'lines' ? { lines: t.value.split('\n') } : { title: t.value } });
+});
+
+// 切り替えの動画(WebM / MP4)
+$('trans-video-pick').addEventListener('click', () => { $('trans-video-file').value = ''; $('trans-video-file').click(); });
+$('trans-video-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const ext = { 'video/webm': '.webm', 'video/mp4': '.mp4' }[f.type];
+  if (!ext) return toast('WebM か MP4 の動画を選んでください', true);
+  try { setOption({ transVideo: await upload(`trans_${Date.now()}${ext}`, f) }); } catch (err) { toast(err.message, true); }
 });
 
 /* ---------- スマホ操作 ---------- */

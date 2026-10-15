@@ -122,10 +122,12 @@
   // lotteryStyle: 'full' | 'short'(短い抽選演出)。timerSec: 制限時間(秒)。timerShow: 配信画面にタイマーを出すか。waitImage: 待ち時間画面の画像
   // waitImages: { 巡: [画像ファイル名, ...] } 待ち時間画面で出す画像(詰将棋の問題 → 答え など)。waitImage は前の版の1枚だけの設定(全部の巡で使う)
   // timerAuto: 巡のはじめにタイマーを自動で動かす
+  // 場面の切り替え(進行表の場面が変わるときだけ): transition = none | fadeBlack | fadeWhite | slide | wipe | video
+  //   transSec: 切り替えの長さ(秒) / transVideo: 動画のファイル名 / transCut: 動画の何秒目で場面を入れ替えるか(0 = 動画の長さの半分)
   // 見た目: bgImage(全画面の背景) / logoImage(大会ロゴ) / teamPrefix(名前の帯の「チーム」)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', teamPrefix: 'チーム', flowWait: true, flowTeams: true, flowStand: true };
+    bgImage: '', logoImage: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
   const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options);
   const roundMode = (s, r = s.round) => optionsOf(s).roundModes[r - 1] || 'bid';
@@ -390,6 +392,7 @@
   // 書式: 種類,項目,値,値,…  種類 = 大会 / 進め方 / 見た目 / 進行表。進行表の行は上から順に場面になる
   // 進行表の項目 = 場面の種類(ロゴ・文字の資料・ドラフト説明・画像の資料・リーダー紹介・ドラフト・最終チーム表・何も出さない)、値 = 場面の名前 …
   const yes = (v) => /^(する|出す|はい|true|1|on)$/i.test(String(v || '').trim());
+  const TRANSITIONS = { none: 'なし', fadeBlack: 'フェード（黒）', fadeWhite: 'フェード（白）', slide: 'スライド', wipe: 'ワイプ', video: '動画' };
   const SCENE_CSV = { logo: 'ロゴ', intro: 'リーダー紹介', draft: 'ドラフト', final: '最終チーム表', blank: '何も出さない' };
   function showToCSV(s) {
     const o = optionsOf(s), rows = [['種類', '項目', '値']];
@@ -402,6 +405,7 @@
     rows.push(['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
     for (let r = 1; r <= s.rounds; r++) rows.push(['進め方', `待ち時間の画像（第${r}巡）`, ...((o.waitImages || {})[r] || [])]);
     rows.push(['見た目', '背景', o.bgImage], ['見た目', '大会ロゴ', o.logoImage], ['見た目', '名前の前につける文字', o.teamPrefix]);
+    rows.push(['見た目', '場面の切り替え', TRANSITIONS[o.transition] || 'なし'], ['見た目', '切り替えの長さ（秒）', o.transSec], ['見た目', '切り替えの動画', o.transVideo], ['見た目', '動画で入れ替える秒数', o.transCut || '自動']);
     for (const g of programOf(s)) {
       if (g.type !== 'slide') { rows.push(['進行表', SCENE_CSV[g.type], g.label]); continue; }
       const sl = slideById(s, g.slideId) || { kind: 'text', title: '', lines: [] };
@@ -431,6 +435,10 @@
         else { const m = /待ち時間の画像.*?(\d+)/.exec(key); if (m) (O.waitImages = O.waitImages || {})[+m[1]] = v.filter(Boolean); }
       } else if (kind === '見た目') {
         if (key === '背景') out.options.bgImage = v0; else if (key === '大会ロゴ') out.options.logoImage = v0; else if (key === '名前の前につける文字') out.options.teamPrefix = v0;
+        else if (key === '場面の切り替え') out.options.transition = Object.keys(TRANSITIONS).find((k) => TRANSITIONS[k] === v0) || 'none';
+        else if (/^切り替えの長さ/.test(key)) out.options.transSec = Math.max(0.2, Math.min(3, +v0 || 0.6));
+        else if (key === '切り替えの動画') out.options.transVideo = v0;
+        else if (key === '動画で入れ替える秒数') out.options.transCut = Math.max(0, +v0 || 0);
       } else if (kind === '進行表') {
         const type = Object.keys(SCENE_CSV).find((t) => SCENE_CSV[t] === key);
         if (type) { if (type !== 'draft' || !prog.some((g) => g.type === 'draft')) prog.push({ id: uid('G'), type, label: v0 || key }); }
@@ -454,5 +462,5 @@
     return s;
   }
 
-  return { initialState, apply, showToCSV, showFromCSV, normalize, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  return { TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));

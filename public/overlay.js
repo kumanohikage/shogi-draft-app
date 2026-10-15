@@ -48,8 +48,8 @@ let first = true; // 開いた直後(OBS の読み込み時)は演出・効果�
 
 function render() {
   const scene = EXPORT || S.scene;
-  for (const k of ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro']) $('sc-' + k).classList.toggle('on', scene === k);
   renderLook();
+  sceneSwitch(scene);
   if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
   SE.setVolume(audio.seVol / 100);
@@ -61,6 +61,79 @@ function render() {
   }
   renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); playLottery(false);
   first = false;
+}
+
+/* ---------- 場面の切り替え ----------
+ * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
+const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro'];
+let shown = null, prevProg = null, transBusy = false;
+function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); }
+function sceneSwitch(scene) {
+  const prog = C.progIdxOf(S), progChanged = prevProg !== null && prog !== prevProg;
+  prevProg = prog;
+  if (transBusy) return; // 切り替えの途中: 入れ替えるときに最新の場面を出す
+  const o = C.optionsOf(S);
+  // 動画は先に読み込んでおく(押してから待たないように)
+  const v = $('trans-video');
+  if (o.transition === 'video' && o.transVideo && !v.src.endsWith(encodeURIComponent(o.transVideo))) v.src = img(o.transVideo);
+  if (EXPORT || first || !progChanged || scene === shown || o.transition === 'none') return showScene(scene);
+  runTransition(o);
+}
+const cur = () => EXPORT || S.scene;
+const later = (ms) => new Promise((r) => setTimeout(r, ms));
+async function runTransition(o) {
+  transBusy = true;
+  const ms = Math.round((o.transSec || 0.6) * 1000);
+  // 出ていく場面は写しを取って、それを動かす(本物はすぐ次の内容に描き変わるので)
+  const orig = shown && $('sc-' + shown);
+  let ghost = null;
+  if (orig && shown !== 'roulette') {
+    ghost = orig.cloneNode(true);
+    ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
+    orig.parentNode.insertBefore(ghost, orig);
+  }
+  const swap = () => { if (ghost) { ghost.remove(); ghost = null; } showScene(cur()); };
+  showScene(null); if (ghost) ghost.classList.add('on');
+  try {
+    if (o.transition === 'fadeBlack' || o.transition === 'fadeWhite') {
+      // 色で覆ってから入れ替えて、また開ける(半透明で重ねないので透けない)
+      const t = $('trans');
+      t.style.background = o.transition === 'fadeWhite' ? '#fff' : '#000';
+      t.style.transition = `opacity ${ms / 2}ms ease-in`; t.style.opacity = 1;
+      await later(ms / 2);
+      swap();
+      t.style.transition = `opacity ${ms / 2}ms ease-out`; t.style.opacity = 0;
+      await later(ms / 2);
+    } else if (o.transition === 'slide' || o.transition === 'wipe') {
+      const next = cur(), to = $('sc-' + next);
+      if (!to) return swap(); // 何も出さない場面へ
+      const ease = 'cubic-bezier(.6,0,.3,1)';
+      to.classList.add('on', 't-top');
+      to.style.animation = `${o.transition === 'slide' ? 'tSlideIn' : 'tWipe'} ${ms}ms ${ease} both`;
+      if (ghost && o.transition === 'slide') ghost.style.animation = `tSlideOut ${ms}ms ${ease} both`;
+      await later(ms);
+      to.style.animation = ''; to.classList.remove('t-top');
+      swap();
+    } else if (o.transition === 'video' && o.transVideo) {
+      // 動画を流して、決めた秒数(なければ長さの半分)で後ろの場面を入れ替える
+      const v = $('trans-video');
+      if (!v.src.endsWith(encodeURIComponent(o.transVideo))) v.src = img(o.transVideo);
+      if (!(v.duration > 0)) await new Promise((r) => { v.onloadedmetadata = r; v.onerror = r; setTimeout(r, 3000); });
+      if (!(v.duration > 0)) return swap(); // 読めない動画は切り替えだけ
+      const cut = o.transCut > 0 ? Math.min(o.transCut, v.duration) : v.duration / 2;
+      v.currentTime = 0; v.volume = Math.min(1, Object.assign({}, C.DEFAULT_AUDIO, S.audio).seVol / 100);
+      v.style.display = 'block';
+      await v.play().catch(() => {});
+      await later(cut * 1000);
+      swap();
+      await new Promise((r) => { if (v.ended) r(); v.onended = r; setTimeout(r, Math.max(0, (v.duration - cut) * 1000 + 500)); });
+      v.style.display = 'none'; v.pause();
+    } else swap();
+  } finally {
+    if (ghost) ghost.remove();
+    transBusy = false;
+    if (shown !== cur()) showScene(cur()); // 切り替えの途中でまた場面が変わっていたら合わせる
+  }
 }
 
 /* ---------- 指名ボード ---------- */
