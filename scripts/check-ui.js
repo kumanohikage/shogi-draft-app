@@ -77,8 +77,8 @@ app.whenReady().then(async () => {
   await check('05-run-entering');
   await act({ type: 'nominate', leaderId: L[5], playerId: P[4] });
   await check('06-run-ready');
-  // 1人ずつ公開を1回 → 残りを一斉公開
-  await js("[...document.querySelectorAll('#next button')].find((b) => b.textContent.includes('1人ずつ公開')).click()"); await wait(400);
+  // 各カードの「公開」で1人だけ公開 → 残りを一斉公開
+  await js("document.querySelector('#noms [data-next=\"revealOne\"]').click(); 0"); await wait(400);
   if (S.picks.length !== 0 || Object.values(S.noms).filter((n) => n.revealed).length !== 1) { console.log('✗ 1人ずつ公開が想定どおりでない'); errors++; }
   await check('06b-run-partial');
   await next('残りを一斉公開');

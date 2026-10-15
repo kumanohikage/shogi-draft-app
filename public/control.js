@@ -144,12 +144,11 @@ function nextStep() {
   }
   if (toReveal.length) {
     // 1人ずつ公開もできる(並び順で次の人)
-    const one = { key: 'revealOne', arg: toReveal[0].id, label: `1人ずつ公開（次: ${lname(toReveal[0].id)}）` };
     const spot = { key: 'spotShow', arg: toReveal[0].id, label: 'ピックアップで公開' };
     const partial = toReveal.length < pend.length;
     return partial
-      ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot, one] }
-      : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [spot, one] };
+      ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot] }
+      : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [spot] };
   }
   return { step: 0, text: '' };
 }
@@ -172,11 +171,11 @@ function renderRun() {
   $('round-title').textContent = done ? 'ドラフト終了' : `第${S.round}巡`;
   const n = nextStep();
   renderSteps(n.step);
-  const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''}>${b.label}</button>`;
+  const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''} ${b.keys ? 'aria-keyshortcuts="Space" title="スペースキーでも押せます"' : ''}>${b.label}</button>`;
   const warn = overlay.count ? '' : '<p class="mt-2 text-sm text-red-300">配信画面が開いていません。OBSのブラウザソース（またはブラウザ）で配信画面を開くと演出が流れます。開いていない間は、抽選の結果がすぐに出ます。</p>';
   $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal"><p class="text-xs text-[var(--text-muted)]">次にやること</p>
     <p class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</p>${warn}</div>
-    <div class="flex flex-wrap gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}${n.main ? btn(n.main, BTN_PRIMARY.replace('h-11 px-4', 'h-12 px-6')) : ''}</div>`;
+    <div class="flex flex-wrap gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}${n.main ? btn({ ...n.main, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 px-6')) : ''}</div>`;
 
   // 重複の一覧(抽選は「次にやること」から順番に)
   $('conflicts').innerHTML = confs.map((c) => `<div class="flex flex-wrap items-center gap-4 p-4 bg-red-500/[.12] border border-red-500/40 rounded-lg">
@@ -262,13 +261,27 @@ document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () 
 selectTab('run');
 
 $('undo').addEventListener('click', () => ws.send(JSON.stringify({ type: 'undo' })));
+// 進行タブでは、スペースキーで「次にやること」のメインのボタン(オレンジ)を押せる。
+// 文字の入力中・登録タブ・画像の調整中は何もしない(暴発しないように)。押しっぱなしの連打も無視
+let lastSpace = 0;
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+  if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if ($('tab-run').classList.contains('hidden') || $('crop').open) return;
+  e.preventDefault(); // フォーカスのあるほかのボタンが押されたり、画面がスクロールしたりしないように
+  if (e.repeat || Date.now() - lastSpace < 500) return;
+  const b = document.querySelector('#next button.h-12');
+  if (!b || b.disabled) return;
+  lastSpace = Date.now();
+  b.click();
+});
 window.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.target.matches('input,textarea')) { e.preventDefault(); $('undo').click(); } });
 document.querySelectorAll('[data-scene]').forEach((b) => b.addEventListener('click', () => act({ type: 'setScene', scene: b.dataset.scene })));
 $('copy-url').addEventListener('click', async () => { try { await navigator.clipboard.writeText(OVERLAY_URL); toast(`コピーしました: ${OVERLAY_URL}`); } catch { toast(OVERLAY_URL); } });
 
 document.addEventListener('change', (e) => {
   const t = e.target;
-  if (t.dataset.nom !== undefined) act({ type: 'nominate', leaderId: t.dataset.nom, playerId: t.value || null });
+  if (t.dataset.nom !== undefined) { act({ type: 'nominate', leaderId: t.dataset.nom, playerId: t.value || null }); t.blur(); } // 選んだらフォーカスを外す(スペースで進められるように)
   else if (t.dataset.lf) act({ type: 'updateLeader', id: t.closest('.item').dataset.id, patch: { [t.dataset.lf]: t.value } });
   else if (t.dataset.pf) act({ type: 'updatePlayer', id: t.closest('.item').dataset.id, patch: { [t.dataset.pf]: t.value } });
   else if (t.id === 'in-title') act({ type: 'setTitle', title: t.value });
