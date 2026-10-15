@@ -264,7 +264,7 @@ function renderSpot(onBoard) {
 // 見出し: ロゴがあればロゴ、なければ大会名の文字
 function titleHtml(small) {
   const o = C.optionsOf(S);
-  return `${o.logoImage ? `<img class="logo" src="${img(o.logoImage)}" alt="${esc(S.title)}">` : esc(S.title)}${small ? `<small>${esc(small)}</small>` : ''}`;
+  return `${C.useLogo(S) ? `<img class="logo" src="${img(o.logoImage)}" alt="${esc(S.title)}">` : esc(S.title)}${small ? `<small>${esc(small)}</small>` : ''}`;
 }
 function renderLook() {
   const o = C.optionsOf(S), st = $('stage');
@@ -273,7 +273,7 @@ function renderLook() {
 }
 function renderLogo() {
   const o = C.optionsOf(S);
-  $('logo-big').innerHTML = o.logoImage ? `<img src="${img(o.logoImage)}" alt="${esc(S.title)}">` : `<b>${esc(S.title)}</b>`;
+  $('logo-big').innerHTML = C.useLogo(S) ? `<img src="${img(o.logoImage)}" alt="${esc(S.title)}">` : `<b>${esc(S.title)}</b>`;
 }
 // 資料: 進行表のいまの場面の資料(文字 or 画像)
 let prevSlideKey = '';

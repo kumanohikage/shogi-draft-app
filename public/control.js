@@ -470,8 +470,18 @@ function renderShow() {
   for (const [key, id] of [['bgImage', 'bg-thumb'], ['logoImage', 'logo-thumb']]) {
     $(id).classList.toggle('hidden', !o[key]);
     if (o[key]) $(id).src = img(o[key]);
-    setDisabled(document.querySelector(`[data-look-clear="${key}"]`), !o[key]);
+    const clear = document.querySelector(`[data-look-clear="${key}"]`);
+    if (clear) setDisabled(clear, !o[key]);
   }
+  // 大会名の表示: 文字 / ロゴ画像(ロゴ画像のときだけ画像を選ぶ)
+  const mode = o.titleMode || (o.logoImage ? 'logo' : 'text');
+  document.querySelectorAll('[data-title-mode]').forEach((b) => {
+    const on = b.dataset.titleMode === mode;
+    b.setAttribute('aria-pressed', on);
+    b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on);
+    b.classList.toggle('text-[var(--text-muted)]', !on);
+  });
+  $('logo-f').classList.toggle('hidden', mode !== 'logo');
   if (document.activeElement !== $('opt-prefix')) $('opt-prefix').value = o.teamPrefix || '';
   if (document.activeElement !== $('in-title')) $('in-title').value = S.title;
   // 場面の切り替え: 動画のときは動画と入れ替える秒数、ほかは長さ
@@ -513,9 +523,10 @@ function renderShow() {
 // 画像を選ぶ: 背景・ロゴ / 立ち絵 / 画像の資料 で共通の入力
 let pickTarget = null;
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-slide-rules],[data-look-pick],[data-look-clear],[data-pick],[data-stand-clear],[data-prog-add],[data-prog-move],[data-prog-del],[data-prog-go],#prog-reset');
+  const t = e.target.closest('[data-title-mode],[data-slide-rules],[data-look-pick],[data-look-clear],[data-pick],[data-stand-clear],[data-prog-add],[data-prog-move],[data-prog-del],[data-prog-go],#prog-reset');
   if (!t) return;
-  if (t.dataset.slideRules) {
+  if (t.dataset.titleMode) setOption({ titleMode: t.dataset.titleMode });
+  else if (t.dataset.slideRules) {
     const sl = C.slideById(S, t.dataset.slideRules), lines = C.ruleLines(S);
     if ((sl.lines || []).some((x) => x.trim()) && !confirm('いまの箇条書きを、今の進め方から作った文に置き換えますか？')) return;
     act({ type: 'updateSlide', id: sl.id, patch: { lines } });
@@ -541,7 +552,7 @@ $('look-file').addEventListener('change', async (e) => {
   if (!IMG_EXT[f.type]) return toast('PNG / JPEG / GIF / WebP の画像を選んでください', true);
   try {
     const name = await upload(`${tg.kind}_${tg.key || tg.id}_${Date.now()}${IMG_EXT[f.type]}`, f);
-    if (tg.kind === 'look') setOption({ [tg.key]: name });
+    if (tg.kind === 'look') setOption(tg.key === 'logoImage' ? { logoImage: name, titleMode: 'logo' } : { [tg.key]: name });
     else if (tg.kind === 'stand') act({ type: 'updateLeader', id: tg.id, patch: { stand: name } });
     else if (tg.kind === 'slide') act({ type: 'updateSlide', id: tg.id, patch: { image: name } });
   } catch (err) { toast(err.message, true); }
