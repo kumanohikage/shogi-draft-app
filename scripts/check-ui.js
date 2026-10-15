@@ -117,7 +117,7 @@ app.whenReady().then(async () => {
   if (S.scene !== 'teams') { console.log('✗ チーム表になっていない'); errors++; }
   await check('12-run-teams');
   await next('第2巡へ進む');
-  if (S.round !== 2 || S.scene !== 'wait') { console.log('✗ 第2巡のボードになっていない'); errors++; }
+  if (S.round !== 2 || S.scene !== 'teams') { console.log('✗ 第2巡のはじめ(待ち時間の画像なし→チーム表)になっていない'); errors++; }
   await check('13-run-round2');
   // 6. 画像の登録: ドロップ → 調整画面 → 位置と大きさを変えて保存 → 開き直すと調整が残っている
   await tab('roster');

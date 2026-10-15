@@ -70,10 +70,10 @@ let prevOpen = new Set(), prevStamp = new Set(), prevDup = new Set();
 function cardHtml(l, playerId, stamp, dup, pop, wait = '指名待ち') {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(l.color)}"><div class="in">
-      <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(l.name)}</div></div>
+      <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div>
         <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && p.note ? `<small>${esc(p.note)}</small>` : ''}</div></div>
         ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
-      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(l.name)}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
+      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(C.teamLabel(S, l))}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
     </div></div>`;
 }
 // めくる: 裏の状態から少し待って表へ(3D はめくっている間だけ)
@@ -219,11 +219,12 @@ function renderSlide() {
   }
 }
 // 立ち絵＋名前の帯(＋紹介文 / 「第◯巡 選択希望選手」)。立ち絵が無ければアイコンを大きく丸で
-function standHtml(l, tag) {
+// 帯の名前: リーダー紹介はフルネーム、ほかは「チーム＋略称」
+function standHtml(l, tag, full) {
   return `<div class="standwrap" style="--c:${esc(l.color)}">
     ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
     ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
-    <div class="band">${esc(C.teamLabel(S, l))}</div></div>`;
+    <div class="band">${esc(full ? l.name : C.teamLabel(S, l))}</div></div>`;
 }
 let prevIntro = '';
 function renderIntro() {
@@ -231,9 +232,7 @@ function renderIntro() {
   const key = l ? JSON.stringify([l, C.optionsOf(S).teamPrefix]) : '';
   if (key === prevIntro) return;
   prevIntro = key;
-  $('intro-body').innerHTML = l ? standHtml(l, l.intro || '') : '';
-  const w = $('intro-body').querySelector('.standwrap');
-  if (w && !first && S.scene === 'intro') w.classList.add('enter');
+  $('intro-body').innerHTML = l ? standHtml(l, l.intro || '', true) : ''; // 紹介は動きなしで切り替える
 }
 
 /* ---------- 待ち時間・制限時間 ---------- */
@@ -243,7 +242,6 @@ function renderWait() {
   const list = C.waitImagesOf(S), f = list[Math.min(S.waitIdx || 0, list.length - 1)];
   $('wait-img').setAttribute('src', f ? img(f) : '');
 }
-let timerEnded = false;
 function renderTimer() {
   if (!S) return;
   const o = C.optionsOf(S), t = S.timer || {};
@@ -256,9 +254,6 @@ function renderTimer() {
     el.classList.toggle('on', o.timerShow && active && !S.spot);
     el.classList.toggle('end', end);
   }
-  // 時間になったら「ピピッ」と合図(自動では何もしない)
-  if (end && !timerEnded && !first && (S.scene === 'board' || S.scene === 'wait')) { SE.pop(); setTimeout(() => SE.pop(), 180); }
-  timerEnded = end;
 }
 setInterval(renderTimer, 250);
 
@@ -283,7 +278,7 @@ function renderTeams() {
       const d = isNew(key) ? k++ : -1;
       return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}${esc(pl ? pl.name : '')}</li>`;
     }).join('');
-    return `<div class="team" style="--c:${esc(l.color)}"><div class="th">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(l.name)}</div></div><ol>${rows}</ol></div>`;
+    return `<div class="team" style="--c:${esc(l.color)}"><div class="th">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
   }).join('');
   for (let i = 0; i < k; i++) setTimeout(() => SE.pop(), 300 + i * 150);
   fitArea(t);
@@ -299,7 +294,7 @@ function playLottery(force) {
   const p = C.playerById(S, L.playerId);
   const leaders = L.leaders.map((id) => C.leaderById(S, id));
   const f = $('roulette').contentWindow;
-  f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: leaders.map((l) => l.name), colors: leaders.map((l) => l.color) }, '*');
+  f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: leaders.map((l) => C.teamLabel(S, l)), colors: leaders.map((l) => l.color) }, '*');
   setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.leaders.indexOf(L.winner), plan: window.__recPlan || (C.optionsOf(S).lotteryStyle === 'short' ? 'short' : '') }, '*') /* __recPlan: 紹介動画の録画用 */, 700);
 }
 addEventListener('message', (e) => {

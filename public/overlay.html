@@ -16,14 +16,14 @@
   .bg { background: radial-gradient(ellipse at 50% 40%, #fff3c4 0%, #e8b84a 38%, #8a5a12 75%, #3a2408 100%); }
   .bg::before { content: ''; position: absolute; inset: 0; opacity: .25;
     background: repeating-conic-gradient(from 0deg at 50% 40%, rgba(255,255,255,.9) 0 4deg, transparent 4deg 12deg); }
-  h1 { position: relative; margin: 0; padding-top: 46px; text-align: center; font: normal 64px 'Dela Gothic One', sans-serif; color: #fff;
+  h1 { position: relative; margin: 0; padding: 40px 0 24px; text-align: center; font: normal 64px 'Dela Gothic One', sans-serif; color: #fff;
     text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 8px 0 #3a1a00, 0 0 30px rgba(255,200,80,.8); letter-spacing: .06em; }
   h1 small { display: block; font-size: 30px; letter-spacing: .1em; margin-top: 4px; }
   /* 背景画像(全画面共通)。設定されていれば金の放射線の代わりに敷く */
   #stage.hasbg .bg { background: var(--bgimg) center / cover no-repeat; }
   #stage.hasbg .bg::before { display: none; }
   /* 大会ロゴ(見出しの大会名の代わり) */
-  h1 .logo { display: block; margin: 0 auto; max-width: 900px; max-height: 120px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+  h1 .logo { display: block; margin: 0 auto; max-width: 820px; max-height: 96px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
   /* ロゴの場面(オープニング・エンディング) */
   .logobig { display: flex; align-items: center; justify-content: center; height: 100%; }
   .logobig img { max-width: 1400px; max-height: 720px; object-fit: contain; filter: drop-shadow(0 10px 30px rgba(0,0,0,.4)); }
@@ -121,9 +121,7 @@
   .timer.end { color: #ffd2cc; animation: tEnd .6s ease-in-out infinite alternate; }
   @keyframes tEnd { to { transform: scale(1.08); } }
   .timer.corner { position: absolute; top: 46px; right: 70px; font-size: 56px; }
-  .timer.big { font-size: 120px; margin-top: 24px; text-align: center; }
-  .waitbox { display: flex; flex-direction: column; align-items: center; }
-  #wait-img { max-width: 1500px; max-height: 640px; border-radius: 18px; box-shadow: 0 14px 40px rgba(0,0,0,.45); background: #fffaf0; }
+  #wait-img { max-width: 1600px; max-height: 100%; object-fit: contain; border-radius: 18px; box-shadow: 0 14px 40px rgba(0,0,0,.45); background: #fffaf0; }
   #wait-img[src=""] { display: none; }
   #roulette { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 </style>
@@ -131,7 +129,7 @@
 <body>
 <div id="stage">
   <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="stand"></div><div id="board-timer" class="timer corner"></div></section>
-  <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><div class="waitbox"><img id="wait-img" alt=""><div id="wait-timer" class="timer big"></div></div></div></section>
+  <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><img id="wait-img" alt=""></div><div id="wait-timer" class="timer corner"></div></section>
   <section id="sc-logo" class="scene bg"><div id="logo-big" class="logobig"></div></section>
   <section id="sc-slide" class="scene bg"><h1 id="slide-title"></h1><div id="slide-body"></div></section>
   <section id="sc-intro" class="scene bg"><div id="intro-body"></div></section>

@@ -48,9 +48,9 @@ assert.deepStrictEqual(Object.values(hits), [1000, 1000, 1000]);
 const csv = C.rosterToCSV(s);
 const back = C.rosterFromCSV(csv);
 assert.strictEqual(back.leaders.length, 6); assert.strictEqual(back.players.length, 20);
-assert.deepStrictEqual(C.rosterFromCSV('種類,名前,色,画像ファイル\n選手,"a,b"\nリーダー,X,#123456,x.png').leaders[0], { name: 'X', color: '#123456', icon: 'x.png' });
+assert.deepStrictEqual(C.rosterFromCSV('種類,名前,色,画像ファイル\n選手,"a,b"\nリーダー,X,#123456,x.png').leaders[0], { name: 'X', short: '', color: '#123456', icon: 'x.png' });
 // 旧書式(チーム名の列あり)も読める
-assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像ファイル\nリーダー,X,チームX,#123456,x.png\n選手,Y,,,y.png'), { leaders: [{ name: 'X', color: '#123456', icon: 'x.png' }], players: [{ name: 'Y', icon: 'y.png', note: '' }] });
+assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像ファイル\nリーダー,X,チームX,#123456,x.png\n選手,Y,,,y.png'), { leaders: [{ name: 'X', short: '', color: '#123456', icon: 'x.png' }], players: [{ name: 'Y', icon: 'y.png', note: '' }] });
 
 // 1人ずつ公開: 全員公開するまでは確定しない(後から重複が出ることがあるため)
 {
@@ -120,7 +120,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
   t = C.apply(t, { type: 'addPlayers', players: [{ name: 'a', note: '初段' }, { name: 'b' }] });
   const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
   assert.strictEqual(t.players[0].note, '初段');
-  assert.ok(C.rosterToCSV(t).includes('選手,a,,,初段'));
+  assert.ok(C.rosterToCSV(t).includes('選手,a,,,,初段'));
   t = C.apply(t, { type: 'nominate', leaderId: L[0], playerId: P[0] });
   assert.throws(() => C.apply(t, { type: 'removePlayer', id: P[1] }), /欠場/);
   assert.throws(() => C.apply(t, { type: 'removeLeader', id: L[1] }), /削除できません/);
@@ -173,3 +173,27 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 }
 
 console.log('core OK');
+
+// 略称: 帯は「チーム＋略称」、略称が無ければフルネーム。CSV の略称列も往復できる
+{
+  let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: '飛鳥 りく', short: '飛鳥' }, { name: '角田 みお' }], players: [] });
+  assert.strictEqual(C.teamLabel(s, s.leaders[0]), 'チーム飛鳥');
+  assert.strictEqual(C.teamLabel(s, s.leaders[1]), 'チーム角田 みお');
+  assert.strictEqual(C.rosterFromCSV(C.rosterToCSV(s)).leaders[0].short, '飛鳥');
+}
+// 巡のはじめ: 待ち時間の画像が無ければ待ち時間の画面は飛ばす / タイマーは自動でスタート(設定で止められる)
+{
+  let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p1' }, { name: 'p2' }, { name: 'p3' }, { name: 'p4' }] });
+  s = C.apply(s, { type: 'progGo', idx: 4, now: 1000 });
+  assert.strictEqual(s.scene, 'board');
+  assert.strictEqual(s.timer.endsAt, 1000 + 300 * 1000);
+  const [a, b] = s.leaders, [p1, p2] = s.players;
+  s = C.apply(s, { type: 'nominate', leaderId: a.id, playerId: p1.id });
+  s = C.apply(s, { type: 'nominate', leaderId: b.id, playerId: p2.id });
+  s = C.apply(s, { type: 'reveal' });
+  s = C.apply(s, { type: 'setOption', patch: { timerAuto: false, waitImages: { 2: ['q.png'] } } });
+  s = C.apply(s, { type: 'nextRound' });
+  assert.strictEqual(s.scene, 'wait');
+  assert.strictEqual(s.timer.endsAt, null);
+}
+console.log('略称・巡のはじめ ok');

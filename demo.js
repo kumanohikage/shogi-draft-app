@@ -38,7 +38,7 @@ function makeDemoState(imgDir) {
     fs.writeFileSync(path.join(imgDir, icon), silhouette(color));
     const stand = `demo_stand_${i + 1}.svg`;
     fs.writeFileSync(path.join(imgDir, stand), standSvg(color));
-    return { name, color, icon, stand, intro: INTROS[i] };
+    return { name, short: name.split(' ')[0], color, icon, stand, intro: INTROS[i] };
   });
   const players = [];
   FAMILY.forEach((f, i) => GIVEN.forEach((g, j) => {

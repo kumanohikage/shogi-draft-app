@@ -33,7 +33,7 @@
       else if (goPrev) sub.push(goPrev);
       return {
         step: -2, info,
-        text: `リーダー紹介: <b>${esc(C.teamLabel(S, l))}</b>（${k + 1} / ${n}）`,
+        text: `リーダー紹介: <b>${esc(l.name)}</b>（${k + 1} / ${n}）`,
         main: nl ? { key: 'introNext', label: `次へ（${esc(nl.name)}）` } : goNext || { label: 'おわり', off: true },
         sub,
       };
@@ -75,7 +75,7 @@
       const rest = [{ key: 'reveal', label: '残りを一斉公開' }];
       const team = esc(C.teamLabel(S, C.leaderById(S, S.spot)));
       if (S.spotStand && !cur.revealed) return { step: renom ? 2 : 1, text: `<b>${team}</b> の立ち絵を出しています`, main: { key: 'spotShow', arg: S.spot, label: 'カードを出す' }, sub: rest };
-      if (!cur.revealed) return { step: renom ? 2 : 1, text: `<b>${team}</b> のカードを出しています。読み上げたら、めくってください`, main: { key: 'spotFlip', arg: S.spot, label: 'めくる' }, sub: rest };
+      if (!cur.revealed) return { step: renom ? 2 : 1, text: `<b>${team}</b> の指名は <b>${name(cur.playerId)}</b>。読み上げたら、めくってください`, main: { key: 'spotFlip', arg: S.spot, label: 'めくる' }, sub: rest };
       if (toReveal.length) return { step: renom ? 2 : 1, text: `ピックアップで公開しています（あと${toReveal.length}人）`, main: spotIn(toReveal[0].id, `次へ（${lname(toReveal[0].id)}）`), sub: rest };
       return { step: renom ? 2 : 1, text: '全員の指名が出ました。一覧を出して、確定と競合を見せます', main: { key: 'spotEnd', label: '一覧を表示' } };
     }
@@ -96,20 +96,23 @@
         ? { step: 4, text: `第${S.round}巡のチーム表を映しています。次は第${S.round + 1}巡です`, main: go }
         : { step: 3, text: `第${S.round}巡の指名がすべて確定しました`, main: { key: 'teams', label: 'チーム表を映す' } };
     }
+    // 待ち時間の画面: 指名を待つ間、オレンジのボタンで画像を順に進める
+    const wn = C.waitImagesOf(S).length, wi = Math.min(S.waitIdx || 0, Math.max(0, wn - 1));
+    const waitMore = S.scene === 'wait' && wi < wn - 1 ? { key: 'waitNext', label: `次の画像へ（${wi + 2} / ${wn}）` } : null;
     // 順番指名の巡: いまの番の人が指名 → 公開(公開した時点で確定)
     const turn = C.currentTurn(S);
     if (turn) {
       const n = S.noms[turn.id] || {};
       if (!n.playerId) {
         if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
-        return { step: 0, text: `順番指名: <b>${lname(turn.id)}</b> の番です。指名を下で入力してください（残り${pend.length}人）`, main: { label: '公開', off: true }, sub };
+        return { step: 0, text: `順番指名: <b>${lname(turn.id)}</b> の番です。指名を下で入力してください（残り${pend.length}人）`, main: waitMore || { label: '公開', off: true }, sub };
       }
       return { step: 1, text: `順番指名: <b>${lname(turn.id)}</b> の指名を公開します`, main: { key: 'revealOne', arg: turn.id, label: '公開' } };
     }
     const label = renom ? '再指名を公開' : '一斉公開';
     if (waiting.length) {
       if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
-      return { step: renom ? 2 : 0, text: `${renom ? '外れたリーダーの再指名' : '各リーダーの指名'}を下で入力してください（あと${waiting.length}人）`, main: { label: 'ピックアップで公開', off: true }, sub };
+      return { step: renom ? 2 : 0, text: `${renom ? '外れたリーダーの再指名' : '各リーダーの指名'}を下で入力してください（あと${waiting.length}人）`, main: waitMore || { label: 'ピックアップで公開', off: true }, sub };
     }
     if (toReveal.length) {
       const spot = spotIn(toReveal[0].id, 'ピックアップで公開');
@@ -145,6 +148,7 @@
       case 'progPrev': return { type: 'progGo', idx: i - 1 };
       case 'progShow': return { type: 'progGo', idx: i };
       case 'introNext': return { type: 'introGo', idx: (S.introIdx || 0) + 1 };
+      case 'waitNext': return { type: 'waitShow', idx: (S.waitIdx || 0) + 1 };
       case 'introPrev': return { type: 'introGo', idx: (S.introIdx || 0) - 1 };
       default: return null;
     }
