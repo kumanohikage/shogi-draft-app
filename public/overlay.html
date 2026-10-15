@@ -51,7 +51,7 @@
   .standwrap.enter .band { animation: bandIn .5s .15s cubic-bezier(.2,.9,.3,1) both; }
   @keyframes standIn { from { opacity: 0; transform: translateX(-50%) translateY(40px); } }
   @keyframes bandIn { from { opacity: 0; transform: translateX(-50%) scaleX(.6); } }
-  #stand { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; pointer-events: none; }
+  #stand { position: absolute; inset: 0; opacity: 0; pointer-events: none; } /* 指名発表の前の立ち絵は動きなしで出す */
   #stand.on { opacity: 1; }
   #sc-board.standon #board-title { opacity: 0; }
   #board-title { transition: opacity .35s; }

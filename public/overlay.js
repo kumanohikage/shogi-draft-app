@@ -235,7 +235,7 @@ function renderSpot(onBoard) {
   if (sk !== prevStandKey) {
     const l = showStand && C.leaderById(S, S.spot);
     stand.innerHTML = l ? standHtml(l, `第${S.round}巡 選択希望選手`) : '';
-    if (l && !first) stand.querySelector('.standwrap').classList.add('enter');
+    // 指名発表の前の立ち絵は動きなしで出す
     prevStandKey = sk;
   }
   stand.classList.toggle('on', showStand);
@@ -315,7 +315,9 @@ function renderIntro() {
   const key = l ? JSON.stringify([l, C.optionsOf(S).teamPrefix]) : '';
   if (key === prevIntro) return;
   prevIntro = key;
-  $('intro-body').innerHTML = l ? standHtml(l, l.intro || '', true) : ''; // 紹介は動きなしで切り替える
+  $('intro-body').innerHTML = l ? standHtml(l, l.intro || '', true) : '';
+  const w = $('intro-body').querySelector('.standwrap');
+  if (w && !first && S.scene === 'intro') w.classList.add('enter'); // リーダー紹介は1人ずつ下から出す
 }
 
 /* ---------- 待ち時間・制限時間 ---------- */
