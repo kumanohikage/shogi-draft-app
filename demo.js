@@ -19,6 +19,16 @@ function silhouette(bg) {
 </svg>`;
 }
 
+// 立ち絵のシルエット(縦長・背景は透明)
+function standSvg(color) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1000">
+<circle cx="300" cy="200" r="120" fill="${color}"/>
+<path d="M110 1000 C110 620 170 380 300 380 C430 380 490 620 490 1000 Z" fill="${color}"/>
+<circle cx="300" cy="200" r="120" fill="#ffffff" fill-opacity=".18"/>
+</svg>`;
+}
+const INTROS = ['前期王者', '初参加', '居飛車の鬼', '振り飛車一筋', '', 'リベンジに燃える'];
+
 // 画像を書き出して、お試し用の初期状態を返す
 function makeDemoState(imgDir) {
   fs.mkdirSync(imgDir, { recursive: true });
@@ -26,7 +36,9 @@ function makeDemoState(imgDir) {
     const color = Core.LEADER_COLORS[i % Core.LEADER_COLORS.length];
     const icon = `demo_leader_${i + 1}.svg`;
     fs.writeFileSync(path.join(imgDir, icon), silhouette(color));
-    return { name, color, icon };
+    const stand = `demo_stand_${i + 1}.svg`;
+    fs.writeFileSync(path.join(imgDir, stand), standSvg(color));
+    return { name, color, icon, stand, intro: INTROS[i] };
   });
   const players = [];
   FAMILY.forEach((f, i) => GIVEN.forEach((g, j) => {

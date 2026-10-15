@@ -94,6 +94,7 @@ function render() {
   renderAudio();
   renderLotteryLog();
   renderOptions();
+  renderShow();
   renderTimer();
   renderWaitCtl();
 }
@@ -115,9 +116,23 @@ function renderSteps(cur) {
   }).join('');
 }
 
+// 番組の進行表(いまの場面・押すとその場面へ)
+function renderProgBar() {
+  const prog = C.programOf(S), cur = C.progIdxOf(S);
+  $('prog-bar').innerHTML = prog.map((g, i) => {
+    const on = i === cur, done = i < cur;
+    const label = g.type === 'draft' ? `${esc(g.label)}（第${S.round}巡）` : esc(g.label);
+    return `${i ? '<li aria-hidden="true" class="text-[var(--text-muted)]">›</li>' : ''}<li><button type="button" data-prog-go="${i}" ${on ? 'aria-current="step"' : ''} title="この場面へ移る"
+      class="h-11 px-3 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${on ? 'bg-primary-500 text-slate-900 border-primary-500' : done ? 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]' : 'bg-[var(--bg-surface)] border-[var(--border-strong)] text-[var(--text-default)]'}">${label}</button></li>`;
+  }).join('');
+}
+
 function renderRun() {
   const confs = C.conflicts(S), done = C.draftComplete(S);
-  $('round-title').textContent = done ? 'ドラフト終了' : `第${S.round}巡`;
+  renderProgBar();
+  const item = C.progItem(S), inDraft = !item || item.type === 'draft';
+  $('round-title').textContent = !inDraft ? item.label : done ? 'ドラフト終了' : `第${S.round}巡`;
+  $('steps').classList.toggle('invisible', !inDraft);
   const n = nextStep();
   renderSteps(n.step);
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''} ${b.keys ? 'aria-keyshortcuts="Space" title="スペースキーでも押せます"' : ''}>${b.label}</button>`;
@@ -196,6 +211,10 @@ function renderRoster() {
   $('leaders').innerHTML = S.leaders.map((l, i) => `<div class="item ${CARD} flex flex-wrap items-end gap-4 px-4 py-3" data-id="${l.id}">
     <button type="button" data-icon="L" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の画像を${l.icon ? '変更' : '設定'}" title="クリック or 画像をドロップで${l.icon ? '変更' : '設定'}">${avatar(l.icon, l.color, 'w-11 h-11')}${CAM}</button>
     <div class="leading-normal"><label class="${LABEL}" for="ln-${l.id}">リーダー名</label><input id="ln-${l.id}" type="text" data-lf="name" value="${esc(l.name)}" class="w-48 ${INPUT}"></div>
+    <div class="leading-normal"><span class="${LABEL}">立ち絵</span><div class="flex items-center gap-1">
+      <button type="button" data-pick="stand:${l.id}" class="flex-none h-11 ${l.stand ? 'w-11 p-0 overflow-hidden' : 'px-3'} inline-flex items-center justify-center text-sm bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の立ち絵を${l.stand ? '変更' : '選ぶ'}">${l.stand ? `<img src="${img(l.stand)}" alt="" class="w-full h-full object-contain">` : '選ぶ'}</button>
+      ${l.stand ? `<button type="button" data-stand-clear="${l.id}" class="${BTN_ICON}" aria-label="${esc(l.name)} の立ち絵を外す">${ICON.del}</button>` : ''}</div></div>
+    <div class="leading-normal"><label class="${LABEL}" for="li-${l.id}">紹介文（1行）</label><input id="li-${l.id}" type="text" data-lf="intro" value="${esc(l.intro || '')}" maxlength="30" class="w-48 ${INPUT}"></div>
     <div class="leading-normal"><label class="${LABEL}" for="lc-${l.id}">色</label><input id="lc-${l.id}" type="color" data-lf="color" value="${esc(l.color)}" class="block w-14 h-11 p-1 bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}"></div>
     <div class="ml-auto flex gap-1">
       <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="上へ" ${i && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
@@ -289,17 +308,10 @@ $('demo-exit').addEventListener('click', () => { sendMode('real'); toast('本番
 $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進行をすべて消して、最初からにしますか？')) sendMode('demo', true); });
 // 「次にやること」のボタン
 function doNext(key, arg) {
-  if (key === 'confirm') act({ type: 'confirmNoms' });
-  else if (key === 'reveal') act({ type: 'reveal' });
-  else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });
-  else if (key === 'spotShow') act({ type: 'spotShow', leaderId: arg });
-  else if (key === 'spotFlip') act({ type: 'reveal', leaderId: arg, spot: true });
-  else if (key === 'spotEnd') act({ type: 'spotEnd' });
-  else if (key === 'draw') act({ type: 'drawLottery', playerId: arg });
-  else if (key === 'board' || key === 'teams') act({ type: 'setScene', scene: key });
-  else if (key === 'nextRound') act({ type: 'nextRound' });
-  else if (key === 'roster') selectTab('roster');
-  else if (key === 'auto') autoNominate();
+  if (key === 'roster') return selectTab('roster');
+  if (key === 'auto') return autoNominate();
+  const a = DraftFlow.actionFor(key, arg, S); // 押したボタン → サーバーへ送る操作(スマホと共通)
+  if (a) act(a);
 }
 // おまかせ指名(お試し専用): 空いている指名をランダムに入れる。上位の選手に寄せて、ときどき重複が起きるようにする
 function autoNominate() {
@@ -429,6 +441,85 @@ $('csv-file').addEventListener('change', async (e) => {
   if (S.picks.length && !confirm('ドラフトの記録が残っています。名簿を置き換えると記録と合わなくなります。続けますか？')) return;
   act({ type: 'replaceRoster', leaders: r.leaders.length ? r.leaders : undefined, players: r.players.length ? r.players : undefined });
   toast(`リーダー${r.leaders.length}人・選手${r.players.length}人を読み込みました`);
+});
+
+/* ---------- 番組タブ(見た目・各巡の流れ・進行表と資料) ---------- */
+const TYPE_LABEL = C.PROGRAM_TYPES;
+function renderShow() {
+  const o = optionsOf();
+  for (const [key, id] of [['bgImage', 'bg-thumb'], ['logoImage', 'logo-thumb']]) {
+    $(id).classList.toggle('hidden', !o[key]);
+    if (o[key]) $(id).src = img(o[key]);
+    setDisabled(document.querySelector(`[data-look-clear="${key}"]`), !o[key]);
+  }
+  if (document.activeElement !== $('opt-prefix')) $('opt-prefix').value = o.teamPrefix || '';
+  for (const k of ['flowWait', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
+  // 入力中は描き直さない
+  if ($('prog-list').contains(document.activeElement) && document.activeElement.matches('input, textarea')) return;
+  const prog = C.programOf(S), cur = C.progIdxOf(S);
+  $('prog-list').innerHTML = prog.map((g, i) => {
+    const sl = g.type === 'slide' ? C.slideById(S, g.slideId) : null;
+    let body = '';
+    if (sl && sl.kind === 'text') {
+      body = `<div class="basis-full grid grid-cols-[1fr_2fr] gap-3 mt-2">
+        <div class="leading-normal"><label class="${LABEL}" for="st-${sl.id}">見出し</label><input id="st-${sl.id}" type="text" data-slide="${sl.id}" data-slide-f="title" value="${esc(sl.title)}" class="w-full ${INPUT}"></div>
+        <div class="leading-normal"><label class="${LABEL}" for="sl-${sl.id}">箇条書き（1行に1つ）</label><textarea id="sl-${sl.id}" rows="${Math.max(3, (sl.lines || []).length)}" data-slide="${sl.id}" data-slide-f="lines" class="w-full px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50">${esc((sl.lines || []).join('\n'))}</textarea></div></div>`;
+    } else if (sl && sl.kind === 'image') {
+      body = `<div class="basis-full flex items-center gap-3 mt-2">${sl.image ? `<img src="${img(sl.image)}" alt="" class="w-40 h-[90px] object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : '<span class="text-sm text-[var(--text-muted)]">画像がまだありません</span>'}
+        <button type="button" data-pick="slide:${sl.id}" class="${BTN_SUB}">画像を選ぶ</button><span class="text-xs text-[var(--text-muted)]">1920×1080 の画像がおすすめです</span></div>`;
+    } else if (g.type === 'draft') {
+      body = `<p class="basis-full mt-1 text-xs text-[var(--text-muted)]">全${S.rounds}巡。巡の中の流れは上の「各巡の流れ」で決めます</p>`;
+    }
+    return `<li class="${CARD} p-3 flex flex-wrap items-center gap-3 ${i === cur ? 'border-primary-500/60' : ''}" data-prog-id="${g.id}">
+      <span class="w-8 flex-none text-center text-sm font-bold ${i === cur ? 'text-primary-300' : 'text-[var(--text-muted)]'}">${i + 1}</span>
+      ${badge(g.type === 'draft' ? 'in' : 'wait', sl ? (sl.kind === 'image' ? '画像の資料' : '文字の資料') : TYPE_LABEL[g.type])}
+      <label class="sr-only" for="pl-${g.id}">場面の名前</label><input id="pl-${g.id}" type="text" data-prog-label="${g.id}" value="${esc(g.label)}" maxlength="20" class="w-56 ${INPUT}">
+      ${i === cur ? '<span class="text-xs text-primary-300">いまここ</span>' : ''}
+      <div class="ml-auto flex gap-1">
+        <button type="button" class="${BTN_ICON}" data-prog-move="-1" aria-label="上へ" ${i ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
+        <button type="button" class="${BTN_ICON}" data-prog-move="1" aria-label="下へ" ${i < prog.length - 1 ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
+        <button type="button" class="${BTN_ICON} hover:text-red-300" data-prog-del aria-label="${esc(g.label)} を外す" ${g.type === 'draft' ? 'disabled aria-disabled="true" title="ドラフトは外せません"' : ''}>${ICON.del}</button>
+      </div>${body}</li>`;
+  }).join('');
+}
+// 画像を選ぶ: 背景・ロゴ / 立ち絵 / 画像の資料 で共通の入力
+let pickTarget = null;
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-look-pick],[data-look-clear],[data-pick],[data-stand-clear],[data-prog-add],[data-prog-move],[data-prog-del],[data-prog-go],#prog-reset');
+  if (!t) return;
+  if (t.dataset.lookPick) { pickTarget = { kind: 'look', key: t.dataset.lookPick }; $('look-file').value = ''; $('look-file').click(); }
+  else if (t.dataset.lookClear) setOption({ [t.dataset.lookClear]: '' });
+  else if (t.dataset.pick) { const [kind, id] = t.dataset.pick.split(':'); pickTarget = { kind, id }; $('look-file').value = ''; $('look-file').click(); }
+  else if (t.dataset.standClear) act({ type: 'updateLeader', id: t.dataset.standClear, patch: { stand: '' } });
+  else if (t.dataset.progAdd) {
+    const k = t.dataset.progAdd;
+    if (k === 'text' || k === 'image') act({ type: 'addSlide', kind: k, toProgram: true, at: C.programOf(S).length - 1 });
+    else act({ type: 'addProgram', item: { type: k }, at: k === 'final' ? undefined : C.programOf(S).length - 1 });
+  } else if (t.dataset.progMove) act({ type: 'moveProgram', id: t.closest('[data-prog-id]').dataset.progId, dir: +t.dataset.progMove });
+  else if (t.dataset.progDel !== undefined) {
+    const g = C.programOf(S).find((x) => x.id === t.closest('[data-prog-id]').dataset.progId);
+    if (!confirm(`「${g.label}」を進行表から外しますか？${g.type === 'slide' ? '\n(資料の中身も消えます)' : ''}`)) return;
+    act(g.type === 'slide' ? { type: 'removeSlide', id: g.slideId } : { type: 'removeProgram', id: g.id });
+  } else if (t.dataset.progGo) act({ type: 'progGo', idx: +t.dataset.progGo });
+  else if (t.id === 'prog-reset') { if (confirm('進行表をひな形に戻しますか？\n（足した資料は進行表から外れます）')) act({ type: 'resetProgram' }); }
+});
+$('look-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0], tg = pickTarget;
+  if (!f || !tg) return;
+  if (!IMG_EXT[f.type]) return toast('PNG / JPEG / GIF / WebP の画像を選んでください', true);
+  try {
+    const name = await upload(`${tg.kind}_${tg.key || tg.id}_${Date.now()}${IMG_EXT[f.type]}`, f);
+    if (tg.kind === 'look') setOption({ [tg.key]: name });
+    else if (tg.kind === 'stand') act({ type: 'updateLeader', id: tg.id, patch: { stand: name } });
+    else if (tg.kind === 'slide') act({ type: 'updateSlide', id: tg.id, patch: { image: name } });
+  } catch (err) { toast(err.message, true); }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'opt-prefix') setOption({ teamPrefix: t.value });
+  else if (/^opt-flow/.test(t.id)) setOption({ [t.id.slice(4)]: t.checked });
+  else if (t.dataset.progLabel) act({ type: 'updateProgram', id: t.dataset.progLabel, patch: { label: t.value.trim() || '（名前なし）' } });
+  else if (t.dataset.slide) act({ type: 'updateSlide', id: t.dataset.slide, patch: t.dataset.slideF === 'lines' ? { lines: t.value.split('\n') } : { title: t.value } });
 });
 
 /* ---------- スマホ操作 ---------- */

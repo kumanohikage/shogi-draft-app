@@ -26,7 +26,7 @@
       lotteries: [],
       // 抽選中: { id, playerId, leaders, winner, done }
       lottery: null,
-      scene: 'board',       // 配信画面: 'board' | 'roulette' | 'teams' | 'blank'
+      scene: 'logo',        // 配信画面: 'logo' | 'slide' | 'intro' | 'wait' | 'board' | 'roulette' | 'teams' | 'blank'(新しく始めるときは進行表の最初=オープニング)
       spot: null,           // ピックアップ公開中のリーダー(配信画面に1人だけ大きく出す)。null なら指名ボード
       audio: { ...DEFAULT_AUDIO },
       options: { ...DEFAULT_OPTIONS },
@@ -34,7 +34,51 @@
       lotteryLog: [],
       // 指名の制限時間: endsAt(終わる時刻 ms) / left(止めたときの残り秒)
       timer: { endsAt: null, left: null },
+      // 資料(文字 or 画像)と、番組の進行表。progIdx = いま進行表の何番目か / introIdx = リーダー紹介の何人目か
+      slides: defaultSlides(),
+      program: null, // null のときはひな形(programOf)
+      progIdx: 0,
+      introIdx: 0,
+      spotStand: false, // ピックアップで、カードの前に立ち絵を出しているところ
     };
+  }
+
+  // ---------- 資料と進行表 ----------
+  // ひな形の資料(大会説明・ドラフト説明)。中身はあとで書き換える前提
+  function defaultSlides() {
+    return [
+      { id: 'S_about', kind: 'text', title: '大会について', lines: ['（ここに大会の説明を書きます）'], image: '' },
+      { id: 'S_draft', kind: 'text', title: 'ドラフト指名について', lines: ['各チーム、巡の数だけ指名する', '指名が重複したときは抽選になる', '交渉権を得られなかったチームのみ、もう一度指名する', '全チームが確定してから、次の巡へ進む'], image: '' },
+    ];
+  }
+  // 進行表の場面: logo(ロゴを大きく) / slide(資料) / intro(リーダー紹介) / draft(ドラフト) / final(最終チーム表) / blank(何も出さない)
+  const PROGRAM_TYPES = { logo: 'ロゴ', slide: '資料', intro: 'リーダー紹介', draft: 'ドラフト', final: '最終チーム表', blank: '何も出さない' };
+  function defaultProgram() {
+    return [
+      { id: 'G_open', type: 'logo', label: 'オープニング' },
+      { id: 'G_about', type: 'slide', slideId: 'S_about', label: '大会説明' },
+      { id: 'G_rule', type: 'slide', slideId: 'S_draft', label: 'ドラフト説明' },
+      { id: 'G_intro', type: 'intro', label: 'リーダー紹介' },
+      { id: 'G_draft', type: 'draft', label: 'ドラフト' },
+      { id: 'G_final', type: 'final', label: '最終チーム表' },
+      { id: 'G_end', type: 'logo', label: 'エンディング' },
+    ];
+  }
+  const programOf = (s) => s.program || defaultProgram();
+  // 前の版のデータ(進行表が無い)は、ドラフトの場面から始める
+  const progIdxOf = (s) => (s.progIdx ?? Math.max(0, programOf(s).findIndex((g) => g.type === 'draft')));
+  const progItem = (s) => programOf(s)[progIdxOf(s)] || null;
+  const slideById = (s, id) => (s.slides || []).find((x) => x.id === id);
+  // 名前の帯: 「チーム」＋リーダー名
+  const teamLabel = (s, l) => (optionsOf(s).teamPrefix || '') + (l ? l.name : '');
+  // 進行表の場面に入ったときに出す配信画面
+  function sceneForItem(s, g) {
+    if (!g) return s.scene;
+    if (g.type === 'draft') {
+      const fresh = s.round === 1 && !s.picks.length && !Object.values(s.noms).some((n) => n.playerId);
+      return fresh && optionsOf(s).flowWait ? 'wait' : 'board';
+    }
+    return { logo: 'logo', slide: 'slide', intro: 'intro', final: 'teams', blank: 'blank' }[g.type] || s.scene;
   }
 
   // ---------- 参照 ----------
@@ -47,7 +91,10 @@
   // 進め方の設定。roundModes[巡-1] = 'bid'(一斉入札) | 'order'(順番指名)。orderStyle: 'snake'(順番指名の巡ごとに逆順) | 'waiver'(毎回同じ順)
   // lotteryStyle: 'full' | 'short'(短い抽選演出)。timerSec: 制限時間(秒)。timerShow: 配信画面にタイマーを出すか。waitImage: 待ち時間画面の画像
   // waitImages: { 巡: [画像ファイル名, ...] } 待ち時間画面で出す画像(詰将棋の問題 → 答え など)。waitImage は前の版の1枚だけの設定(全部の巡で使う)
-  const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, waitImages: {}, waitImage: '' };
+  // 見た目: bgImage(全画面の背景) / logoImage(大会ロゴ) / teamPrefix(名前の帯の「チーム」)
+  // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
+  const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, waitImages: {}, waitImage: '',
+    bgImage: '', logoImage: '', teamPrefix: 'チーム', flowWait: true, flowTeams: true, flowStand: true };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
   const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options);
   const roundMode = (s, r = s.round) => optionsOf(s).roundModes[r - 1] || 'bid';
@@ -127,7 +174,7 @@
         s.players = s.players.filter((p) => p.id !== action.id); break;
       case 'replaceRoster': // CSV 読み込み
         if (action.leaders && action.leaders.length > MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです（CSVに${action.leaders.length}人います）`);
-        if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), name: l.name, color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '' }));
+        if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), name: l.name, color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '', stand: l.stand || '', intro: l.intro || '' }));
         if (action.players) s.players = action.players.map((p) => ({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }));
         break;
 
@@ -152,14 +199,63 @@
           // 順番指名は公開した時点で確定(すでに確定した選手は選べないので重複しない)
           for (const id of ids) { const n = s.noms[id]; if (n && n.revealed && !pickOf(s, id, s.round)) s.picks.push({ round: s.round, leaderId: id, playerId: n.playerId, by: 'order' }); }
         } else confirmSingles(s);
-        s.scene = 'board'; // 公開はボードで見せる
+        s.scene = 'board'; s.spotStand = false; // 公開はボードで見せる
         // spot: true なら、その人を配信画面に大きく出す(ピックアップ公開)
         s.spot = action.spot && action.leaderId ? action.leaderId : null;
         break;
       }
       // ピックアップ公開: spotShow でその人のカードを裏のまま大きく出す → reveal(spot: true) でめくる → spotEnd で一覧へ
-      case 'spotShow': s.spot = action.leaderId; s.scene = 'board'; break;
-      case 'spotEnd': s.spot = null; break;
+      case 'spotShow': s.spot = action.leaderId; s.spotStand = false; s.scene = 'board'; break;
+      case 'spotStand': s.spot = action.leaderId; s.spotStand = true; s.scene = 'board'; break; // カードの前に立ち絵
+      case 'spotEnd': s.spot = null; s.spotStand = false; break;
+      // ---------- 資料 ----------
+      case 'addSlide': {
+        const id = uid('S');
+        s.slides = [...(s.slides || []), { id, kind: action.kind === 'image' ? 'image' : 'text', title: action.kind === 'image' ? '画像の資料' : '新しい資料', lines: [], image: '' }];
+        if (action.toProgram) { s.program = [...programOf(s)]; s.program.splice(action.at ?? s.program.length, 0, { id: uid('G'), type: 'slide', slideId: id, label: action.kind === 'image' ? '画像の資料' : '新しい資料' }); }
+        break;
+      }
+      case 'updateSlide': { const x = slideById(s, action.id); if (x) Object.assign(x, action.patch); break; }
+      case 'removeSlide':
+        s.slides = (s.slides || []).filter((x) => x.id !== action.id);
+        s.program = programOf(s).filter((g) => g.slideId !== action.id);
+        s.progIdx = Math.min(progIdxOf(s), s.program.length - 1);
+        break;
+      // ---------- 進行表 ----------
+      case 'addProgram': {
+        if (!PROGRAM_TYPES[action.item?.type] || action.item.type === 'draft') throw new Error('この場面は足せません');
+        s.program = [...programOf(s)];
+        s.program.splice(action.at ?? s.program.length, 0, { id: uid('G'), label: PROGRAM_TYPES[action.item.type], ...action.item });
+        break;
+      }
+      case 'updateProgram': { s.program = programOf(s).map((g) => (g.id === action.id ? { ...g, ...action.patch, id: g.id, type: g.type } : g)); break; }
+      case 'removeProgram': {
+        const g = programOf(s).find((x) => x.id === action.id);
+        if (!g) break;
+        if (g.type === 'draft') throw new Error('ドラフトの場面は外せません');
+        const i = programOf(s).indexOf(g);
+        s.program = programOf(s).filter((x) => x.id !== action.id);
+        if (progIdxOf(s) > i) s.progIdx = progIdxOf(s) - 1;
+        s.progIdx = Math.min(progIdxOf(s), s.program.length - 1);
+        break;
+      }
+      case 'moveProgram': {
+        const p = [...programOf(s)], i = p.findIndex((x) => x.id === action.id), j = i + action.dir;
+        if (i < 0 || j < 0 || j >= p.length) break;
+        const cur = p[progIdxOf(s)];
+        [p[i], p[j]] = [p[j], p[i]];
+        s.program = p; s.progIdx = p.indexOf(cur);
+        break;
+      }
+      case 'resetProgram': s.program = null; s.progIdx = 0; if (!(s.slides || []).some((x) => x.id === 'S_about')) s.slides = [...defaultSlides(), ...(s.slides || [])]; break;
+      // 進行表の場面へ移る(配信画面もその場面に)
+      case 'progGo': {
+        const p = programOf(s), i = Math.max(0, Math.min(p.length - 1, action.idx | 0));
+        s.progIdx = i; s.introIdx = 0;
+        s.scene = sceneForItem(s, p[i]);
+        break;
+      }
+      case 'introGo': s.introIdx = Math.max(0, Math.min(s.leaders.length - 1, action.idx | 0)); s.scene = 'intro'; break;
       case 'waitShow': s.waitIdx = Math.max(0, action.idx | 0); break; // 待ち時間画面の何枚目を出すか
       case 'confirmNoms': s.confirmedKey = confirmKey(s); break; // 公開前の確認をした
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
@@ -179,14 +275,16 @@
       case 'nextRound':
         if (!roundComplete(s)) throw new Error('この巡はまだ全員の指名が確定していません');
         if (s.round >= s.rounds) throw new Error('最後の巡です');
-        s.round += 1; s.noms = {}; s.lottery = null; s.scene = 'board'; s.spot = null; s.waitIdx = 0;
+        s.round += 1; s.noms = {}; s.lottery = null; s.spot = null; s.spotStand = false; s.waitIdx = 0;
+        s.scene = optionsOf(s).flowWait ? 'wait' : 'board'; // 巡のはじめは待ち時間画面(設定で外せる)
         break;
       case 'setScene': s.scene = action.scene; break;
       // 音(BGM・効果音)の設定。「戻す」の対象外
       case 'setAudio': s.audio = Object.assign({}, DEFAULT_AUDIO, s.audio, action.patch); break;
       // ドラフトを最初から(名簿・画像・音・設定はそのまま。抽選の記録には「リセット」を残す)
       case 'resetDraft':
-        s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; s.spot = null; s.timer = { endsAt: null, left: null }; s.waitIdx = 0;
+        s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.spot = null; s.spotStand = false; s.timer = { endsAt: null, left: null }; s.waitIdx = 0;
+        s.progIdx = 0; s.introIdx = 0; s.scene = sceneForItem(s, programOf(s)[0]);
         s.lotteryLog = [...(s.lotteryLog || []), { reset: true, at: Date.now() }];
         break;
       // 設定(進め方・抽選演出・タイマー・待ち時間の画像)。「戻す」の対象外
@@ -240,5 +338,5 @@
     return { leaders, players };
   }
 
-  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf };
+  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, sceneForItem, defaultSlides };
 }));

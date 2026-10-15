@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const WebSocket = require('ws');
 const { start } = require('../server.js');
+const C = require('../public/core.js');
 
 const OUT = path.join(__dirname, '../ui-check');
 const PORT = 5197;
@@ -63,6 +64,8 @@ app.whenReady().then(async () => {
   await tab('roster'); await check('02-roster-empty');
   // 2. お試しモード(ダミー名簿)
   await send({ type: 'mode', mode: 'demo' });
+  // 進行表のドラフトの場面へ(お試しは進行表の最初=オープニングから始まる)
+  await act({ type: 'progGo', idx: C.programOf(S).findIndex((g) => g.type === 'draft') });
   await check('03-roster-demo');
   await tab('run'); await check('04-run-demo-start');
   const L = S.leaders.map((l) => l.id), P = S.players.map((p) => p.id);
@@ -114,7 +117,7 @@ app.whenReady().then(async () => {
   if (S.scene !== 'teams') { console.log('✗ チーム表になっていない'); errors++; }
   await check('12-run-teams');
   await next('第2巡へ進む');
-  if (S.round !== 2 || S.scene !== 'board') { console.log('✗ 第2巡のボードになっていない'); errors++; }
+  if (S.round !== 2 || S.scene !== 'wait') { console.log('✗ 第2巡のボードになっていない'); errors++; }
   await check('13-run-round2');
   // 6. 画像の登録: ドロップ → 調整画面 → 位置と大きさを変えて保存 → 開き直すと調整が残っている
   await tab('roster');
@@ -140,6 +143,7 @@ app.whenReady().then(async () => {
   else console.log('✓ 開き直すと前の調整のまま');
   await js("document.getElementById('crop').close(); 0");
   await check('15-roster-image');
+  await tab('show'); await check('16-show');
   await send({ type: 'mode', mode: 'real' });
 
   console.log(`\n合計 error ${errors} / warn ${warns}   (HTML とスクショ: ${OUT})`);

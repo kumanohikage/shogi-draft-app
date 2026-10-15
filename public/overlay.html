@@ -19,6 +19,40 @@
   h1 { position: relative; margin: 0; padding-top: 46px; text-align: center; font: normal 64px 'Dela Gothic One', sans-serif; color: #fff;
     text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 8px 0 #3a1a00, 0 0 30px rgba(255,200,80,.8); letter-spacing: .06em; }
   h1 small { display: block; font-size: 30px; letter-spacing: .1em; margin-top: 4px; }
+  /* 背景画像(全画面共通)。設定されていれば金の放射線の代わりに敷く */
+  #stage.hasbg .bg { background: var(--bgimg) center / cover no-repeat; }
+  #stage.hasbg .bg::before { display: none; }
+  /* 大会ロゴ(見出しの大会名の代わり) */
+  h1 .logo { display: block; margin: 0 auto; max-width: 900px; max-height: 120px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.35)); }
+  /* ロゴの場面(オープニング・エンディング) */
+  .logobig { display: flex; align-items: center; justify-content: center; height: 100%; }
+  .logobig img { max-width: 1400px; max-height: 720px; object-fit: contain; filter: drop-shadow(0 10px 30px rgba(0,0,0,.4)); }
+  .logobig b { font: normal 140px 'Dela Gothic One', sans-serif; color: #fff; text-align: center; padding: 0 80px;
+    text-shadow: 0 0 3px #5a2a00, 5px 5px 0 #5a2a00, -5px 5px 0 #5a2a00, 5px -5px 0 #5a2a00, -5px -5px 0 #5a2a00, 0 12px 0 #3a1a00; }
+  /* 資料(文字): 白いパネルに見出し＋箇条書き */
+  .slidebox { position: absolute; left: 140px; right: 140px; top: 210px; bottom: 90px; padding: 60px 90px; box-sizing: border-box; background: rgba(255,255,255,.93); border-radius: 28px; box-shadow: 0 20px 50px rgba(0,0,0,.3); overflow: hidden; }
+  .slidebox h2 { margin: 0 0 40px; display: inline-block; font: 900 76px 'Noto Sans JP', sans-serif; color: #1a1a1a; border-bottom: 8px solid #1a1a1a; padding-bottom: 6px; }
+  .slidebox ul { margin: 0; padding: 0; list-style: none; }
+  .slidebox li { position: relative; padding-left: 60px; margin: 18px 0; font: 700 52px/1.45 'Noto Sans JP', sans-serif; color: #1a1a1a; white-space: pre-wrap; }
+  .slidebox li::before { content: '・'; position: absolute; left: 0; }
+  /* 資料(画像): 画面いっぱい(縦横比はそのまま) */
+  .slideimg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .slideimg img { max-width: 1920px; max-height: 1080px; object-fit: contain; }
+  /* 立ち絵(リーダー紹介・ピックアップの前): 立ち絵＋名前の帯 */
+  .standwrap { position: absolute; inset: 0; }
+  .standwrap .stand { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); max-width: 1400px; height: 1000px; object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
+  .standwrap .standicon { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); width: 560px; height: 560px; border-radius: 50%; object-fit: cover; border: 12px solid var(--c); box-shadow: 0 20px 50px rgba(0,0,0,.35); background: #fff; }
+  .standwrap .band { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); min-width: 1000px; padding: 22px 80px; box-sizing: border-box; text-align: center;
+    background: linear-gradient(90deg, #f0b400, #ffe27a 50%, #f0b400); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -8px 0 var(--c); font: 900 70px 'Noto Sans JP', sans-serif; color: #1a1205; }
+  .standwrap .tag { position: absolute; left: 50%; bottom: 210px; transform: translateX(-50%); padding: 10px 34px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 36px 'Noto Sans JP', sans-serif; white-space: nowrap; }
+  .standwrap.enter .stand, .standwrap.enter .standicon { animation: standIn .6s cubic-bezier(.2,.9,.3,1) both; }
+  .standwrap.enter .band { animation: bandIn .5s .15s cubic-bezier(.2,.9,.3,1) both; }
+  @keyframes standIn { from { opacity: 0; transform: translateX(-50%) translateY(40px); } }
+  @keyframes bandIn { from { opacity: 0; transform: translateX(-50%) scaleX(.6); } }
+  #stand { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; pointer-events: none; }
+  #stand.on { opacity: 1; }
+  #sc-board.standon #board-title { opacity: 0; }
+  #board-title { transition: opacity .35s; }
 
   /* 指名ボード */
   /* 見出しの下〜画面の下の真ん中に置く(数が多くても少なくても) */
@@ -96,8 +130,11 @@
 </head>
 <body>
 <div id="stage">
-  <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="board-timer" class="timer corner"></div></section>
+  <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="stand"></div><div id="board-timer" class="timer corner"></div></section>
   <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><div class="waitbox"><img id="wait-img" alt=""><div id="wait-timer" class="timer big"></div></div></div></section>
+  <section id="sc-logo" class="scene bg"><div id="logo-big" class="logobig"></div></section>
+  <section id="sc-slide" class="scene bg"><h1 id="slide-title"></h1><div id="slide-body"></div></section>
+  <section id="sc-intro" class="scene bg"><div id="intro-body"></div></section>
   <section id="sc-teams" class="scene bg"><h1 id="teams-title"></h1><div class="area"><div id="teams" class="teams"></div></div></section>
   <section id="sc-roulette" class="scene"><iframe id="roulette" src="roulette.html?layout=horizontal"></iframe></section>
 </div>

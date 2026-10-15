@@ -5,3 +5,4 @@ ui-check/
 *.log
 # 企画メモ(公開しない)
 docs/要件.md
+docs/要件-番組.md

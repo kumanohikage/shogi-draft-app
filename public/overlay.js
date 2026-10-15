@@ -48,7 +48,8 @@ let first = true; // 開いた直後(OBS の読み込み時)は演出・効果�
 
 function render() {
   const scene = EXPORT || S.scene;
-  for (const k of ['board', 'teams', 'roulette', 'wait']) $('sc-' + k).classList.toggle('on', scene === k);
+  for (const k of ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro']) $('sc-' + k).classList.toggle('on', scene === k);
+  renderLook();
   if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
   SE.setVolume(audio.seVol / 100);
@@ -58,7 +59,7 @@ function render() {
     f.postMessage({ type: 'volume', v: audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
-  renderBoard(); renderTeams(); renderWait(); renderTimer(); playLottery(false);
+  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); playLottery(false);
   first = false;
 }
 
@@ -83,7 +84,7 @@ function flipIn(c, delay, sound) {
 
 let prevSpot = null, prevSpotOpen = false;
 function renderBoard() {
-  $('board-title').innerHTML = `${esc(S.title)}<small>第${S.round}巡 指名選手</small>`;
+  $('board-title').innerHTML = titleHtml(`第${S.round}巡 指名選手`);
   const g = $('grid');
   g.style.gridTemplateColumns = `repeat(${cols(S.leaders.length)}, 520px)`;
   const dupIds = new Set(C.conflicts(S).flatMap((c) => c.leaders));
@@ -153,14 +154,27 @@ function renderBoard() {
 }
 
 // ピックアップ: 1人のカードを裏のまま大きく出す → 管理画面で「めくる」を押したらめくれる
+let prevStandKey = '', spotCardFor = null; // spotCardFor: いま大きいカードを出しているリーダー
 function renderSpot(onBoard) {
-  const sp = $('spot');
-  sp.classList.toggle('on', !!S.spot);
-  if (!S.spot) { prevSpotOpen = false; return; }
+  const sp = $('spot'), stand = $('stand');
+  const showStand = !!S.spot && !!S.spotStand && !(S.noms[S.spot] || {}).revealed;
+  const sk = showStand ? S.spot : '';
+  if (sk !== prevStandKey) {
+    const l = showStand && C.leaderById(S, S.spot);
+    stand.innerHTML = l ? standHtml(l, `第${S.round}巡 選択希望選手`) : '';
+    if (l && !first) stand.querySelector('.standwrap').classList.add('enter');
+    prevStandKey = sk;
+  }
+  stand.classList.toggle('on', showStand);
+  $('sc-board').classList.toggle('standon', showStand);
+  sp.classList.toggle('on', !!S.spot && !showStand);
+  if (showStand) { spotCardFor = null; prevSpotOpen = false; return; } // 立ち絵のあとにカードを出すときは、新しく出す扱い
+  if (!S.spot) { spotCardFor = null; prevSpotOpen = false; return; }
   const l = C.leaderById(S, S.spot), n = S.noms[S.spot] || {};
   if (!l) return;
   const isOpen = !!n.revealed;
-  if (S.spot !== prevSpot) {
+  if (S.spot !== spotCardFor) {
+    spotCardFor = S.spot;
     // 次の人: 裏のカードを出す(もうめくってあれば表で)
     // ピックアップは指名が済んでいるので、裏はプロ野球の読み上げと同じ「第◯巡 選択希望選手」
     sp.innerHTML = `<div class="spotcard">${cardHtml(l, isOpen ? n.playerId : null, '', false, false, `第${S.round}巡 選択希望選手`)}</div>`;
@@ -173,10 +187,59 @@ function renderSpot(onBoard) {
   prevSpotOpen = isOpen;
 }
 
+/* ---------- 見た目(背景・ロゴ)と、番組の場面(ロゴ・資料・リーダー紹介) ---------- */
+// 見出し: ロゴがあればロゴ、なければ大会名の文字
+function titleHtml(small) {
+  const o = C.optionsOf(S);
+  return `${o.logoImage ? `<img class="logo" src="${img(o.logoImage)}" alt="${esc(S.title)}">` : esc(S.title)}${small ? `<small>${esc(small)}</small>` : ''}`;
+}
+function renderLook() {
+  const o = C.optionsOf(S), st = $('stage');
+  st.classList.toggle('hasbg', !!o.bgImage);
+  st.style.setProperty('--bgimg', o.bgImage ? `url("${img(o.bgImage)}")` : 'none');
+}
+function renderLogo() {
+  const o = C.optionsOf(S);
+  $('logo-big').innerHTML = o.logoImage ? `<img src="${img(o.logoImage)}" alt="${esc(S.title)}">` : `<b>${esc(S.title)}</b>`;
+}
+// 資料: 進行表のいまの場面の資料(文字 or 画像)
+let prevSlideKey = '';
+function renderSlide() {
+  const g = C.progItem(S), sl = g && g.type === 'slide' ? C.slideById(S, g.slideId) : null;
+  const key = JSON.stringify(sl);
+  if (key === prevSlideKey) return;
+  prevSlideKey = key;
+  if (!sl) { $('slide-title').innerHTML = ''; $('slide-body').innerHTML = ''; return; }
+  if (sl.kind === 'image') {
+    $('slide-title').innerHTML = '';
+    $('slide-body').innerHTML = sl.image ? `<div class="slideimg"><img src="${img(sl.image)}" alt=""></div>` : '';
+  } else {
+    $('slide-title').innerHTML = titleHtml('');
+    $('slide-body').innerHTML = `<div class="slidebox"><h2>${esc(sl.title)}</h2><ul>${(sl.lines || []).filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  }
+}
+// 立ち絵＋名前の帯(＋紹介文 / 「第◯巡 選択希望選手」)。立ち絵が無ければアイコンを大きく丸で
+function standHtml(l, tag) {
+  return `<div class="standwrap" style="--c:${esc(l.color)}">
+    ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
+    ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
+    <div class="band">${esc(C.teamLabel(S, l))}</div></div>`;
+}
+let prevIntro = '';
+function renderIntro() {
+  const l = S.leaders[Math.min(S.introIdx || 0, S.leaders.length - 1)];
+  const key = l ? JSON.stringify([l, C.optionsOf(S).teamPrefix]) : '';
+  if (key === prevIntro) return;
+  prevIntro = key;
+  $('intro-body').innerHTML = l ? standHtml(l, l.intro || '') : '';
+  const w = $('intro-body').querySelector('.standwrap');
+  if (w && !first && S.scene === 'intro') w.classList.add('enter');
+}
+
 /* ---------- 待ち時間・制限時間 ---------- */
 function renderWait() {
   const o = C.optionsOf(S);
-  $('wait-title').innerHTML = `${esc(S.title)}<small>第${S.round}巡 指名中</small>`;
+  $('wait-title').innerHTML = titleHtml(`第${S.round}巡 指名中`);
   const list = C.waitImagesOf(S), f = list[Math.min(S.waitIdx || 0, list.length - 1)];
   $('wait-img').setAttribute('src', f ? img(f) : '');
 }
@@ -202,7 +265,7 @@ setInterval(renderTimer, 250);
 /* ---------- チーム表 ---------- */
 let prevPicks = new Set();
 function renderTeams() {
-  $('teams-title').innerHTML = `${esc(S.title)}<small>${C.draftComplete(S) ? '全チーム決定' : `チーム編成（第${S.round}巡まで）`}</small>`;
+  $('teams-title').innerHTML = titleHtml(C.draftComplete(S) ? '全チーム決定' : `チーム編成（第${S.round}巡まで）`);
   const t = $('teams');
   const n = S.leaders.length;
   t.style.gridTemplateColumns = `repeat(${n <= 6 ? n : Math.ceil(n / 2)}, 280px)`;

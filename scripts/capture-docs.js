@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const WebSocket = require('ws');
 const { start } = require('../server.js');
+const C = require('../public/core.js');
 
 const OUT = path.join(__dirname, '../docs/images');
 const PORT = 5190;
@@ -56,19 +57,30 @@ app.whenReady().then(async () => {
   await shotC('control-crop', 900);
   await cjs("document.getElementById('crop').close(); selectTab('run'); 0");
 
-  // 2. 指名の入力
+  // 2. 番組: 進行表・資料・リーダー紹介
+  await cjs("selectTab('show'); 0");
+  await shotC('control-show', 1300);
+  await cjs("selectTab('run'); 0");
+  await act({ type: 'progGo', idx: 1 });
+  await shotO('overlay-slide', 1200);
+  await act({ type: 'introGo', idx: 0 }); await act({ type: 'progGo', idx: 3 });
+  await shotO('overlay-intro', 1500);
+  await act({ type: 'progGo', idx: C.programOf(S).findIndex((g) => g.type === 'draft') });
+  await act({ type: 'setScene', scene: 'board' });
+
+  // 3. 指名の入力
   for (const [i, p] of [[0, 0], [1, 7], [2, 0], [3, 13]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
   await shotC('control-nominate', 1000);
   for (const [i, p] of [[4, 21], [5, 7]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
   await shotC('control-ready', 760);
 
-  // 3. 確認 → 一斉公開 → 重複(2件)
+  // 4. 確認 → 一斉公開 → 重複(2件)
   await clickNext();
   await cjs("[...document.querySelectorAll('#next button')].find((b) => /一斉公開|再指名を公開/.test(b.textContent)).click(); 0"); await wait(400);
   await shotO('overlay-board', 3500);
   await shotC('control-conflict', 900);
 
-  // 4. 抽選ルーレット(2件続けて)
+  // 5. 抽選ルーレット(2件続けて)
   await clickNext();
   await shotO('overlay-roulette', 4500);
   for (let i = 0; i < 160 && !S.lottery.done; i++) await wait(500);
@@ -78,7 +90,7 @@ app.whenReady().then(async () => {
   for (let i = 0; i < 160 && !S.lottery.done; i++) await wait(500);
   await wait(1500);
 
-  // 5. ボードに戻して、外れた人がまとめて再指名
+  // 6. ボードに戻して、外れた人がまとめて再指名
   await clickNext();
   await shotC('control-renominate', 1000);
   const losers = S.lotteries.flatMap((x) => x.leaders.filter((id) => id !== x.winner));
@@ -87,7 +99,7 @@ app.whenReady().then(async () => {
   await cjs("[...document.querySelectorAll('#next button')].find((b) => /一斉公開|再指名を公開/.test(b.textContent)).click(); 0"); await wait(400);
   await shotO('overlay-board-done', 3500);
 
-  // 6. チーム表
+  // 7. チーム表
   await clickNext();
   await shotO('overlay-teams', 3000);
   await shotC('control-teams', 620);

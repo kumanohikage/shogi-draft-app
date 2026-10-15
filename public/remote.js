@@ -29,7 +29,8 @@ function setDisabled(el, v) { el.disabled = v; if (v) el.setAttribute('aria-disa
 function render() {
   $('title').textContent = S.title || 'ドラフト会議';
   const done = C.draftComplete(S);
-  $('round-title').textContent = done ? 'ドラフト終了' : `第${S.round}巡`;
+  const item = C.progItem(S), inDraft = !item || item.type === 'draft';
+  $('round-title').textContent = !inDraft ? item.label : done ? 'ドラフト終了' : `第${S.round}巡`;
   const n = F.nextStep(S, { demo });
   $('step-label').textContent = n.step >= 0 && n.step < F.STEPS.length ? F.STEPS[n.step] : '';
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''}>${b.label}</button>`;
@@ -93,15 +94,7 @@ document.addEventListener('click', (e) => {
   const key = b.dataset.next, arg = b.dataset.arg;
   if (b.dataset.scene) act({ type: 'setScene', scene: b.dataset.scene });
   else if (b.dataset.waitStep) act({ type: 'waitShow', idx: Math.max(0, (S.waitIdx || 0) + +b.dataset.waitStep) });
-  else if (key === 'confirm') act({ type: 'confirmNoms' });
-  else if (key === 'reveal') act({ type: 'reveal' });
-  else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });
-  else if (key === 'spotShow') act({ type: 'spotShow', leaderId: arg });
-  else if (key === 'spotFlip') act({ type: 'reveal', leaderId: arg, spot: true });
-  else if (key === 'spotEnd') act({ type: 'spotEnd' });
-  else if (key === 'draw') act({ type: 'drawLottery', playerId: arg });
-  else if (key === 'board' || key === 'teams') act({ type: 'setScene', scene: key });
-  else if (key === 'nextRound') act({ type: 'nextRound' });
+  else if (key && DraftFlow.actionFor(key, arg, S)) act(DraftFlow.actionFor(key, arg, S));
   else if (key === 'roster') toast('名簿の登録はパソコンのアプリで行ってください');
   else if (b.id === 'timer-start') act({ type: 'timer', cmd: 'start' });
   else if (b.id === 'timer-stop') act({ type: 'timer', cmd: 'stop' });
