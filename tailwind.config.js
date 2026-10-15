@@ -1,7 +1,7 @@
 // 管理画面のスタイル(melta UI のトークン体系に合わせる。色だけはアプリの金×焦げ茶を踏襲)
 // 生成: npm run css  →  public/control.css
 module.exports = {
-  content: ['./public/control.html', './public/control.js'],
+  content: ['./public/control.html', './public/control.js', './public/remote.html', './public/remote.js', './public/flow.js'],
   theme: {
     extend: {
       colors: {

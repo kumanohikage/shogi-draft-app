@@ -60,9 +60,10 @@ app.whenReady().then(async () => {
   for (const [i, p] of [[0, 0], [1, 7], [2, 0], [3, 13]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
   await shotC('control-nominate', 1000);
   for (const [i, p] of [[4, 21], [5, 7]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
-  await shotC('control-ready', 620);
+  await shotC('control-ready', 760);
 
-  // 3. 一斉公開 → 重複(2件)
+  // 3. 確認 → 一斉公開 → 重複(2件)
+  await clickNext();
   await clickNext();
   await shotO('overlay-board', 3500);
   await shotC('control-conflict', 900);
@@ -82,6 +83,7 @@ app.whenReady().then(async () => {
   await shotC('control-renominate', 1000);
   const losers = S.lotteries.flatMap((x) => x.leaders.filter((id) => id !== x.winner));
   for (const [i, id] of losers.entries()) await act({ type: 'nominate', leaderId: id, playerId: P[30 + i] });
+  await clickNext();
   await clickNext();
   await shotO('overlay-board-done', 3500);
 

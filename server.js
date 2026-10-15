@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const WebSocket = require('ws');
+const os = require('os');
+const QRCode = require('qrcode');
 const Core = require('./public/core.js');
 const { makeDemoState } = require('./demo.js');
 
@@ -109,7 +111,8 @@ function start(opts = {}) {
 
   const wss = new WebSocket.Server({ server });
   const send = (ws, msg) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(msg));
-  const broadcast = (msg) => wss.clients.forEach((c) => send(c, msg));
+  const allClients = () => [...wss.clients, ...(remote.wss ? remote.wss.clients : [])];
+  const broadcast = (msg) => allClients().forEach((c) => send(c, msg));
   // 「1つ戻す」で抽選が取り消されるか(管理画面で確認を出すため)
   const undoCancelsLottery = () => history.length > 0 && history[history.length - 1].lotteries.length < state.lotteries.length;
   const snapshot = () => ({ type: 'state', state, canUndo: history.length > 0, undoCancelsLottery: undoCancelsLottery(), demo: mode === 'demo' });
@@ -131,9 +134,73 @@ function start(opts = {}) {
     return { type: 'presence', count: list.length, obs: list.some((o) => o.obs), active: list.some((o) => o.obs && o.active === true), hidden: list.length > 0 && list.every((o) => o.obs && (o.visible === false || o.active === false)) };
   };
 
-  wss.on('connection', (ws) => {
+  /* ---------- スマホ操作(同じ Wi-Fi の端末から) ----------
+   * 使うときだけ、別のポートで LAN に開く(ふだんはこのPCの中だけ)。
+   * 推測できない鍵(128bit)を QR コードの URL に入れ、鍵を持たない端末は画面も操作も拒否する。
+   * 鍵はオンにするたび・作り直すたびに新しくなり、アプリを閉じれば無効になる。 */
+  const REMOTE_PORT = opts.remotePort || PORT + 2;
+  const remote = { token: null, server: null, wss: null };
+  const REMOTE_FILES = new Set(['/remote.html', '/remote.js', '/core.js', '/flow.js', '/control.css']);
+  const safeEqual = (a, b) => typeof a === 'string' && typeof b === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  const cookieToken = (req) => (/(?:^|;\s*)dk=([0-9a-f]+)/.exec(req.headers.cookie || '') || [])[1];
+  function remoteHandler(req, res) {
+    const url = new URL(req.url, 'http://x');
+    let p = decodeURIComponent(url.pathname);
+    // QR の URL(?k=鍵)で来たら、鍵をクッキーにしてから画面へ(URL に鍵を残さない)
+    const k = url.searchParams.get('k');
+    if (k && safeEqual(k, remote.token)) {
+      res.writeHead(302, { 'Set-Cookie': `dk=${k}; HttpOnly; SameSite=Strict; Path=/`, Location: '/remote', 'Cache-Control': 'no-store' });
+      return res.end();
+    }
+    if (!safeEqual(cookieToken(req), remote.token)) {
+      res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end('<!doctype html><meta name="viewport" content="width=device-width"><p style="font:16px sans-serif;padding:24px">つながりませんでした。パソコンのアプリに出ている QR コードを読み直してください。</p>');
+    }
+    if (p === '/' || p === '/remote') p = '/remote.html';
+    let file;
+    if (p.startsWith('/images/')) file = path.join(IMG, path.basename(p));
+    else if (REMOTE_FILES.has(p)) file = path.join(PUB, p);
+    else { res.writeHead(404); return res.end(); }
+    fs.readFile(file, (err, buf) => {
+      if (err) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      res.end(buf);
+    });
+  }
+  // このPCの LAN の IP(家庭や会場の Wi-Fi で使われる範囲を優先)
+  function lanIPs() {
+    const ips = Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
+    const rank = (ip) => (/^192\.168\./.test(ip) ? 0 : /^10\./.test(ip) ? 1 : /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ? 2 : 3);
+    return ips.sort((a, b) => rank(a) - rank(b));
+  }
+  async function remoteInfo() {
+    if (!remote.server) return { type: 'remote', on: false };
+    const urls = lanIPs().map((ip) => `http://${ip}:${REMOTE_PORT}/remote?k=${remote.token}`);
+    const qr = urls[0] ? await QRCode.toString(urls[0], { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : '';
+    return { type: 'remote', on: true, urls, qr, clients: remote.wss.clients.size };
+  }
+  // 鍵などを含むので、このPCの管理画面にだけ送る
+  const sendLocal = async () => { const info = await remoteInfo(); wss.clients.forEach((c) => send(c, info)); };
+  function closeRemote() {
+    if (!remote.server) return;
+    remote.wss.clients.forEach((c) => c.terminate());
+    remote.wss.close(); remote.server.close();
+    Object.assign(remote, { token: null, server: null, wss: null });
+  }
+  function openRemote() {
+    closeRemote();
+    remote.token = crypto.randomBytes(16).toString('hex');
+    remote.server = http.createServer(remoteHandler);
+    remote.wss = new WebSocket.Server({ server: remote.server, verifyClient: (info) => safeEqual(cookieToken(info.req), remote.token) });
+    remote.wss.on('connection', (ws) => { onConnection(ws, true); sendLocal(); ws.on('close', sendLocal); });
+    return new Promise((resolve, reject) => { remote.server.once('error', reject); remote.server.listen(REMOTE_PORT, '0.0.0.0', resolve); });
+  }
+
+  wss.on('connection', (ws) => onConnection(ws, false));
+  function onConnection(ws, isRemote) {
     send(ws, snapshot());
     send(ws, presence());
+    if (!isRemote) remoteInfo().then((i) => send(ws, i));
     ws.on('close', () => { if (overlays.delete(ws)) broadcast(presence()); });
     ws.on('message', (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -159,6 +226,11 @@ function start(opts = {}) {
           state = Object.assign(history.pop(), keep);
           const alive = new Set(state.lotteries.map((x) => x.id));
           state.lotteryLog = (state.lotteryLog || []).map((e) => (e.id && !alive.has(e.id) && !e.canceledAt ? { ...e, canceledAt: Date.now() } : e));
+        } else if (msg.type === 'remote') { // スマホ操作のオン・オフ・鍵の作り直し(このPCの管理画面からだけ)
+          if (isRemote) return;
+          if (msg.cmd === 'off') { closeRemote(); sendLocal(); }
+          else openRemote().then(sendLocal, (e) => { closeRemote(); send(ws, { type: 'error', message: `スマホ操作を始められませんでした(${e.message})` }); sendLocal(); });
+          return;
         } else if (msg.type === 'mode') { // お試しモードの出入り / お試しのやり直し
           switchMode(msg.mode, !!msg.fresh);
         } else return;
@@ -168,11 +240,11 @@ function start(opts = {}) {
         send(ws, { type: 'error', message: e.message });
       }
     });
-  });
+  }
 
   return new Promise((resolve, reject) => {
     server.on('error', reject);
-    server.listen(PORT, '127.0.0.1', () => resolve({ port: PORT, dataDir: DATA, close: () => server.close() }));
+    server.listen(PORT, '127.0.0.1', () => resolve({ port: PORT, dataDir: DATA, close: () => { closeRemote(); server.close(); } }));
   });
 }
 

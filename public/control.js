@@ -5,6 +5,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const img = (f) => (f ? `/images/${encodeURIComponent(f)}` : '');
 const OVERLAY_URL = `${location.origin}/overlay`;
 
+let remoteInfo = { on: false };
 let S = null, canUndo = false, undoCancelsLottery = false, demo = false, ws = null, bgmList = [], overlay = { count: 0 };
 
 /* ---------- 見た目(melta UI のクラス。色はアプリの金×焦げ茶) ---------- */
@@ -45,6 +46,7 @@ function connect() {
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === 'state') { S = m.state; canUndo = m.canUndo; undoCancelsLottery = !!m.undoCancelsLottery; demo = !!m.demo; render(); }
+    else if (m.type === 'remote') { remoteInfo = m; renderRemote(); }
     else if (m.type === 'presence') { overlay = m; renderOverlayStatus(); if (S) renderRun(); }
     else if (m.type === 'bgmList') { bgmList = m.list; if (S) renderAudio(); }
     else if (m.type === 'error') toast(m.message, true);
@@ -240,7 +242,7 @@ let lastSpace = 0;
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
   if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-  if ($('tab-run').classList.contains('hidden') || $('crop').open) return;
+  if ($('tab-run').classList.contains('hidden') || $('crop').open || $('remote-dlg').open) return;
   e.preventDefault(); // フォーカスのあるほかのボタンが押されたり、画面がスクロールしたりしないように
   if (e.repeat || Date.now() - lastSpace < 500) return;
   const b = document.querySelector('#next button.h-12');
@@ -426,6 +428,29 @@ $('csv-file').addEventListener('change', async (e) => {
   if (S.picks.length && !confirm('ドラフトの記録が残っています。名簿を置き換えると記録と合わなくなります。続けますか？')) return;
   act({ type: 'replaceRoster', leaders: r.leaders.length ? r.leaders : undefined, players: r.players.length ? r.players : undefined });
   toast(`リーダー${r.leaders.length}人・選手${r.players.length}人を読み込みました`);
+});
+
+/* ---------- スマホ操作 ---------- */
+function renderRemote() {
+  const r = remoteInfo;
+  $('remote-label').textContent = r.on ? `スマホ操作: オン（${r.clients}台）` : 'スマホ操作';
+  $('remote-body').innerHTML = r.on
+    ? `<div class="flex gap-4 items-start">
+        <div class="w-44 h-44 flex-none p-2 bg-white rounded-lg [&_svg]:w-full [&_svg]:h-full" role="img" aria-label="スマホ操作の QR コード">${r.qr || ''}</div>
+        <div class="min-w-0 flex flex-col gap-2">
+          <p class="text-sm">${badge('ok', 'オン')} <span class="ml-1">つながっている端末: <b class="text-[var(--text-heading)]">${r.clients}台</b></span></p>
+          <button type="button" data-remote="renew" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="鍵を作り直します。いまつながっている端末は切れます">鍵を作り直す</button>
+          <button type="button" data-remote="off" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">オフにする</button>
+        </div>
+      </div>
+      ${r.urls && r.urls.length ? '' : '<p class="mt-3 text-sm text-red-300">Wi-Fi などのネットワークが見つかりません</p>'}`
+    : `<p class="text-sm">いまはオフです。オンにすると QR コードが出ます。</p><button type="button" data-remote="on" class="mt-3 inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-primary-500 text-slate-900 rounded-lg hover:bg-primary-600 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">オンにする</button>`;
+}
+$('remote-open').addEventListener('click', () => { renderRemote(); $('remote-dlg').showModal(); });
+$('remote-close').addEventListener('click', () => $('remote-dlg').close());
+$('remote-dlg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-remote]');
+  if (b) ws.send(JSON.stringify({ type: 'remote', cmd: b.dataset.remote }));
 });
 
 /* ---------- 進め方の設定 ---------- */

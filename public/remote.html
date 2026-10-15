@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14100c">
+<title>ドラフト会議 スマホ操作</title>
+<link rel="stylesheet" href="control.css">
+</head>
+<body class="min-h-screen bg-[var(--bg-page)] text-[var(--text-default)] font-sans">
+<header class="sticky top-0 z-10 flex items-center gap-3 px-4 h-14 bg-[var(--bg-page)] border-b border-[var(--border-default)]">
+  <h1 id="title" class="min-w-0 flex-1 text-base font-bold text-primary-400 truncate">ドラフト会議</h1>
+  <span id="conn" class="text-xs text-[var(--text-muted)]" aria-live="polite">接続中…</span>
+</header>
+
+<main class="px-4 pt-4 pb-16 flex flex-col gap-4">
+  <div class="flex items-baseline gap-3">
+    <h2 id="round-title" class="text-2xl font-bold text-[var(--text-heading)]">第1巡</h2>
+    <p id="step-label" class="text-sm text-[var(--text-muted)]"></p>
+  </div>
+
+  <!-- 次にやること -->
+  <section id="next" class="flex flex-col gap-3 p-4 bg-[var(--bg-surface)] border border-primary-500/40 rounded-xl" aria-live="polite"></section>
+
+  <!-- 配信画面の切り替え -->
+  <section class="leading-normal">
+    <h3 id="scene-label" class="mb-2 text-xs text-[var(--text-muted)]">配信画面</h3>
+    <div id="scenes" class="grid grid-cols-3 gap-2" role="group" aria-labelledby="scene-label"></div>
+  </section>
+
+  <!-- 制限時間 -->
+  <section class="leading-normal">
+    <h3 class="mb-2 text-xs text-[var(--text-muted)]">制限時間</h3>
+    <div class="flex items-center gap-2">
+    <span id="timer-left" class="min-w-[4rem] text-xl font-bold tabular-nums text-[var(--text-heading)]">2:00</span>
+    <button type="button" id="timer-start" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">スタート</button>
+    <button type="button" id="timer-stop" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">止める</button>
+    <button type="button" id="timer-reset" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リセット</button>
+    </div>
+  </section>
+
+  <!-- 各リーダーの指名 -->
+  <section class="leading-normal">
+    <h3 class="mb-2 text-xs text-[var(--text-muted)]">指名</h3>
+    <div id="noms" class="flex flex-col gap-2"></div>
+  </section>
+
+  <button type="button" id="undo" class="self-start inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
+    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    1つ戻す
+  </button>
+</main>
+
+<div id="toast" class="hidden" role="status" aria-live="polite"></div>
+<script src="core.js"></script>
+<script src="flow.js"></script>
+<script src="remote.js"></script>
+</body>
+</html>
