@@ -15,6 +15,8 @@
   --border-default: #4a3a26;
   --border-strong: #8a7350;
 }
+/* スマホで連続タップしても拡大しない(2本指で広げる拡大はできるまま) */
+html { touch-action: manipulation; }
 body { line-height: 2.0; letter-spacing: 0.02em; }
 h1, h2, h3, h4, h5, h6 { line-height: 1.4; letter-spacing: 0.01em; }
 @media (prefers-reduced-motion: reduce) {
