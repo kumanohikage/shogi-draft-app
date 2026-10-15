@@ -16,7 +16,7 @@
       title: 'ドラフト会議',
       rounds: 3,
       leaders: [],          // { id, name, color, icon }  ※チーム名はドラフト後に決まるので持たない
-      players: [],          // { id, name, icon }
+      players: [],          // { id, name, icon, note(ひとこと), absent(欠場) }
       round: 1,             // 今の巡
       // 今の巡の指名: leaderId -> { playerId, revealed }
       noms: {},
@@ -29,6 +29,11 @@
       scene: 'board',       // 配信画面: 'board' | 'roulette' | 'teams' | 'blank'
       spot: null,           // ピックアップ公開中のリーダー(配信画面に1人だけ大きく出す)。null なら指名ボード
       audio: { ...DEFAULT_AUDIO },
+      options: { ...DEFAULT_OPTIONS },
+      // 抽選の記録(取り消した抽選も残す。「1つ戻す」でも消えない): [{ id, round, playerId, leaders, winner, at, canceledAt? }]
+      lotteryLog: [],
+      // 指名の制限時間: endsAt(終わる時刻 ms) / left(止めたときの残り秒)
+      timer: { endsAt: null, left: null },
     };
   }
 
@@ -39,6 +44,21 @@
   const pickOf = (s, leaderId, round) => s.picks.find((p) => p.leaderId === leaderId && p.round === round);
   const DEFAULT_AUDIO = { bgm: '', bgmOn: true, bgmVol: 30, seVol: 70, rlVol: 70 }; // bgm = bgm フォルダの曲のファイル名 / seVol = 指名ボード・チーム表の効果音 / rlVol = 抽選ルーレットの音
   const MAX_ROUNDS = 5; // チーム表が1画面に収まる上限
+  // 進め方の設定。roundModes[巡-1] = 'bid'(一斉入札) | 'order'(順番指名)。orderStyle: 'snake'(順番指名の巡ごとに逆順) | 'waiver'(毎回同じ順)
+  // lotteryStyle: 'full' | 'short'(短い抽選演出)。timerSec: 制限時間(秒)。timerShow: 配信画面にタイマーを出すか。waitImage: 待ち時間画面の画像
+  const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 120, timerShow: true, waitImage: '' };
+  const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options);
+  const roundMode = (s, r = s.round) => optionsOf(s).roundModes[r - 1] || 'bid';
+  // 順番指名の巡の順番: 登録順。スネークなら、順番指名の巡を数えて奇数回目は逆順
+  function turnOrder(s, r = s.round) {
+    const o = optionsOf(s);
+    let k = 0; for (let i = 1; i < r; i++) if (roundMode(s, i) === 'order') k++;
+    return o.orderStyle === 'snake' && k % 2 === 1 ? [...s.leaders].reverse() : [...s.leaders];
+  }
+  // 順番指名でいま指名する人(この巡でまだ確定していない、順番の最初の人)
+  const currentTurn = (s) => (roundMode(s) === 'order' ? turnOrder(s).find((l) => !pickOf(s, l.id, s.round)) || null : null);
+  // ドラフトが始まっているか(指名か確定が1つでもある)
+  const draftStarted = (s) => s.picks.length > 0 || s.round > 1 || Object.values(s.noms).some((n) => n.playerId);
   const teamOf = (s, leaderId) => s.picks.filter((p) => p.leaderId === leaderId).sort((a, b) => a.round - b.round);
 
   // 公開済みで、まだ確定していない指名のうち、2人以上が同じ選手を指名しているもの
@@ -88,19 +108,23 @@
         break;
       }
       case 'updateLeader': { const l = leaderById(s, action.id); if (l) Object.assign(l, action.patch); break; }
-      case 'removeLeader': s.leaders = s.leaders.filter((l) => l.id !== action.id); delete s.noms[action.id]; break;
+      case 'removeLeader':
+        if (draftStarted(s)) throw new Error('ドラフトの途中はリーダーを削除できません');
+        s.leaders = s.leaders.filter((l) => l.id !== action.id); delete s.noms[action.id]; break;
       case 'moveLeader': {
         const i = s.leaders.findIndex((l) => l.id === action.id), j = i + action.dir;
         if (i >= 0 && j >= 0 && j < s.leaders.length) [s.leaders[i], s.leaders[j]] = [s.leaders[j], s.leaders[i]];
         break;
       }
-      case 'addPlayers': for (const p of action.players) s.players.push({ id: uid('P'), name: p.name, icon: p.icon || '' }); break;
+      case 'addPlayers': for (const p of action.players) s.players.push({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }); break;
       case 'updatePlayer': { const p = playerById(s, action.id); if (p) Object.assign(p, action.patch); break; }
-      case 'removePlayer': s.players = s.players.filter((p) => p.id !== action.id); break;
+      case 'removePlayer':
+        if (draftStarted(s)) throw new Error('ドラフトの途中は選手を削除できません（欠場にしてください）');
+        s.players = s.players.filter((p) => p.id !== action.id); break;
       case 'replaceRoster': // CSV 読み込み
         if (action.leaders && action.leaders.length > MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです（CSVに${action.leaders.length}人います）`);
         if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), name: l.name, color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '' }));
-        if (action.players) s.players = action.players.map((p) => ({ id: uid('P'), name: p.name, icon: p.icon || '' }));
+        if (action.players) s.players = action.players.map((p) => ({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }));
         break;
 
       case 'nominate': { // 公開前の指名を入れる/変える(空で取り消し)
@@ -111,13 +135,19 @@
         if (s.lottery && !s.lottery.done) throw new Error('抽選の演出が終わるまで待ってください');
         if (conflicts(s).length) throw new Error('残りの重複をすべて抽選してから再指名してください');
         if (action.playerId && pickedIds(s).has(action.playerId)) throw new Error('その選手はすでに指名が確定しています');
+        if (action.playerId && playerById(s, action.playerId)?.absent) throw new Error('その選手は欠場です');
+        const turn = currentTurn(s);
+        if (turn && turn.id !== action.leaderId) throw new Error('順番指名です。いまは ' + turn.name + ' の番です');
         s.noms[action.leaderId] = { playerId: action.playerId || null, revealed: false };
         break;
       }
       case 'reveal': { // 入力済みの指名を一斉公開 → 単独指名は確定。leaderId を付けると1人だけ公開
         const ids = action.leaderId ? [action.leaderId] : pendingLeaders(s).map((l) => l.id);
         for (const id of ids) { const n = s.noms[id]; if (n && n.playerId) n.revealed = true; }
-        confirmSingles(s);
+        if (roundMode(s) === 'order') {
+          // 順番指名は公開した時点で確定(すでに確定した選手は選べないので重複しない)
+          for (const id of ids) { const n = s.noms[id]; if (n && n.revealed && !pickOf(s, id, s.round)) s.picks.push({ round: s.round, leaderId: id, playerId: n.playerId, by: 'order' }); }
+        } else confirmSingles(s);
         s.scene = 'board'; // 公開はボードで見せる
         // spot: true なら、その人を配信画面に大きく出す(ピックアップ公開)
         s.spot = action.spot && action.leaderId ? action.leaderId : null;
@@ -132,6 +162,7 @@
         const winner = c.leaders[Math.floor(rng() * c.leaders.length)];
         s.lottery = { id: uid('R'), playerId: c.playerId, leaders: c.leaders, winner, done: false };
         s.lotteries.push({ id: s.lottery.id, round: s.round, playerId: c.playerId, leaders: c.leaders, winner, at: Date.now() });
+        s.lotteryLog = [...(s.lotteryLog || []), { id: s.lottery.id, round: s.round, playerId: c.playerId, leaders: c.leaders, winner, at: Date.now() }];
         s.picks.push({ round: s.round, leaderId: winner, playerId: c.playerId, by: 'lottery' });
         // 外れたリーダーは再指名(指名を空に戻す)
         for (const id of c.leaders) if (id !== winner) s.noms[id] = { playerId: null, revealed: false };
@@ -147,7 +178,21 @@
       case 'setScene': s.scene = action.scene; break;
       // 音(BGM・効果音)の設定。「戻す」の対象外
       case 'setAudio': s.audio = Object.assign({}, DEFAULT_AUDIO, s.audio, action.patch); break;
-      case 'resetDraft': s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; s.spot = null; break;
+      // ドラフトを最初から(名簿・画像・音・設定はそのまま。抽選の記録には「リセット」を残す)
+      case 'resetDraft':
+        s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; s.spot = null; s.timer = { endsAt: null, left: null };
+        s.lotteryLog = [...(s.lotteryLog || []), { reset: true, at: Date.now() }];
+        break;
+      // 設定(進め方・抽選演出・タイマー・待ち時間の画像)。「戻す」の対象外
+      case 'setOption': s.options = Object.assign({}, DEFAULT_OPTIONS, s.options, action.patch); break;
+      // 制限時間: start(残りがあれば続きから) / stop(一時停止) / reset
+      case 'timer': {
+        const sec = optionsOf(s).timerSec, t = s.timer || {}, now = action.now || Date.now();
+        if (action.cmd === 'start') s.timer = { endsAt: now + (t.left ?? sec) * 1000, left: null };
+        else if (action.cmd === 'stop') s.timer = { endsAt: null, left: t.endsAt ? Math.max(0, Math.round((t.endsAt - now) / 1000)) : t.left };
+        else s.timer = { endsAt: null, left: null };
+        break;
+      }
       default: throw new Error('不明な操作: ' + action.type);
     }
     return s;
@@ -168,11 +213,11 @@
     return rows.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c));
   }
   const csvCell = (v) => (/[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? ''));
-  // 書式: 種類,名前,色,画像ファイル  (種類 = リーダー / 選手)。旧書式(チーム名の列あり)も読める
+  // 書式: 種類,名前,色,画像ファイル,ひとこと  (種類 = リーダー / 選手)。旧書式(チーム名の列あり・ひとことなし)も読める
   function rosterToCSV(s) {
-    const lines = ['種類,名前,色,画像ファイル'];
-    for (const l of s.leaders) lines.push(['リーダー', l.name, l.color, l.icon].map(csvCell).join(','));
-    for (const p of s.players) lines.push(['選手', p.name, '', p.icon].map(csvCell).join(','));
+    const lines = ['種類,名前,色,画像ファイル,ひとこと'];
+    for (const l of s.leaders) lines.push(['リーダー', l.name, l.color, l.icon, ''].map(csvCell).join(','));
+    for (const p of s.players) lines.push(['選手', p.name, '', p.icon, p.note || ''].map(csvCell).join(','));
     return lines.join('\r\n') + '\r\n';
   }
   function rosterFromCSV(text) {
@@ -182,12 +227,12 @@
     for (const r0 of rows) {
       const kind = r0[0];
       if (kind === '種類') { old = r0.includes('チーム名'); continue; }
-      const r = old || r0.length >= 5 ? [r0[0], r0[1], r0[3], r0[4]] : r0;
+      const r = old ? [r0[0], r0[1], r0[3], r0[4], ''] : r0;
       if (/^リーダー|^leader$/i.test(kind)) leaders.push({ name: r[1], color: /^#[0-9a-f]{6}$/i.test(r[2] || '') ? r[2] : '', icon: r[3] || '' });
-      else if (/^選手|^player$/i.test(kind)) players.push({ name: r[1], icon: r[3] || '' });
+      else if (/^選手|^player$/i.test(kind)) players.push({ name: r[1], icon: r[3] || '', note: r[4] || '' });
     }
     return { leaders, players };
   }
 
-  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, MAX_ROUNDS, MAX_LEADERS };
+  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted };
 }));

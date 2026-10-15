@@ -16,8 +16,12 @@ const MIME = {
   '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.opus': 'audio/ogg', '.wav': 'audio/wav',
   '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac',
+  '.woff2': 'font/woff2', '.woff': 'font/woff',
 };
 const HISTORY_MAX = 200;
+// 「戻す」の対象にしない操作と、戻しても変えない状態
+const NO_UNDO = new Set(['lotteryDone', 'setAudio', 'setOption', 'timer']);
+const KEEP_ON_UNDO = ['audio', 'options', 'timer', 'lotteryLog'];
 const IMG_RE = /\.(png|jpe?g|gif|webp)$/i;
 const AUDIO_RE = /\.(mp3|ogg|oga|opus|wav|m4a|aac|flac)$/i;
 // 抽選は暗号論的な乱数で(偏りなく)
@@ -97,7 +101,9 @@ function start(opts = {}) {
   const wss = new WebSocket.Server({ server });
   const send = (ws, msg) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(msg));
   const broadcast = (msg) => wss.clients.forEach((c) => send(c, msg));
-  const snapshot = () => ({ type: 'state', state, canUndo: history.length > 0, demo: mode === 'demo' });
+  // 「1つ戻す」で抽選が取り消されるか(管理画面で確認を出すため)
+  const undoCancelsLottery = () => history.length > 0 && history[history.length - 1].lotteries.length < state.lotteries.length;
+  const snapshot = () => ({ type: 'state', state, canUndo: history.length > 0, undoCancelsLottery: undoCancelsLottery(), demo: mode === 'demo' });
 
   // 配信画面(OBS)を開いていないと演出の終わりが届かず先へ進めないので、2分たったら終わったことにする
   function lotterySafety(id) {
@@ -130,7 +136,7 @@ function start(opts = {}) {
         if (msg.type === 'action') {
           const next = Core.apply(state, msg.action, fairRandom);
           // 抽選の演出完了の知らせと音の設定は「戻す」の対象にしない
-          if (msg.action.type !== 'lotteryDone' && msg.action.type !== 'setAudio') { history.push(state); if (history.length > HISTORY_MAX) history.shift(); }
+          if (!NO_UNDO.has(msg.action.type)) { history.push(state); if (history.length > HISTORY_MAX) history.shift(); }
           state = next;
           if (msg.action.type === 'drawLottery') {
             // 配信画面が開いていなければ演出は流れないので、その場で結果を出す
@@ -139,8 +145,11 @@ function start(opts = {}) {
           }
         } else if (msg.type === 'undo') {
           if (!history.length) return;
-          const audio = state.audio; // 戻しても音の設定はそのまま
-          state = history.pop(); state.audio = audio;
+          // 戻しても、音・設定・タイマー・抽選の記録はそのまま。取り消された抽選は記録に「取り消し」を付ける
+          const keep = Object.fromEntries(KEEP_ON_UNDO.map((k) => [k, state[k]]));
+          state = Object.assign(history.pop(), keep);
+          const alive = new Set(state.lotteries.map((x) => x.id));
+          state.lotteryLog = (state.lotteryLog || []).map((e) => (e.id && !alive.has(e.id) && !e.canceledAt ? { ...e, canceledAt: Date.now() } : e));
         } else if (msg.type === 'mode') { // お試しモードの出入り / お試しのやり直し
           switchMode(msg.mode, !!msg.fresh);
         } else return;

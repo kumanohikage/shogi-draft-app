@@ -90,6 +90,12 @@
 
     <h3 class="mt-10 mb-4 text-xl font-bold text-[var(--text-heading)]">チーム</h3>
     <div id="teams" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"></div>
+
+    <!-- 抽選の記録(取り消した抽選も残る) -->
+    <details class="mt-10 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+      <summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">抽選の記録 <span id="lottery-log-count" class="text-sm font-normal text-[var(--text-muted)]"></span></summary>
+      <ul id="lottery-log" class="px-4 pb-3 divide-y divide-[var(--border-default)]"></ul>
+    </details>
   </section>
 
   <!-- 登録 -->
@@ -114,6 +120,7 @@
       <div class="ml-auto flex gap-2">
         <button type="button" id="csv-in" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">CSV読み込み</button>
         <button type="button" id="csv-out" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">CSV書き出し</button>
+        <button type="button" data-reset class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-red-300 border border-red-500/50 rounded-lg hover:bg-red-500/[.12] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="名簿はそのままで、指名と抽選の結果だけを消します">ドラフトを最初から</button>
       </div>
       <input id="csv-file" type="file" accept=".csv,text/csv" hidden aria-label="CSVファイル">
     </div>

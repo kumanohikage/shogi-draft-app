@@ -10,17 +10,21 @@
     "css": "tailwindcss -c tailwind.config.js -i ui/control.src.css -o public/control.css --minify",
     "check:ui": "npm run css && electron scripts/check-ui.js",
     "test": "node test/core.test.js",
-    "dist": "npm run css && electron-builder --win"
+    "dist": "npm run vendor && npm run css && electron-builder --win",
+    "vendor": "node scripts/vendor.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@fontsource/dela-gothic-one": "^5.3.0",
+    "@fontsource/noto-sans-jp": "^5.3.1",
     "axe-core": "^4.11.1",
     "electron": "^43.1.1",
     "electron-builder": "^26.15.3",
     "melta-ds-mcp": "^1.9.1",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "three": "^0.170.0"
   },
   "build": {
     "appId": "jp.kumanohikage.draftapp",

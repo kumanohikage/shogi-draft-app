@@ -50,7 +50,7 @@ const back = C.rosterFromCSV(csv);
 assert.strictEqual(back.leaders.length, 6); assert.strictEqual(back.players.length, 20);
 assert.deepStrictEqual(C.rosterFromCSV('種類,名前,色,画像ファイル\n選手,"a,b"\nリーダー,X,#123456,x.png').leaders[0], { name: 'X', color: '#123456', icon: 'x.png' });
 // 旧書式(チーム名の列あり)も読める
-assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像ファイル\nリーダー,X,チームX,#123456,x.png\n選手,Y,,,y.png'), { leaders: [{ name: 'X', color: '#123456', icon: 'x.png' }], players: [{ name: 'Y', icon: 'y.png' }] });
+assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像ファイル\nリーダー,X,チームX,#123456,x.png\n選手,Y,,,y.png'), { leaders: [{ name: 'X', color: '#123456', icon: 'x.png' }], players: [{ name: 'Y', icon: 'y.png', note: '' }] });
 
 // 1人ずつ公開: 全員公開するまでは確定しない(後から重複が出ることがあるため)
 {
@@ -111,6 +111,65 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
   assert.strictEqual(t.picks.length, 3);
   t = C.apply(t, { type: 'spotEnd' });
   assert.strictEqual(t.spot, null);
+}
+
+// 欠場・削除の制限・ひとこと
+{
+  let t = C.initialState();
+  for (let i = 0; i < 2; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
+  t = C.apply(t, { type: 'addPlayers', players: [{ name: 'a', note: '初段' }, { name: 'b' }] });
+  const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
+  assert.strictEqual(t.players[0].note, '初段');
+  assert.ok(C.rosterToCSV(t).includes('選手,a,,,初段'));
+  t = C.apply(t, { type: 'nominate', leaderId: L[0], playerId: P[0] });
+  assert.throws(() => C.apply(t, { type: 'removePlayer', id: P[1] }), /欠場/);
+  assert.throws(() => C.apply(t, { type: 'removeLeader', id: L[1] }), /削除できません/);
+  t = C.apply(t, { type: 'updatePlayer', id: P[1], patch: { absent: true } });
+  assert.throws(() => C.apply(t, { type: 'nominate', leaderId: L[1], playerId: P[1] }), /欠場/);
+}
+
+// 順番指名(スネーク): 1巡目は一斉入札、2・3巡目は順番指名。2巡目は登録順、3巡目は逆順
+{
+  let t = C.initialState();
+  for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
+  t = C.apply(t, { type: 'addPlayers', players: Array.from({ length: 9 }, (_, i) => ({ name: `p${i}` })) });
+  t = C.apply(t, { type: 'setOption', patch: { roundModes: ['bid', 'order', 'order'], orderStyle: 'snake' } });
+  const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
+  for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'nominate', leaderId: L[i], playerId: P[i] });
+  t = C.apply(t, { type: 'reveal' });
+  t = C.apply(t, { type: 'nextRound' });
+  assert.strictEqual(C.currentTurn(t).id, L[0]);
+  assert.throws(() => C.apply(t, { type: 'nominate', leaderId: L[1], playerId: P[3] }), /番です/);
+  t = C.apply(t, { type: 'nominate', leaderId: L[0], playerId: P[3] });
+  t = C.apply(t, { type: 'reveal', leaderId: L[0] });
+  assert.ok(C.pickOf(t, L[0], 2), '順番指名は公開で確定');
+  assert.strictEqual(C.currentTurn(t).id, L[1]);
+  for (const [i, p] of [[1, 4], [2, 5]]) { t = C.apply(t, { type: 'nominate', leaderId: L[i], playerId: P[p] }); t = C.apply(t, { type: 'reveal', leaderId: L[i] }); }
+  t = C.apply(t, { type: 'nextRound' });
+  assert.deepStrictEqual(C.turnOrder(t).map((l) => l.id), [L[2], L[1], L[0]], 'スネークで逆順');
+}
+
+// 抽選の記録・リセット・タイマー
+{
+  let t = C.initialState();
+  for (let i = 0; i < 2; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
+  t = C.apply(t, { type: 'addPlayers', players: [{ name: 'a' }] });
+  const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
+  for (const id of L) t = C.apply(t, { type: 'nominate', leaderId: id, playerId: P[0] });
+  t = C.apply(t, { type: 'reveal' });
+  t = C.apply(t, { type: 'drawLottery', playerId: P[0] }, () => 0);
+  assert.strictEqual(t.lotteryLog.length, 1);
+  t = C.apply(t, { type: 'resetDraft' });
+  assert.strictEqual(t.picks.length, 0);
+  assert.strictEqual(t.players.length, 1, '名簿は残る');
+  assert.ok(t.lotteryLog[1].reset);
+  t = C.apply(t, { type: 'setOption', patch: { timerSec: 60 } });
+  t = C.apply(t, { type: 'timer', cmd: 'start', now: 1000 });
+  assert.strictEqual(t.timer.endsAt, 61000);
+  t = C.apply(t, { type: 'timer', cmd: 'stop', now: 31000 });
+  assert.strictEqual(t.timer.left, 30);
+  t = C.apply(t, { type: 'timer', cmd: 'start', now: 40000 });
+  assert.strictEqual(t.timer.endsAt, 70000, '止めた所から続き');
 }
 
 console.log('core OK');

@@ -67,7 +67,7 @@ function cardHtml(l, playerId, stamp, dup, pop, wait = '指名待ち') {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(l.color)}"><div class="in">
       <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(l.name)}</div></div>
-        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<b>${esc(p ? p.name : '')}</b></div>
+        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && p.note ? `<small>${esc(p.note)}</small>` : ''}</div></div>
         ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
       <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(l.name)}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
     </div></div>`;

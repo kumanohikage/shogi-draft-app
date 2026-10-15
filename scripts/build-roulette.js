@@ -21,6 +21,11 @@ rep('</style>', `  /* アプリ埋め込み: 操作UIは出さない */
 rep('  const winner = PREVIEW ? previewWinner(n) : Math.floor(Math.random() * n);',
   '  // 埋め込み: 勝者はアプリ(サーバー)が抽選済みのものを使う\n  const winner = EMBED.winner;');
 
+// ネットが無くても動くように、フォントと3D表示(three.js)はアプリに同梱したものを読む(scripts/vendor.js)
+rep("<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n<link href=\"https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@700;900&display=swap\" rel=\"stylesheet\">", "<!-- フォントはアプリに同梱(ネットが無くても表示できる) -->\n<link href=\"vendor/fonts/dela-gothic-one/font.css\" rel=\"stylesheet\">\n<link href=\"vendor/fonts/noto-sans-jp/font.css\" rel=\"stylesheet\">");
+rep('"three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"', '"three": "./vendor/three/build/three.module.js"');
+rep('"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"', '"three/addons/": "./vendor/three/examples/jsm/"');
+
 // 「ボタンを押せ」「連打」は出さない(配信画面は OBS の中なので主催者が触れない)
 rep('  const push = chance(PUSH_RATE[heat]);', '  const push = false; // アプリ埋め込み: PUSH 演出なし');
 rep('    plan.push = true; plan.mash = true; plan.heat = \'rainbow\';', '    plan.push = false; plan.mash = false; plan.heat = \'rainbow\';');

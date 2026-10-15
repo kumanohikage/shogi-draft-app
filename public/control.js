@@ -5,7 +5,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const img = (f) => (f ? `/images/${encodeURIComponent(f)}` : '');
 const OVERLAY_URL = `${location.origin}/overlay`;
 
-let S = null, canUndo = false, demo = false, ws = null, bgmList = [], overlay = { count: 0 };
+let S = null, canUndo = false, undoCancelsLottery = false, demo = false, ws = null, bgmList = [], overlay = { count: 0 };
 
 /* ---------- 見た目(melta UI のクラス。色はアプリの金×焦げ茶) ---------- */
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50';
@@ -44,7 +44,7 @@ function connect() {
   ws.onclose = () => { $('conn').textContent = '× 切断（再接続中…）'; $('conn').className = 'text-xs text-red-300'; setTimeout(connect, 1000); };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state') { S = m.state; canUndo = m.canUndo; demo = !!m.demo; render(); }
+    if (m.type === 'state') { S = m.state; canUndo = m.canUndo; undoCancelsLottery = !!m.undoCancelsLottery; demo = !!m.demo; render(); }
     else if (m.type === 'presence') { overlay = m; renderOverlayStatus(); if (S) renderRun(); }
     else if (m.type === 'bgmList') { bgmList = m.list; if (S) renderAudio(); }
     else if (m.type === 'error') toast(m.message, true);
@@ -90,6 +90,7 @@ function render() {
   renderRun();
   renderRoster();
   renderAudio();
+  renderLotteryLog();
 }
 
 /* ---------- 次にやること ----------
@@ -184,7 +185,7 @@ function renderRun() {
 
   // 各リーダーの指名
   const taken = C.pickedIds(S);
-  const options = S.players.filter((p) => !taken.has(p.id));
+  const options = S.players.filter((p) => !taken.has(p.id) && !p.absent);
   const picked = (id) => {
     const p = C.playerById(S, id);
     return `<div class="flex items-center gap-3 h-11">${avatar(p?.icon, null, 'w-9 h-9')}<p class="text-lg font-bold text-[var(--text-heading)] truncate">${esc(p?.name)}</p></div>`;
@@ -223,26 +224,48 @@ function renderRun() {
   }).join('');
 }
 
+// 抽選の記録(取り消し・リセットも残る)
+function renderLotteryLog() {
+  const log = S.lotteryLog || [];
+  $('lottery-log-count').textContent = `（${log.filter((e) => e.id).length}件）`;
+  const time = (t) => new Date(t).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const name = (id) => esc(C.playerById(S, id)?.name || '（削除された選手）');
+  const lname = (id) => esc(C.leaderById(S, id)?.name || '（削除されたリーダー）');
+  $('lottery-log').innerHTML = log.length ? log.slice().reverse().map((e) => e.reset
+    ? `<li class="flex items-center gap-3 py-2"><span class="w-20 flex-none text-xs text-[var(--text-muted)]">${time(e.at)}</span>${badge('wait', 'リセット')}<span class="text-sm text-[var(--text-muted)]">ドラフトを最初からにしました</span></li>`
+    : `<li class="flex flex-wrap items-center gap-3 py-2"><span class="w-20 flex-none text-xs text-[var(--text-muted)]">${time(e.at)}</span>${e.canceledAt ? badge('dup', '取り消し') : badge('ok', '有効')}
+      <span class="text-sm ${e.canceledAt ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-heading)]'}">第${e.round}巡 <b>${name(e.playerId)}</b>（${e.leaders.map(lname).join(' / ')}）→ <b>${lname(e.winner)}</b></span>
+      ${e.canceledAt ? `<span class="text-xs text-red-300">${time(e.canceledAt)} に取り消し</span>` : ''}</li>`).join('')
+    : '<li class="py-2 text-sm text-[var(--text-muted)]">まだ抽選はありません</li>';
+}
+
 function renderRoster() {
   if (document.activeElement && document.activeElement.closest('#tab-roster') && document.activeElement.matches('input[type=text],textarea')) return; // 入力中は描き直さない
   $('in-title').value = S.title; $('in-rounds').value = S.rounds;
+  const started = C.draftStarted(S);
   $('leaders').innerHTML = S.leaders.map((l, i) => `<div class="item ${CARD} flex flex-wrap items-end gap-4 px-4 py-3" data-id="${l.id}">
     <button type="button" data-icon="L" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の画像を${l.icon ? '変更' : '設定'}" title="クリック or 画像をドロップで${l.icon ? '変更' : '設定'}">${avatar(l.icon, l.color, 'w-11 h-11')}${CAM}</button>
     <div class="leading-normal"><label class="${LABEL}" for="ln-${l.id}">リーダー名</label><input id="ln-${l.id}" type="text" data-lf="name" value="${esc(l.name)}" class="w-48 ${INPUT}"></div>
     <div class="leading-normal"><label class="${LABEL}" for="lc-${l.id}">色</label><input id="lc-${l.id}" type="color" data-lf="color" value="${esc(l.color)}" class="block w-14 h-11 p-1 bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}"></div>
     <div class="ml-auto flex gap-1">
-      <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="上へ" ${i ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
-      <button type="button" class="${BTN_ICON}" data-move="1" aria-label="下へ" ${i < S.leaders.length - 1 ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
-      <button type="button" class="${BTN_ICON} hover:text-red-300" data-del-leader aria-label="${esc(l.name)} を削除">${ICON.del}</button>
+      <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="上へ" ${i && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
+      <button type="button" class="${BTN_ICON}" data-move="1" aria-label="下へ" ${i < S.leaders.length - 1 && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
+      <button type="button" class="${BTN_ICON} hover:text-red-300" data-del-leader aria-label="${esc(l.name)} を削除" ${started ? 'disabled aria-disabled="true" title="ドラフトの途中は削除できません"' : ''}>${ICON.del}</button>
     </div></div>`).join('') || '<p class="text-base text-[var(--text-muted)] text-center py-16">まだいません。「追加」で登録してください</p>';
   const taken = C.pickedIds(S);
   $('player-count').textContent = `${S.players.length}人`;
   $('leader-count').textContent = `${S.leaders.length} / ${C.MAX_LEADERS}人`;
   setDisabled($('add-leader'), S.leaders.length >= C.MAX_LEADERS);
-  $('players').innerHTML = S.players.map((p) => `<div class="item ${CARD} flex items-center gap-2 p-2 ${taken.has(p.id) ? 'opacity-50' : ''}" data-id="${p.id}" title="${taken.has(p.id) ? '指名済み' : ''}">
+  $('players').innerHTML = S.players.map((p) => `<div class="item ${CARD} flex items-start gap-2 p-2 ${taken.has(p.id) ? 'opacity-50' : ''}" data-id="${p.id}" title="${taken.has(p.id) ? '指名済み' : ''}">
     <button type="button" data-icon="P" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(p.name)} の画像を${p.icon ? '変更' : '設定'}" title="クリック or 画像をドロップで${p.icon ? '変更' : '設定'}">${avatar(p.icon, null, 'w-11 h-11')}${CAM}</button>
-    <input type="text" data-pf="name" value="${esc(p.name)}" aria-label="選手名" class="min-w-0 flex-1 ${INPUT}">
-    <button type="button" class="${BTN_ICON} hover:text-red-300" data-del-player aria-label="${esc(p.name)} を削除">${ICON.del}</button></div>`).join('')
+    <div class="min-w-0 flex-1 flex flex-col gap-1">
+      <input type="text" data-pf="name" value="${esc(p.name)}" aria-label="選手名" class="w-full ${INPUT}">
+      <input type="text" data-pf="note" value="${esc(p.note || '')}" aria-label="${esc(p.name)} のひとこと" placeholder="ひとこと（段位など）" maxlength="30" class="w-full ${INPUT}">
+      ${p.absent ? `<span>${badge('dup', '欠場')}</span>` : ''}
+    </div>
+    ${taken.has(p.id) ? '' : started
+      ? `<button type="button" class="${BTN_SUB} flex-none px-3 text-sm" data-absent aria-pressed="${!!p.absent}">${p.absent ? '欠場を取り消す' : '欠場にする'}</button>`
+      : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-del-player aria-label="${esc(p.name)} を削除">${ICON.del}</button>`}</div>`).join('')
     || '<p class="col-span-full text-base text-[var(--text-muted)] text-center py-16">まだいません。上の欄に名前を入れて「まとめて追加」</p>';
 }
 
@@ -260,7 +283,10 @@ function selectTab(name) {
 document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
 selectTab('run');
 
-$('undo').addEventListener('click', () => ws.send(JSON.stringify({ type: 'undo' })));
+$('undo').addEventListener('click', () => {
+  if (undoCancelsLottery && !confirm('直前の抽選を取り消します。\n取り消したことは「抽選の記録」に残ります。よろしいですか？')) return;
+  ws.send(JSON.stringify({ type: 'undo' }));
+});
 // 進行タブでは、スペースキーで「次にやること」のメインのボタン(オレンジ)を押せる。
 // 文字の入力中・登録タブ・画像の調整中は何もしない(暴発しないように)。押しっぱなしの連打も無視
 let lastSpace = 0;
@@ -294,6 +320,8 @@ document.addEventListener('click', (e) => {
   else if (t.dataset.move) act({ type: 'moveLeader', id: t.closest('.item').dataset.id, dir: +t.dataset.move });
   else if (t.dataset.delLeader !== undefined) { if (confirm('このリーダーを削除しますか？')) act({ type: 'removeLeader', id: t.closest('.item').dataset.id }); }
   else if (t.dataset.delPlayer !== undefined) act({ type: 'removePlayer', id: t.closest('.item').dataset.id });
+  else if (t.dataset.absent !== undefined) { const p = C.playerById(S, t.closest('.item').dataset.id); act({ type: 'updatePlayer', id: p.id, patch: { absent: !p.absent } }); }
+  else if (t.dataset.reset !== undefined) { if (confirm('ドラフトを最初からやり直します。\n名簿・画像・音の設定はそのままで、指名と抽選の結果だけを消します。\n（「1つ戻す」で元に戻せます）')) { act({ type: 'resetDraft' }); toast('ドラフトを最初からにしました'); } }
   else if (t.dataset.icon) pickImage(t.dataset.icon, t.closest('.item').dataset.id);
 });
 $('add-leader').addEventListener('click', () => act({ type: 'addLeader' }));
@@ -325,7 +353,7 @@ function doNext(key, arg) {
 // おまかせ指名(お試し専用): 空いている指名をランダムに入れる。上位の選手に寄せて、ときどき重複が起きるようにする
 function autoNominate() {
   const taken = C.pickedIds(S);
-  const free = S.players.filter((p) => !taken.has(p.id));
+  const free = S.players.filter((p) => !taken.has(p.id) && !p.absent);
   const hot = free.slice(0, 3);
   for (const l of C.pendingLeaders(S)) {
     if (S.noms[l.id] && S.noms[l.id].playerId) continue;
