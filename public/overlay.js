@@ -289,7 +289,17 @@ function renderSlide() {
   } else {
     $('slide-title').innerHTML = titleHtml('');
     $('slide-body').innerHTML = `<div class="slidebox"><h2>${esc(sl.title)}</h2><ul>${(sl.lines || []).filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
+    fitSlide();
+    document.fonts.ready.then(fitSlide); // フォントの読み込みで大きさが変わるので、読み込み後にもう一度
   }
+}
+// 文字の資料: パネルに入りきらないときは、入るまで文字を少しずつ縮める(半分まで)
+function fitSlide() {
+  const box = document.querySelector('#slide-body .slidebox');
+  if (!box) return;
+  let k = 1;
+  box.style.setProperty('--k', k);
+  while (box.scrollHeight > box.clientHeight + 1 && k > 0.5) { k = Math.round((k - 0.04) * 100) / 100; box.style.setProperty('--k', k); }
 }
 // 立ち絵＋名前の帯(＋紹介文 / 「第◯巡 選択希望選手」)。立ち絵が無ければアイコンを大きく丸で
 // 帯の名前: リーダー紹介はフルネーム、ほかは「チーム＋略称」
