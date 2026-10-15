@@ -11,7 +11,8 @@
   body { font-family: 'Noto Sans JP', sans-serif; color: #3a2408; }
   /* 1920×1080 の舞台を窓に合わせて拡大縮小 */
   #stage { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
-  .scene { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .5s; display: flex; flex-direction: column; }
+  /* 場面の切り替えは一瞬で(重ねて薄くすると、途中で両方が半透明になって OBS 側が透けて光って見える) */
+  .scene { position: absolute; inset: 0; opacity: 0; pointer-events: none; display: flex; flex-direction: column; }
   .scene.on { opacity: 1; }
   .bg { background: radial-gradient(ellipse at 50% 40%, #fff3c4 0%, #e8b84a 38%, #8a5a12 75%, #3a2408 100%); }
   .bg::before { content: ''; position: absolute; inset: 0; opacity: .25;

@@ -297,9 +297,13 @@ document.addEventListener('click', (e) => {
 });
 $('add-leader').addEventListener('click', () => act({ type: 'addLeader' }));
 $('add-players').addEventListener('click', () => {
-  const names = $('bulk-players').value.split('\n').map((v) => v.trim()).filter(Boolean);
-  if (!names.length) return;
-  act({ type: 'addPlayers', players: names.map((name) => ({ name })) });
+  // 1行に1人。「名前,ひとこと」のようにカンマ(またはタブ)で区切ると、ひとことも入る(表計算ソフトから2列を貼り付けてもよい)
+  const players = $('bulk-players').value.split('\n').map((v) => v.trim()).filter(Boolean).map((line) => {
+    const [name, ...rest] = line.split(/[,，\t]/);
+    return { name: name.trim(), note: rest.join(' ').trim() };
+  }).filter((p) => p.name);
+  if (!players.length) return;
+  act({ type: 'addPlayers', players });
   $('bulk-players').value = '';
 });
 
