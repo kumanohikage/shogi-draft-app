@@ -197,3 +197,18 @@ console.log('core OK');
   assert.strictEqual(s.timer.endsAt, null);
 }
 console.log('略称・巡のはじめ ok');
+// 番組の CSV: 書き出し → 読み込みで同じ番組になる
+{
+  let s = C.apply(C.initialState(), { type: 'setOption', patch: { roundModes: ['bid', 'order', 'order'], orderStyle: 'waiver', timerSec: 240, flowStand: false, waitImages: { 2: ['a.png', 'b.png'] }, teamPrefix: '' } });
+  s = C.apply(s, { type: 'addSlide', kind: 'image', toProgram: true, at: 1 });
+  const csv = C.showToCSV(s);
+  let t = C.apply(C.initialState(), { type: 'replaceShow', ...C.showFromCSV(csv) });
+  assert.strictEqual(C.showToCSV(t), csv);
+  assert.deepStrictEqual(C.optionsOf(t).waitImages, { 1: [], 2: ['a.png', 'b.png'], 3: [] });
+  assert.strictEqual(C.slideById(t, C.programOf(t).find((g) => g.label === 'ドラフト説明').slideId).rules, true);
+  // ドラフトの場面がない CSV でも、ドラフトは必ず残る
+  const r = C.showFromCSV('種類,項目,値\n進行表,ロゴ,オープニング\n');
+  assert.deepStrictEqual(r.program.map((g) => g.type), ['logo', 'draft']);
+  assert.strictEqual(C.normalize({ rounds: 10, round: 1 }).rounds, 3);
+}
+console.log('番組の CSV ok');

@@ -314,6 +314,18 @@
         startRoundTimer(s, action.now || Date.now());
         break;
       case 'setScene': s.scene = action.scene; break;
+      // 番組の CSV 読み込み(大会・進め方・見た目・進行表)。ドラフトの途中でも名簿と結果はそのまま
+      case 'replaceShow': {
+        if (action.title != null) s.title = String(action.title).slice(0, 40);
+        if (action.rounds != null) { if (draftStarted(s) && action.rounds !== s.rounds) throw new Error('ドラフトの途中は巡の数を変えられません'); s.rounds = Math.max(1, Math.min(MAX_ROUNDS, action.rounds | 0)); }
+        if (action.options) s.options = Object.assign({}, DEFAULT_OPTIONS, s.options, action.options);
+        if (action.program) {
+          s.slides = action.slides || [];
+          s.program = action.program;
+          s.progIdx = Math.min(progIdxOf(s), s.program.length - 1);
+        }
+        break;
+      }
       // 音(BGM・効果音)の設定。「戻す」の対象外
       case 'setAudio': s.audio = Object.assign({}, DEFAULT_AUDIO, s.audio, action.patch); break;
       // ドラフトを最初から(名簿・画像・音・設定はそのまま。抽選の記録には「リセット」を残す)
@@ -374,5 +386,73 @@
     return { leaders, players };
   }
 
-  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  // ---------- 番組の CSV(大会・進め方・見た目・進行表) ----------
+  // 書式: 種類,項目,値,値,…  種類 = 大会 / 進め方 / 見た目 / 進行表。進行表の行は上から順に場面になる
+  // 進行表の項目 = 場面の種類(ロゴ・文字の資料・ドラフト説明・画像の資料・リーダー紹介・ドラフト・最終チーム表・何も出さない)、値 = 場面の名前 …
+  const yes = (v) => /^(する|出す|はい|true|1|on)$/i.test(String(v || '').trim());
+  const SCENE_CSV = { logo: 'ロゴ', intro: 'リーダー紹介', draft: 'ドラフト', final: '最終チーム表', blank: '何も出さない' };
+  function showToCSV(s) {
+    const o = optionsOf(s), rows = [['種類', '項目', '値']];
+    rows.push(['大会', '大会名', s.title], ['大会', '巡の数', s.rounds]);
+    rows.push(['進め方', '指名のしかた', ...Array.from({ length: s.rounds }, (_, i) => (roundMode(s, i + 1) === 'order' ? '順番指名' : '一斉入札'))]);
+    rows.push(['進め方', '順番指名の順番', o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク']);
+    rows.push(['進め方', '抽選の演出', o.lotteryStyle === 'short' ? '短い' : '通常']);
+    rows.push(['進め方', '制限時間（秒）', o.timerSec]);
+    rows.push(['進め方', 'タイマーを自動でスタート', o.timerAuto ? 'する' : 'しない'], ['進め方', 'タイマーを配信画面に出す', o.timerShow ? 'する' : 'しない']);
+    rows.push(['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
+    for (let r = 1; r <= s.rounds; r++) rows.push(['進め方', `待ち時間の画像（第${r}巡）`, ...((o.waitImages || {})[r] || [])]);
+    rows.push(['見た目', '背景', o.bgImage], ['見た目', '大会ロゴ', o.logoImage], ['見た目', '名前の前につける文字', o.teamPrefix]);
+    for (const g of programOf(s)) {
+      if (g.type !== 'slide') { rows.push(['進行表', SCENE_CSV[g.type], g.label]); continue; }
+      const sl = slideById(s, g.slideId) || { kind: 'text', title: '', lines: [] };
+      if (sl.kind === 'image') rows.push(['進行表', '画像の資料', g.label, sl.image || '']);
+      else rows.push(['進行表', sl.rules || sl.id === 'S_draft' ? 'ドラフト説明' : '文字の資料', g.label, sl.title, ...(sl.lines || [])]);
+    }
+    return rows.map((r) => r.map((v) => csvCell(v ?? '')).join(',')).join('\r\n') + '\r\n';
+  }
+  // 読み込んだ内容を replaceShow で渡す形にする。書いていない項目は今のまま
+  function showFromCSV(text) {
+    const out = { options: {}, program: null, slides: [] };
+    const prog = [];
+    for (const r of parseCSV(text.replace(/^\uFEFF/, ''))) {
+      const [kind, key, ...v] = r, v0 = v[0] ?? '';
+      if (kind === '大会') { if (key === '大会名') out.title = v0; else if (key === '巡の数') out.rounds = +v0 || 3; }
+      else if (kind === '進め方') {
+        const O = out.options;
+        if (key === '指名のしかた') O.roundModes = v.filter((x) => x !== '').map((x) => (/順番/.test(x) ? 'order' : 'bid'));
+        else if (key === '順番指名の順番') O.orderStyle = /ウェーバー/.test(v0) ? 'waiver' : 'snake';
+        else if (key === '抽選の演出') O.lotteryStyle = /短/.test(v0) ? 'short' : 'full';
+        else if (/^制限時間/.test(key)) O.timerSec = Math.max(10, Math.min(3600, +v0 || 300));
+        else if (key === 'タイマーを自動でスタート') O.timerAuto = yes(v0);
+        else if (key === 'タイマーを配信画面に出す') O.timerShow = yes(v0);
+        else if (key === '待ち時間の画面') O.flowWait = yes(v0);
+        else if (key === 'ピックアップ前の立ち絵') O.flowStand = yes(v0);
+        else if (key === '巡の終わりのチーム表') O.flowTeams = yes(v0);
+        else { const m = /待ち時間の画像.*?(\d+)/.exec(key); if (m) (O.waitImages = O.waitImages || {})[+m[1]] = v.filter(Boolean); }
+      } else if (kind === '見た目') {
+        if (key === '背景') out.options.bgImage = v0; else if (key === '大会ロゴ') out.options.logoImage = v0; else if (key === '名前の前につける文字') out.options.teamPrefix = v0;
+      } else if (kind === '進行表') {
+        const type = Object.keys(SCENE_CSV).find((t) => SCENE_CSV[t] === key);
+        if (type) { if (type !== 'draft' || !prog.some((g) => g.type === 'draft')) prog.push({ id: uid('G'), type, label: v0 || key }); }
+        else if (key === '文字の資料' || key === 'ドラフト説明' || key === '画像の資料') {
+          const id = uid('S'), image = key === '画像の資料';
+          out.slides.push(image ? { id, kind: 'image', title: v0, lines: [], image: v[1] || '' } : { id, kind: 'text', title: v[1] || v0, lines: v.slice(2).filter((x) => x !== ''), image: '', rules: key === 'ドラフト説明' });
+          prog.push({ id: uid('G'), type: 'slide', slideId: id, label: v0 || key });
+        }
+      }
+    }
+    if (prog.length) {
+      if (!prog.some((g) => g.type === 'draft')) prog.push({ id: uid('G'), type: 'draft', label: 'ドラフト' }); // ドラフトの場面は必ず1つ
+      out.program = prog;
+    }
+    return out;
+  }
+  // 保存データの読み込み時: 範囲外の値を直す(前の版のデータなど)
+  function normalize(s) {
+    if (!(s.rounds >= 1 && s.rounds <= MAX_ROUNDS)) s.rounds = 3;
+    if (s.round > s.rounds) s.round = s.rounds;
+    return s;
+  }
+
+  return { initialState, apply, showToCSV, showFromCSV, normalize, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));

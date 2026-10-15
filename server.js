@@ -41,7 +41,7 @@ function start(opts = {}) {
 
   function load(file) {
     if (fs.existsSync(file)) {
-      try { return Object.assign(Core.initialState(), JSON.parse(fs.readFileSync(file, 'utf8'))); }
+      try { return Core.normalize(Object.assign(Core.initialState(), JSON.parse(fs.readFileSync(file, 'utf8')))); }
       catch (e) { console.warn(path.basename(file) + ' を読めませんでした。初期状態で起動します:', e.message); }
     }
     return null;

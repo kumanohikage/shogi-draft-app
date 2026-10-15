@@ -444,6 +444,20 @@ $('csv-file').addEventListener('change', async (e) => {
 });
 
 /* ---------- 番組タブ(見た目・各巡の流れ・進行表と資料) ---------- */
+// 番組の CSV(大会・進め方・見た目・進行表)
+$('show-csv-out').addEventListener('click', () => {
+  const blob = new Blob(['\uFEFF' + C.showToCSV(S)], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'draft-show.csv'; a.click();
+});
+$('show-csv-in').addEventListener('click', () => { $('show-csv-file').value = ''; $('show-csv-file').click(); });
+$('show-csv-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = C.showFromCSV(await f.text());
+  if (r.title == null && r.rounds == null && !Object.keys(r.options).length && !r.program) return toast('読み込める行がありませんでした', true);
+  if (r.program && !confirm('進行表と資料を CSV の内容に置き換えますか？')) return;
+  act({ type: 'replaceShow', ...r });
+  toast('番組の設定を読み込みました');
+});
 const TYPE_LABEL = C.PROGRAM_TYPES;
 function renderShow() {
   const o = optionsOf();
@@ -562,6 +576,8 @@ function renderOptions() {
       return `<div class="relative"><label class="sr-only" for="rm-${i}">第${i + 1}巡の指名のしかた</label><select id="rm-${i}" data-round-mode="${i}" class="appearance-none w-44 pl-3 pr-10 ${INPUT} cursor-pointer"><option value="bid" ${m === 'bid' ? 'selected' : ''}>第${i + 1}巡: 一斉入札</option><option value="order" ${m === 'order' ? 'selected' : ''}>第${i + 1}巡: 順番指名</option></select>${ICON.chevron}</div>`;
     }).join('');
   }
+  // 順番指名の巡が1つもなければ、順番の設定は使わない
+  setDisabled($('opt-order'), !o.roundModes.slice(0, S.rounds).includes('order'));
   for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
   $('opt-timershow').checked = !!o.timerShow;
   $('opt-timerauto').checked = !!o.timerAuto;
