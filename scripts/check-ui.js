@@ -2,6 +2,7 @@
 // あわせて axe-core で WCAG 2.1 AA(コントラスト等)も検査する(melta の CI と同じ道具)
 // 使い方: npm run check:ui   (結果は ui-check/ に出る。error が1件でもあれば exit 1)
 const { app, BrowserWindow } = require('electron');
+app.commandLine.appendSwitch('mute-audio'); // 検証中はスピーカーから音を出さない
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -117,7 +118,7 @@ app.whenReady().then(async () => {
   if (S.scene !== 'teams') { console.log('✗ チーム表になっていない'); errors++; }
   await check('12-run-teams');
   await next('第2巡へ進む');
-  if (S.round !== 2 || S.scene !== 'teams') { console.log('✗ 第2巡のはじめ(待ち時間の画像なし→チーム表)になっていない'); errors++; }
+  if (S.round !== 2 || S.scene !== 'board') { console.log('✗ 第2巡のはじめ(待ち時間の画像なし→指名ボード)になっていない'); errors++; }
   await check('13-run-round2');
   // 6. 画像の登録: ドロップ → 調整画面 → 位置と大きさを変えて保存 → 開き直すと調整が残っている
   await tab('roster');

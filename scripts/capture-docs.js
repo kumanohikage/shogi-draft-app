@@ -1,6 +1,7 @@
 // README 用のスクリーンショットを撮る(お試しモードのダミー名簿で一連の流れを進める)
 // 使い方: npx electron scripts/capture-docs.js   → docs/images/ に保存
 const { app, BrowserWindow } = require('electron');
+app.commandLine.appendSwitch('mute-audio'); // 検証中はスピーカーから音を出さない
 const path = require('path');
 const fs = require('fs');
 const os = require('os');

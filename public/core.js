@@ -72,12 +72,8 @@
   // 名前の帯など: 「チーム」＋略称(なければフルネーム)。リーダー紹介だけはフルネーム
   const shortName = (l) => (l ? (l.short || '').trim() || l.name : '');
   const teamLabel = (s, l) => (optionsOf(s).teamPrefix || '') + shortName(l);
-  // 巡のはじめの画面: 待ち時間の画像があれば待ち時間、なければチーム表(1巡目は指名ボード)
-  function roundStartScene(s) {
-    const o = optionsOf(s);
-    if (o.flowWait && waitImagesOf(s).length) return 'wait';
-    return s.round > 1 && o.flowWait ? 'teams' : 'board';
-  }
+  // 巡のはじめの画面: 待ち時間の画像があれば待ち時間、なければ指名ボード
+  const roundStartScene = (s) => (optionsOf(s).flowWait && waitImagesOf(s).length ? 'wait' : 'board');
   // 巡のはじめにタイマーを動かす(設定で止められる)
   function startRoundTimer(s, now) {
     const o = optionsOf(s);
