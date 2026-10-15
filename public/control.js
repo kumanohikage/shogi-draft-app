@@ -141,7 +141,7 @@ function renderRun() {
   const warn = overlay.count ? '' : '<p class="mt-2 text-sm text-red-300">配信画面が開いていません。OBSのブラウザソース（またはブラウザ）で配信画面を開くと演出が流れます。開いていない間は、抽選の結果がすぐに出ます。</p>';
   $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal"><p class="text-xs text-[var(--text-muted)]">次にやること</p>
     <p class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</p>${warn}</div>
-    <div class="flex flex-wrap items-center gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}${n.main ? btn({ ...n.main, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 px-6')) : ''}</div>`;
+    <div class="flex flex-wrap items-center gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}${n.main ? btn({ ...n.main, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 min-w-[184px] px-6')) : ''}</div>`;
 
   // 重複の一覧(抽選は「次にやること」から順番に)
   $('conflicts').innerHTML = confs.map((c) => `<div class="flex flex-wrap items-center gap-4 p-4 bg-red-500/[.12] border border-red-500/40 rounded-lg">
@@ -503,7 +503,7 @@ function renderShow() {
     if (sl && sl.kind === 'text') {
       body = `<div class="basis-full grid grid-cols-[1fr_2fr] gap-3 mt-2">
         <div class="leading-normal"><label class="${LABEL}" for="st-${sl.id}">見出し</label><input id="st-${sl.id}" type="text" data-slide="${sl.id}" data-slide-f="title" value="${esc(sl.title)}" class="w-full ${INPUT}"></div>
-        <div class="leading-normal"><div class="flex items-end justify-between gap-2"><label class="${LABEL}" for="sl-${sl.id}">箇条書き</label>${sl.rules || sl.id === 'S_draft' ? `<button type="button" data-slide-rules="${sl.id}" class="mb-2 text-xs font-medium text-primary-300 hover:underline cursor-pointer ${FOCUS}">今の進め方で書く</button>` : ''}</div><textarea id="sl-${sl.id}" rows="${Math.max(3, (sl.lines || []).length)}" data-slide="${sl.id}" data-slide-f="lines" class="w-full px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50">${esc((sl.lines || []).join('\n'))}</textarea></div></div>`;
+        <div class="leading-normal"><div class="flex items-end justify-between gap-2"><label class="${LABEL}" for="sl-${sl.id}">箇条書き</label>${sl.rules || sl.id === 'S_draft' ? `<button type="button" data-slide-rules="${sl.id}" class="mb-2 text-xs font-medium text-primary-300 hover:underline cursor-pointer ${FOCUS}">今の進め方で自動入力</button>` : ''}</div><textarea id="sl-${sl.id}" rows="${Math.max(3, (sl.lines || []).length)}" data-slide="${sl.id}" data-slide-f="lines" class="w-full px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50">${esc((sl.lines || []).join('\n'))}</textarea></div></div>`;
     } else if (sl && sl.kind === 'image') {
       body = `<div class="basis-full flex items-center gap-3 mt-2">${sl.image ? `<img src="${img(sl.image)}" alt="" class="w-40 h-[90px] object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : '<span class="text-sm text-[var(--text-muted)]">画像がまだありません</span>'}
         <button type="button" data-pick="slide:${sl.id}" class="${BTN_SUB}">画像を選ぶ</button></div>`;
