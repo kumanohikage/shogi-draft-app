@@ -26,6 +26,8 @@ const ICON = {
   up: svg('<path d="m18 15-6-6-6 6"/>'),
   down: svg('<path d="m6 9 6 6 6-6"/>'),
   del: svg('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'),
+  x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
+  undo: svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   chevron: '<svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
 };
 // 画像を登録できる印(顔アイコンの右下のカメラ)
@@ -233,7 +235,7 @@ function renderRoster() {
       ${p.absent ? `<span>${badge('dup', '欠場')}</span>` : ''}
     </div>
     ${taken.has(p.id) ? '' : started
-      ? `<button type="button" class="${BTN_SUB} flex-none px-3 text-sm" data-absent aria-pressed="${!!p.absent}">${p.absent ? '欠場を取り消す' : '欠場にする'}</button>`
+      ? `<button type="button" class="${BTN_ICON} ${p.absent ? 'hover:text-primary-300' : 'hover:text-red-300'}" data-absent aria-pressed="${!!p.absent}" aria-label="${esc(p.name)} を${p.absent ? '欠場から戻す' : '欠場にする'}" title="${p.absent ? '欠場から戻す' : '欠場にする'}">${p.absent ? ICON.undo : ICON.x}</button>`
       : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-del-player aria-label="${esc(p.name)} を削除">${ICON.del}</button>`}</div>`).join('')
     || '<p class="col-span-full text-base text-[var(--text-muted)] text-center py-16">まだいません。上の欄に名前を入れて「まとめて追加」</p>';
 }
