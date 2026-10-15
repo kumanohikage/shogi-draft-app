@@ -6,6 +6,9 @@ const img = (f) => (f ? `/images/${encodeURIComponent(f)}` : '');
 const OVERLAY_URL = `${location.origin}/overlay`;
 
 let remoteInfo = { on: false };
+// 画面の状態: いまのタブ / 進行表の見せ方(edit 編集・live 本番) / 編集で選んでいる場面 / ドラフトの場面のサブタブ / 選手の絞り込み / 選んでいるリーダー
+const ui = { tab: 'prog', view: 'edit', selId: null, draftTab: 'live', filter: 'all', search: '', leaderId: null };
+let selectNewScene = 0; // 場面を足したとき、足した場面を選ぶための目印
 let S = null, canUndo = false, undoCancelsLottery = false, demo = false, ws = null, bgmList = [], overlay = { count: 0 };
 
 /* ---------- 見た目(melta UI のクラス。色はアプリの金×焦げ茶) ---------- */
@@ -14,6 +17,7 @@ const BTN_PRIMARY = `inline-flex items-center justify-center h-11 px-4 text-[1re
 const BTN_SUB = `inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default ${FOCUS}`;
 const BTN_ICON = `w-11 h-11 flex-none inline-flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-page-alt)] hover:text-[var(--text-default)] cursor-pointer disabled:opacity-40 disabled:cursor-default ${FOCUS}`;
 const CARD = 'bg-[var(--bg-surface)] rounded-xl border border-[var(--border-default)] shadow-sm';
+const TEXTAREA = 'block w-full px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400';
 const INPUT = 'h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400';
 const LABEL = 'block mb-2 text-xs text-[var(--text-muted)]';
 const BADGE = {
@@ -47,7 +51,12 @@ function connect() {
   ws.onclose = () => { $('conn').textContent = '× 切断（再接続中…）'; $('conn').className = 'text-xs text-red-300'; setTimeout(connect, 1000); };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state') { S = m.state; canUndo = m.canUndo; undoCancelsLottery = !!m.undoCancelsLottery; demo = !!m.demo; render(); }
+    if (m.type === 'state') {
+      S = m.state; canUndo = m.canUndo; undoCancelsLottery = !!m.undoCancelsLottery; demo = !!m.demo;
+      const prog = C.programOf(S);
+      if (selectNewScene && prog.length >= selectNewScene) { ui.selId = prog[prog.length - 2]?.id || null; selectNewScene = 0; }
+      render();
+    }
     else if (m.type === 'remote') { remoteInfo = m; renderRemote(); }
     else if (m.type === 'presence') { overlay = m; renderOverlayStatus(); if (S) renderRun(); }
     else if (m.type === 'bgmList') { bgmList = m.list; if (S) renderAudio(); }
@@ -55,7 +64,7 @@ function connect() {
   };
 }
 const act = (action) => ws.send(JSON.stringify({ type: 'action', action }));
-const TOAST = 'fixed left-1/2 bottom-6 -translate-x-1/2 z-20 px-4 py-3 rounded-lg shadow-xl text-sm border bg-[var(--bg-surface)]';
+const TOAST = 'fixed left-1/2 bottom-28 -translate-x-1/2 z-40 px-4 py-3 rounded-lg shadow-xl text-sm border bg-[var(--bg-surface)]';
 function toast(t, err) {
   const el = $('toast'); el.textContent = t;
   el.className = `${TOAST} ${err ? 'border-red-500/60 text-red-300' : 'border-[var(--border-strong)] text-[var(--text-heading)]'}`;
@@ -90,15 +99,15 @@ function render() {
     b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on);
     b.classList.toggle('text-[var(--text-muted)]', !on); b.classList.toggle('hover:text-[var(--text-default)]', !on);
   });
-  show($('demo-banner'), demo, 'flex'); show($('demo-enter'), !demo, 'inline-flex');
-  renderRun();
-  renderRoster();
+  show($('demo-banner'), demo, 'flex'); show($('demo-enter'), !demo && ui.view !== 'live', 'inline-flex');
+  renderProg();
+  renderLeaders();
+  renderPlayers();
   renderAudio();
   renderLotteryLog();
   renderOptions();
   renderShow();
   renderTimer();
-  renderWaitCtl();
 }
 
 /* ---------- 次にやること(flow.js と共用) ---------- */
@@ -118,29 +127,142 @@ function renderSteps(cur) {
   }).join('');
 }
 
-// 番組の進行表(いまの場面・押すとその場面へ)
-function renderProgBar() {
+/* ---------- 進行表 ----------
+ * 編集: 左に場面の一覧、右に選んだ場面(ドラフトは「本番 | ⚙ 進め方」)
+ * 本番: 左に映している場面、右に「次にやること」と「メモ」、その下に次の場面。番組の中身と設定は触れない */
+const TYPE_LABEL = C.PROGRAM_TYPES;
+const typeLabel = (g) => { const sl = g.type === 'slide' ? C.slideById(S, g.slideId) : null; return sl ? (sl.kind === 'image' ? '画像の資料' : '文字の資料') : TYPE_LABEL[g.type]; };
+const selItem = () => { const prog = C.programOf(S); return prog.find((g) => g.id === ui.selId) || C.progItem(S) || prog[0]; };
+function renderProg() {
+  const live = ui.view === 'live';
+  $('prog-edit').classList.toggle('hidden', live); $('prog-live').classList.toggle('hidden', !live);
+  $('tabs').classList.toggle('hidden', live); show($('live-head'), live, 'flex'); show($('live-exit'), live, 'inline-flex');
+  const cur = C.progItem(S), sel = live ? cur : selItem(), isDraft = sel && sel.type === 'draft';
+  // ドラフトの場面の「本番」と、制限時間は、編集と本番で同じものを置き場所だけ変えて使う
+  const dl = $('draft-live'), tr = $('timer-row');
+  if (live) {
+    if (cur && cur.type === 'draft') { if (dl.parentElement !== $('live-main')) $('live-main').appendChild(dl); dl.classList.remove('hidden'); }
+    else if (dl.parentElement !== $('scene-pane')) $('scene-pane').insertBefore(dl, $('draft-setup'));
+    if (tr.parentElement !== $('live-timer')) $('live-timer').appendChild(tr);
+  } else {
+    if (dl.parentElement !== $('scene-pane')) $('scene-pane').insertBefore(dl, $('draft-setup'));
+    if (tr.parentElement !== $('round-summary').parentElement) $('round-summary').parentElement.appendChild(tr);
+  }
+  renderRun();
+  if (live) renderLive(cur);
+  else {
+    renderRail(sel);
+    renderFirstRun();
+    renderSceneHead(sel);
+    renderSceneEdit(sel);
+    dl.classList.toggle('hidden', !isDraft || ui.draftTab !== 'live');
+    $('draft-setup').classList.toggle('hidden', !isDraft || ui.draftTab !== 'setup');
+    $('round-edit').classList.remove('hidden');
+  }
+}
+function renderRail(sel) {
   const prog = C.programOf(S), cur = C.progIdxOf(S);
-  $('prog-bar').innerHTML = prog.map((g, i) => {
-    const on = i === cur, done = i < cur;
-    const label = g.type === 'draft' ? `${esc(g.label)}（第${S.round}巡）` : esc(g.label);
-    return `${i ? '<li aria-hidden="true" class="text-[var(--text-muted)]">›</li>' : ''}<li><button type="button" data-prog-go="${i}" ${on ? 'aria-current="step"' : ''} title="この場面へ移る"
-      class="h-11 px-3 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${on ? 'bg-primary-500 text-slate-900 border-primary-500' : done ? 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]' : 'bg-[var(--bg-surface)] border-[var(--border-strong)] text-[var(--text-default)]'}">${label}</button></li>`;
+  $('prog-rail').innerHTML = prog.map((g, i) => {
+    const on = g.id === sel.id, now = i === cur, done = i < cur;
+    return `<li><button type="button" data-sel="${g.id}" ${on ? 'aria-current="true"' : ''} class="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm border cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12] text-[var(--text-heading)] font-bold' : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-page-alt)] ' + (done ? 'text-[var(--text-muted)]' : 'text-[var(--text-default)]')}">
+      <span class="w-5 flex-none text-xs tabular-nums text-[var(--text-muted)]">${done ? '✓' : i + 1}</span><span class="min-w-0 flex-1 truncate">${esc(g.label)}</span>
+      ${now ? '<span class="flex-none px-2 rounded-full text-[11px] font-bold bg-red-500/[.12] text-red-300">映している</span>' : `<span class="flex-none text-[11px] text-[var(--text-muted)]">${esc(typeLabel(g))}</span>`}</button></li>`;
   }).join('');
+}
+// はじめて(名簿が空): 何から始めるか
+function renderFirstRun() {
+  const el = $('first-run'), empty = !S.leaders.length || !S.players.length;
+  show(el, empty && !demo, 'flex');
+  if (!empty || demo) return;
+  const step = (n, text, done, btn) => `<div class="flex items-center gap-3 min-h-11 px-3 py-2 rounded-lg border border-[var(--border-default)]"><span class="w-7 h-7 flex-none inline-flex items-center justify-center rounded-full text-sm font-bold ${done ? 'bg-emerald-500/[.12] text-emerald-300' : 'border border-[var(--border-strong)] text-[var(--text-muted)]'}">${done ? '✓' : n}</span><span class="flex-1 text-sm ${done ? 'text-[var(--text-muted)]' : 'text-[var(--text-heading)]'}">${text}</span>${btn}</div>`;
+  el.innerHTML = `<h2 class="text-base font-bold text-[var(--text-heading)]">はじめに</h2>
+    ${step(1, 'リーダーを登録する', S.leaders.length > 0, `<button type="button" data-goto="leaders" class="${BTN_SUB}">リーダーへ</button>`)}
+    ${step(2, 'エントリー選手を登録する', S.players.length > 0, `<button type="button" data-goto="players" class="${BTN_SUB}">選手へ</button>`)}
+    ${step(3, '大会名と見た目を決める', false, `<button type="button" data-goto="show" class="${BTN_SUB}">大会へ</button>`)}
+    ${step(4, 'OBS に配信画面を追加する', overlay.count > 0, `<button type="button" data-copy-url class="${BTN_SUB}">URL をコピー</button>`)}
+    ${step(5, 'お試しで一通り動かしてみる', false, `<button type="button" data-demo class="${BTN_SUB}">お試しを始める</button>`)}`;
+}
+// 選んだ場面の見出し: 種類・名前・(ドラフトはサブタブ)・並べ替え・外す・映す
+function renderSceneHead(g) {
+  const el = $('scene-head');
+  if (el.contains(document.activeElement) && document.activeElement.matches('input')) return;
+  const prog = C.programOf(S), i = prog.indexOf(g), cur = C.progIdxOf(S);
+  el.dataset.progId = g.id;
+  const tabBtn = (k, t) => `<button type="button" data-draft-tab="${k}" aria-pressed="${ui.draftTab === k}" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer ${FOCUS} ${ui.draftTab === k ? 'bg-[var(--bg-page-alt)] text-[var(--text-heading)]' : 'text-[var(--text-muted)]'}">${t}</button>`;
+  el.innerHTML = `${badge(g.type === 'draft' ? 'in' : 'wait', esc(typeLabel(g)))}
+    <label class="sr-only" for="pl-${g.id}">場面の名前</label><input id="pl-${g.id}" type="text" data-prog-label="${g.id}" value="${esc(g.label)}" maxlength="20" class="w-56 ${INPUT}">
+    ${g.type === 'draft' ? `<div class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-page)] border border-[var(--border-strong)]" role="group" aria-label="ドラフトの場面">${tabBtn('live', '本番')}${tabBtn('setup', '⚙ 進め方')}</div>` : ''}
+    <div class="ml-auto flex items-center gap-1">
+      <button type="button" class="${BTN_ICON}" data-prog-move="-1" aria-label="上へ" ${i ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
+      <button type="button" class="${BTN_ICON}" data-prog-move="1" aria-label="下へ" ${i < prog.length - 1 ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
+      <button type="button" class="${BTN_ICON} hover:text-red-300" data-prog-del aria-label="${esc(g.label)} を外す" ${g.type === 'draft' ? 'disabled aria-disabled="true" title="ドラフトは外せません"' : ''}>${ICON.del}</button>
+      <button type="button" data-prog-go="${i}" class="${BTN_SUB} ml-2" ${i === cur ? 'disabled aria-disabled="true"' : ''}>${i === cur ? '映しています' : 'この場面を映す'}</button>
+    </div>`;
+}
+// ドラフト以外の場面の中身(＋全場面の自分用メモ)
+function renderSceneEdit(g) {
+  const el = $('scene-edit');
+  if (el.contains(document.activeElement) && document.activeElement.matches('input, textarea')) return;
+  const sl = g.type === 'slide' ? C.slideById(S, g.slideId) : null;
+  let body = '';
+  if (sl && sl.kind === 'text') {
+    body = `<div class="grid grid-cols-[1fr_2fr] gap-4">
+      <div class="leading-normal"><label class="${LABEL}" for="st-${sl.id}">見出し</label><input id="st-${sl.id}" type="text" data-slide="${sl.id}" data-slide-f="title" value="${esc(sl.title)}" class="w-full ${INPUT}"></div>
+      <div class="leading-normal"><div class="flex items-end justify-between gap-2"><label class="${LABEL}" for="sl-${sl.id}">箇条書き</label>${sl.rules || sl.id === 'S_draft' ? `<button type="button" data-slide-rules="${sl.id}" class="mb-2 text-xs font-medium text-primary-300 hover:underline cursor-pointer ${FOCUS}">今の進め方で自動入力</button>` : ''}</div><textarea id="sl-${sl.id}" rows="${Math.max(4, (sl.lines || []).length)}" data-slide="${sl.id}" data-slide-f="lines" class="${TEXTAREA}">${esc((sl.lines || []).join('\n'))}</textarea></div></div>`;
+  } else if (sl && sl.kind === 'image') {
+    body = `<div class="flex items-center gap-3">${sl.image ? `<img src="${img(sl.image)}" alt="" class="w-64 aspect-video object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : '<span class="text-sm text-[var(--text-muted)]">画像がまだありません</span>'}<button type="button" data-pick="slide:${sl.id}" class="${BTN_SUB}">画像を選ぶ</button></div>`;
+  } else if (g.type === 'intro') {
+    body = `<p class="text-sm text-[var(--text-muted)]">リーダーを1人ずつ、立ち絵と名前の帯で出します。紹介文と紹介のメモはここでも直せます。</p>
+      <ol class="flex flex-col gap-2">${S.leaders.map((l) => `<li class="item flex flex-wrap items-center gap-3 p-3 ${CARD}" data-id="${l.id}">${avatar(l.icon, l.color)}<b class="w-32 truncate text-sm text-[var(--text-heading)]">${esc(l.name)}</b>
+        <label class="sr-only" for="ii-${l.id}">${esc(l.name)} の紹介文</label><input id="ii-${l.id}" type="text" data-lf="intro" value="${esc(l.intro || '')}" placeholder="紹介文（配信に出る）" maxlength="30" class="w-56 ${INPUT}">
+        <label class="sr-only" for="im-${l.id}">${esc(l.name)} の紹介のメモ</label><input id="im-${l.id}" type="text" data-lf="introMemo" value="${esc(l.introMemo || '')}" placeholder="紹介のメモ（自分用）" class="flex-1 min-w-48 ${INPUT}"></li>`).join('')}</ol>`;
+  } else if (g.type === 'logo') body = '<p class="text-sm text-[var(--text-muted)]">大会のロゴ（なければ大会名）を大きく出します。</p>';
+  else if (g.type === 'final') body = '<p class="text-sm text-[var(--text-muted)]">最終のチーム表を出します。</p>';
+  else if (g.type === 'blank') body = '<p class="text-sm text-[var(--text-muted)]">配信画面に何も出しません。</p>';
+  const memo = `<div class="leading-normal"><label class="${LABEL}" for="pm-${g.id}">メモ（自分用。配信には出ません）</label><textarea id="pm-${g.id}" rows="2" data-prog-memo="${g.id}" class="${TEXTAREA}">${esc(g.memo || '')}</textarea></div>`;
+  // ドラフトの場面は「⚙ 進め方」のときだけメモを出す(本番の画面は指名に集中)
+  el.innerHTML = g.type === 'draft' ? (ui.draftTab === 'setup' ? memo : '') : body + memo;
+}
+// 本番ビュー: 映している場面・次にやること・メモ・次の場面
+let previewOn = false;
+function renderLive(cur) {
+  const prog = C.programOf(S), i = C.progIdxOf(S), n = nextStep();
+  $('live-pos').textContent = `${i + 1} / ${prog.length}`;
+  const isDraft = cur && cur.type === 'draft', isIntro = cur && cur.type === 'intro';
+  const k = Math.min(S.introIdx || 0, S.leaders.length - 1), l = isIntro ? S.leaders[k] : null;
+  $('live-title').textContent = !cur ? '' : isDraft ? cur.label : isIntro && l ? `${cur.label}　${k + 1} / ${S.leaders.length}　${l.name}` : cur.label;
+  $('live-preview').classList.toggle('hidden', !!isDraft);
+  if (!isDraft && !previewOn) { $('preview-frame').src = '/overlay?preview=1'; previewOn = true; fitPreview(); }
+  $('round-edit').classList.add('hidden'); // 本番では設定に行かない
+  $('live-next').innerHTML = n.text || '';
+  const memo = [l && l.introMemo ? `${l.name}: ${l.introMemo}` : '', cur && cur.memo ? cur.memo : ''].filter(Boolean).join('\n');
+  $('live-memo').textContent = memo || '（メモはありません）';
+  $('live-memo').classList.toggle('text-[var(--text-muted)]', !memo);
+  const nl = isIntro ? S.leaders[k + 1] : null, ng = prog[i + 1];
+  $('live-upnext').textContent = nl ? nl.name : ng ? ng.label : '（最後の場面です）';
+}
+function fitPreview() { const box = $('live-preview'); $('preview-frame').style.transform = `scale(${box.clientWidth / 1920})`; }
+addEventListener('resize', () => { if (ui.view === 'live') fitPreview(); });
+function setView(v) {
+  ui.view = v;
+  if (v === 'live') { selectTab('prog'); ui.draftTab = 'live'; }
+  else { $('preview-frame').src = 'about:blank'; previewOn = false; }
+  render();
+  if (v === 'live') requestAnimationFrame(fitPreview);
 }
 
 function renderRun() {
   const confs = C.conflicts(S), done = C.draftComplete(S);
-  renderProgBar();
-  const item = C.progItem(S), inDraft = !item || item.type === 'draft';
-  $('round-title').textContent = !inDraft ? item.label : done ? 'ドラフト終了' : `第${S.round}巡`;
-  $('steps').classList.toggle('invisible', !inDraft);
+  $('round-title').textContent = done ? 'ドラフト終了' : `第${S.round}巡`;
+  // この巡の設定の1行の要約(変更は「⚙ 進め方」で)
+  const wn = C.waitImagesOf(S).length, wi = Math.min(S.waitIdx || 0, Math.max(0, wn - 1));
+  $('round-summary').textContent = `第${S.round}巡: ${C.roundMode(S) === 'order' ? '順番指名' : '一斉入札'} ・ 待ち時間の画像 ${wn ? (S.scene === 'wait' ? `${wi + 1} / ${wn}枚目` : `${wn}枚`) : 'なし'}`;
   const n = nextStep();
   renderSteps(n.step);
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''} ${b.keys ? 'aria-keyshortcuts="Space" title="スペースキーでも押せます"' : ''}>${b.label}</button>`;
   const warn = overlay.count ? '' : '<p class="mt-2 text-sm text-red-300">配信画面が開いていません。OBSのブラウザソース（またはブラウザ）で配信画面を開くと演出が流れます。開いていない間は、抽選の結果がすぐに出ます。</p>';
-  $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal"><p class="text-xs text-[var(--text-muted)]">次にやること</p>
-    <p class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</p>${warn}</div>
+  $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal">${ui.view === 'live' ? warn : `<p class="text-xs text-[var(--text-muted)]">次にやること</p>
+    <div class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</div>${warn}`}</div>
     <div class="flex flex-wrap items-center gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}${n.main ? btn({ ...n.main, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 min-w-[184px] px-6')) : ''}</div>`;
 
   // 重複の一覧(抽選は「次にやること」から順番に)
@@ -206,42 +328,76 @@ function renderLotteryLog() {
     : '<li class="py-2 text-sm text-[var(--text-muted)]">まだ抽選はありません</li>';
 }
 
-function renderRoster() {
-  if (document.activeElement && document.activeElement.closest('#tab-roster') && document.activeElement.matches('input[type=text],textarea')) return; // 入力中は描き直さない
+/* ---------- リーダー: 一覧と、選んだ1人のパネル ---------- */
+function renderLeaders() {
   const started = C.draftStarted(S);
-  $('leaders').innerHTML = S.leaders.map((l, i) => `<div class="item ${CARD} flex flex-wrap items-end gap-4 px-4 py-3" data-id="${l.id}">
-    <button type="button" data-icon="L" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の画像を${l.icon ? '変更' : '設定'}" title="クリック or 画像をドロップで${l.icon ? '変更' : '設定'}">${avatar(l.icon, l.color, 'w-11 h-11')}${CAM}</button>
-    <div class="leading-normal"><label class="${LABEL}" for="ln-${l.id}">名前</label><input id="ln-${l.id}" type="text" data-lf="name" value="${esc(l.name)}" class="w-48 ${INPUT}"></div>
-    <div class="leading-normal"><label class="${LABEL}" for="ls-${l.id}">略称</label><input id="ls-${l.id}" type="text" data-lf="short" value="${esc(l.short || '')}" placeholder="${esc(l.name)}" maxlength="12" class="w-28 ${INPUT}"></div>
-    <div class="leading-normal"><span class="${LABEL}">立ち絵</span><div class="flex items-center gap-1">
-      <button type="button" data-pick="stand:${l.id}" class="flex-none h-11 ${l.stand ? 'w-11 p-0 overflow-hidden' : 'px-3'} inline-flex items-center justify-center text-sm bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の立ち絵を${l.stand ? '変更' : '選ぶ'}">${l.stand ? `<img src="${img(l.stand)}" alt="" class="w-full h-full object-contain">` : '選ぶ'}</button>
-      ${l.stand ? `<button type="button" data-stand-clear="${l.id}" class="${BTN_ICON}" aria-label="${esc(l.name)} の立ち絵を外す">${ICON.del}</button>` : ''}</div></div>
-    <div class="leading-normal"><label class="${LABEL}" for="li-${l.id}">紹介文</label><input id="li-${l.id}" type="text" data-lf="intro" value="${esc(l.intro || '')}" maxlength="30" class="w-48 ${INPUT}"></div>
-    <div class="leading-normal"><label class="${LABEL}" for="lc-${l.id}">色</label><input id="lc-${l.id}" type="color" data-lf="color" value="${esc(l.color)}" class="block w-14 h-11 p-1 bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}"></div>
-    <div class="ml-auto flex gap-1">
-      <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="上へ" ${i && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
-      <button type="button" class="${BTN_ICON}" data-move="1" aria-label="下へ" ${i < S.leaders.length - 1 && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
-      <button type="button" class="${BTN_ICON} hover:text-red-300" data-del-leader aria-label="${esc(l.name)} を削除" ${started ? 'disabled aria-disabled="true" title="ドラフトの途中は削除できません"' : ''}>${ICON.del}</button>
-    </div></div>`).join('') || '<p class="text-base text-[var(--text-muted)] text-center py-16">まだいません。「追加」で登録してください</p>';
-  const taken = C.pickedIds(S);
-  $('player-count').textContent = `${S.players.length}人`;
   $('leader-count').textContent = `${S.leaders.length} / ${C.MAX_LEADERS}人`;
   setDisabled($('add-leader'), S.leaders.length >= C.MAX_LEADERS);
-  $('players').innerHTML = S.players.map((p) => `<div class="item ${CARD} flex items-start gap-2 p-2 ${taken.has(p.id) ? 'opacity-50' : ''}" data-id="${p.id}" title="${taken.has(p.id) ? '指名済み' : ''}">
+  if (!S.leaders.some((l) => l.id === ui.leaderId)) ui.leaderId = S.leaders[0]?.id || null;
+  $('leaders').innerHTML = S.leaders.map((l, i) => {
+    const on = l.id === ui.leaderId;
+    return `<li class="item flex items-center gap-2" data-id="${l.id}"><button type="button" data-leader-sel="${l.id}" ${on ? 'aria-current="true"' : ''} class="flex-1 min-w-0 min-h-14 flex items-center gap-3 px-3 py-2 rounded-xl border text-left cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-page-alt)]'}">
+      ${avatar(l.icon, l.color)}<span class="min-w-0 flex-1"><b class="block truncate text-base text-[var(--text-heading)]">${esc(l.name)}</b><span class="block truncate text-xs text-[var(--text-muted)]">${esc(C.teamLabel(S, l))}</span></span>
+      ${badge(l.stand ? 'ok' : 'wait', l.stand ? '立ち絵あり' : '立ち絵なし')}</button>
+      <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="${esc(l.name)} を上へ" ${i && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
+      <button type="button" class="${BTN_ICON}" data-move="1" aria-label="${esc(l.name)} を下へ" ${i < S.leaders.length - 1 && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button></li>`;
+  }).join('') || '<li class="text-base text-[var(--text-muted)] text-center py-16">まだいません。「追加」で登録してください</li>';
+  renderLeaderPanel(started);
+}
+function renderLeaderPanel(started) {
+  const el = $('leader-panel'), l = C.leaderById(S, ui.leaderId);
+  if (el.contains(document.activeElement) && document.activeElement.matches('input')) return; // 入力中は描き直さない
+  show(el, !!l, 'flex');
+  if (!l) return;
+  el.className = el.className.replace(/\bitem\b/, '').trim() + ' item';
+  el.dataset.id = l.id;
+  const team = C.teamOf(S, l.id).filter((p) => !hiddenPick(p));
+  el.innerHTML = `<div class="flex items-center gap-3">
+      <button type="button" data-icon="L" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の顔の画像を${l.icon ? '変更' : '設定'}" title="クリック or 画像をドロップ">${avatar(l.icon, l.color, 'w-16 h-16')}${CAM}</button>
+      <div class="min-w-0"><b class="block truncate text-lg text-[var(--text-heading)]">${esc(l.name)}</b><span class="text-xs text-[var(--text-muted)]">顔をクリック / ドロップで変更</span></div></div>
+    <div class="leading-normal"><label class="${LABEL}" for="ln-${l.id}">名前</label><input id="ln-${l.id}" type="text" data-lf="name" value="${esc(l.name)}" class="w-full ${INPUT}"></div>
+    <div class="flex gap-3">
+      <div class="leading-normal flex-1"><label class="${LABEL}" for="ls-${l.id}">略称</label><input id="ls-${l.id}" type="text" data-lf="short" value="${esc(l.short || '')}" placeholder="${esc(l.name)}" maxlength="12" class="w-full ${INPUT}"></div>
+      <div class="leading-normal"><label class="${LABEL}" for="lc-${l.id}">色</label><input id="lc-${l.id}" type="color" data-lf="color" value="${esc(l.color)}" class="block w-14 h-11 p-1 bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}"></div></div>
+    <div class="leading-normal"><label class="${LABEL}" for="li-${l.id}">紹介文</label><input id="li-${l.id}" type="text" data-lf="intro" value="${esc(l.intro || '')}" maxlength="30" class="w-full ${INPUT}"></div>
+    <div class="leading-normal"><label class="${LABEL}" for="lm-${l.id}">紹介のメモ（自分用）</label><input id="lm-${l.id}" type="text" data-lf="introMemo" value="${esc(l.introMemo || '')}" class="w-full ${INPUT}"></div>
+    <div class="leading-normal"><span class="${LABEL}">立ち絵</span><div class="flex items-end gap-2">${l.stand ? `<img src="${img(l.stand)}" alt="" class="h-28 w-24 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : ''}
+      <button type="button" data-pick="stand:${l.id}" class="${BTN_SUB}">${l.stand ? '変更' : '選ぶ'}</button>${l.stand ? `<button type="button" data-stand-clear="${l.id}" class="${BTN_SUB}">外す</button>` : ''}</div></div>
+    <div class="leading-normal"><span class="${LABEL}">チーム</span><ol class="flex flex-col gap-1">${Array.from({ length: S.rounds }, (_, i) => { const p = team.find((t) => t.round === i + 1); return `<li class="flex items-center gap-2 text-sm"><span class="w-10 text-xs text-[var(--text-muted)]">${i + 1}巡</span>${p ? `<span class="text-[var(--text-heading)]">${esc(C.playerById(S, p.playerId)?.name)}</span>` : '<span class="text-[var(--text-muted)]">―</span>'}</li>`; }).join('')}</ol></div>
+    <div class="flex"><button type="button" class="ml-auto ${BTN_SUB} text-red-300" data-del-leader ${started ? 'disabled aria-disabled="true" title="ドラフトの途中は削除できません"' : ''}>削除</button></div>`;
+}
+
+/* ---------- 選手: 状態で絞り込む一覧 ---------- */
+function renderPlayers() {
+  if (document.activeElement && document.activeElement.closest('#players') && document.activeElement.matches('input')) return; // 入力中は描き直さない
+  const started = C.draftStarted(S), taken = C.pickedIds(S);
+  const teamOfPlayer = (id) => { const p = S.picks.find((x) => x.playerId === id && !hiddenPick(x)); return p ? C.leaderById(S, p.leaderId) : null; };
+  const stateOf = (p) => (p.absent ? 'absent' : taken.has(p.id) ? 'picked' : 'free');
+  const count = { all: S.players.length, free: 0, picked: 0, absent: 0 };
+  S.players.forEach((p) => count[stateOf(p)]++);
+  $('player-count').textContent = `${S.players.length}人`;
+  const FILTERS = [['all', 'すべて'], ['free', '未指名'], ['picked', '確定'], ['absent', '欠場']];
+  $('player-filter').innerHTML = FILTERS.map(([k, t]) => `<button type="button" data-filter="${k}" aria-pressed="${ui.filter === k}" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-3 rounded-md text-sm font-medium cursor-pointer ${FOCUS} ${ui.filter === k ? 'bg-[var(--bg-page-alt)] text-[var(--text-heading)]' : 'text-[var(--text-muted)]'}">${t} ${count[k]}</button>`).join('');
+  const q = ui.search.trim();
+  const list = S.players.filter((p) => (ui.filter === 'all' || stateOf(p) === ui.filter) && (!q || p.name.includes(q)));
+  $('players').innerHTML = list.map((p) => {
+    const tl = teamOfPlayer(p.id);
+    return `<div class="item ${CARD} flex items-start gap-2 p-2" data-id="${p.id}">
     <button type="button" data-icon="P" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(p.name)} の画像を${p.icon ? '変更' : '設定'}" title="クリック or 画像をドロップで${p.icon ? '変更' : '設定'}">${avatar(p.icon, null, 'w-11 h-11')}${CAM}</button>
     <div class="min-w-0 flex-1 flex flex-col gap-1">
       <input type="text" data-pf="name" value="${esc(p.name)}" aria-label="選手名" class="w-full ${INPUT}">
       <input type="text" data-pf="note" value="${esc(p.note || '')}" aria-label="${esc(p.name)} のひとこと" placeholder="ひとこと（段位など）" maxlength="30" class="w-full ${INPUT}">
-      ${p.absent ? `<span>${badge('dup', '欠場')}</span>` : ''}
+      ${p.absent ? `<span>${badge('dup', '欠場')}</span>` : tl ? `<span>${badge('ok', esc(C.teamLabel(S, tl)))}</span>` : ''}
     </div>
     ${taken.has(p.id) ? '' : started
       ? `<button type="button" class="${BTN_ICON} ${p.absent ? 'hover:text-primary-300' : 'hover:text-red-300'}" data-absent aria-pressed="${!!p.absent}" aria-label="${esc(p.name)} を${p.absent ? '欠場から戻す' : '欠場にする'}" title="${p.absent ? '欠場から戻す' : '欠場にする'}">${p.absent ? ICON.undo : ICON.x}</button>`
-      : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-del-player aria-label="${esc(p.name)} を削除">${ICON.del}</button>`}</div>`).join('')
-    || '<p class="col-span-full text-base text-[var(--text-muted)] text-center py-16">まだいません。上の欄に名前を入れて「まとめて追加」</p>';
+      : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-del-player aria-label="${esc(p.name)} を削除">${ICON.del}</button>`}</div>`;
+  }).join('') || `<p class="col-span-full text-base text-[var(--text-muted)] text-center py-16">${S.players.length ? '当てはまる選手はいません' : 'まだいません。上の欄に名前を入れて「まとめて追加」'}</p>`;
 }
 
 /* ---------- 操作 ---------- */
 function selectTab(name) {
+  ui.tab = name;
   document.querySelectorAll('.tab').forEach((x) => {
     const on = x.dataset.tab === name;
     x.setAttribute('aria-selected', on);
@@ -252,7 +408,7 @@ function selectTab(name) {
   if (S) render();
 }
 document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
-selectTab('run');
+selectTab('prog');
 
 $('undo').addEventListener('click', () => {
   if (undoCancelsLottery && !confirm('直前の抽選を取り消します。\n取り消したことは「抽選の記録」に残ります。よろしいですか？')) return;
@@ -264,7 +420,7 @@ let lastSpace = 0;
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
   if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-  if ($('tab-run').classList.contains('hidden') || $('crop').open || $('remote-dlg').open) return;
+  if ($('tab-prog').classList.contains('hidden') || $('crop').open || $('remote-dlg').open || !$('audio-pop').classList.contains('hidden')) return;
   e.preventDefault(); // フォーカスのあるほかのボタンが押されたり、画面がスクロールしたりしないように
   if (e.repeat || Date.now() - lastSpace < 500) return;
   const b = document.querySelector('#next button.h-12');
@@ -296,6 +452,26 @@ document.addEventListener('click', (e) => {
   else if (t.dataset.icon) pickImage(t.dataset.icon, t.closest('.item').dataset.id);
 });
 $('add-leader').addEventListener('click', () => act({ type: 'addLeader' }));
+// 進行表・リーダー・選手の画面の操作
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-sel],[data-draft-tab],[data-leader-sel],[data-filter],[data-goto],[data-copy-url],[data-demo],#round-edit,#live-start,#live-exit');
+  if (!t) return;
+  if (t.dataset.sel) { ui.selId = t.dataset.sel; render(); }
+  else if (t.dataset.draftTab) { ui.draftTab = t.dataset.draftTab; render(); }
+  else if (t.dataset.leaderSel) { ui.leaderId = t.dataset.leaderSel; render(); }
+  else if (t.dataset.filter) { ui.filter = t.dataset.filter; render(); }
+  else if (t.dataset.goto) selectTab(t.dataset.goto);
+  else if (t.dataset.copyUrl !== undefined) $('copy-url').click();
+  else if (t.dataset.demo !== undefined) $('demo-enter').click();
+  else if (t.id === 'round-edit') { ui.draftTab = 'setup'; render(); document.querySelector(`[data-round-row="${S.round}"]`)?.scrollIntoView({ block: 'center' }); }
+  else if (t.id === 'live-start') setView('live');
+  else if (t.id === 'live-exit') setView('edit');
+});
+$('player-search').addEventListener('input', (e) => { ui.search = e.target.value; renderPlayers(); });
+// 音: ヘッダーから開く小さな窓
+$('audio-open').addEventListener('click', (e) => { e.stopPropagation(); const p = $('audio-pop'), open = p.classList.contains('hidden'); p.classList.toggle('hidden', !open); $('audio-open').setAttribute('aria-expanded', open); });
+document.addEventListener('click', (e) => { if (!e.target.closest('#audio-pop') && !e.target.closest('#audio-open')) { $('audio-pop').classList.add('hidden'); $('audio-open').setAttribute('aria-expanded', 'false'); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('audio-pop').classList.add('hidden'); $('audio-open').setAttribute('aria-expanded', 'false'); } });
 $('add-players').addEventListener('click', () => {
   // 1行に1人。「名前,ひとこと」のようにカンマ(またはタブ)で区切ると、ひとことも入る(表計算ソフトから2列を貼り付けてもよい)
   const players = $('bulk-players').value.split('\n').map((v) => v.trim()).filter(Boolean).map((line) => {
@@ -309,12 +485,12 @@ $('add-players').addEventListener('click', () => {
 
 // お試しモード(本番とは別のデータで、ダミーの名簿を使う)
 const sendMode = (mode, fresh) => ws.send(JSON.stringify({ type: 'mode', mode, fresh }));
-$('demo-enter').addEventListener('click', () => { sendMode('demo'); selectTab('run'); toast('お試しモードを始めました（本番のデータはそのまま残っています）'); });
+$('demo-enter').addEventListener('click', () => { sendMode('demo'); selectTab('prog'); toast('お試しモードを始めました（本番のデータはそのまま残っています）'); });
 $('demo-exit').addEventListener('click', () => { sendMode('real'); toast('本番のデータに戻りました'); });
 $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進行をすべて消して、最初からにしますか？')) sendMode('demo', true); });
 // 「次にやること」のボタン
 function doNext(key, arg) {
-  if (key === 'roster') return selectTab('roster');
+  if (key === 'roster') return selectTab('leaders');
   if (key === 'auto') return autoNominate();
   const a = DraftFlow.actionFor(key, arg, S); // 押したボタン → サーバーへ送る操作(スマホと共通)
   if (a) act(a);
@@ -435,11 +611,11 @@ document.addEventListener('drop', (e) => {
 });
 
 // CSV
-$('csv-out').addEventListener('click', () => {
+document.querySelectorAll('[data-csv-out]').forEach((b) => b.addEventListener('click', () => {
   const blob = new Blob(['﻿' + C.rosterToCSV(S)], { type: 'text/csv' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'draft-roster.csv'; a.click();
-});
-$('csv-in').addEventListener('click', () => { $('csv-file').value = ''; $('csv-file').click(); });
+}));
+document.querySelectorAll('[data-csv-in]').forEach((b) => b.addEventListener('click', () => { $('csv-file').value = ''; $('csv-file').click(); }));
 $('csv-file').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
   const r = C.rosterFromCSV(await f.text());
@@ -464,7 +640,6 @@ $('show-csv-file').addEventListener('change', async (e) => {
   act({ type: 'replaceShow', ...r });
   toast('番組の設定を読み込みました');
 });
-const TYPE_LABEL = C.PROGRAM_TYPES;
 function renderShow() {
   const o = optionsOf();
   for (const [key, id] of [['bgImage', 'bg-thumb'], ['logoImage', 'logo-thumb']]) {
@@ -494,31 +669,6 @@ function renderShow() {
   $('trans-video-name').textContent = o.transVideo || 'まだありません';
   if (document.activeElement !== $('in-rounds')) $('in-rounds').value = S.rounds;
   for (const k of ['flowWait', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
-  // 入力中は描き直さない
-  if ($('prog-list').contains(document.activeElement) && document.activeElement.matches('input, textarea')) return;
-  const prog = C.programOf(S), cur = C.progIdxOf(S);
-  $('prog-list').innerHTML = prog.map((g, i) => {
-    const sl = g.type === 'slide' ? C.slideById(S, g.slideId) : null;
-    let body = '';
-    if (sl && sl.kind === 'text') {
-      body = `<div class="basis-full grid grid-cols-[1fr_2fr] gap-3 mt-2">
-        <div class="leading-normal"><label class="${LABEL}" for="st-${sl.id}">見出し</label><input id="st-${sl.id}" type="text" data-slide="${sl.id}" data-slide-f="title" value="${esc(sl.title)}" class="w-full ${INPUT}"></div>
-        <div class="leading-normal"><div class="flex items-end justify-between gap-2"><label class="${LABEL}" for="sl-${sl.id}">箇条書き</label>${sl.rules || sl.id === 'S_draft' ? `<button type="button" data-slide-rules="${sl.id}" class="mb-2 text-xs font-medium text-primary-300 hover:underline cursor-pointer ${FOCUS}">今の進め方で自動入力</button>` : ''}</div><textarea id="sl-${sl.id}" rows="${Math.max(3, (sl.lines || []).length)}" data-slide="${sl.id}" data-slide-f="lines" class="w-full px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50">${esc((sl.lines || []).join('\n'))}</textarea></div></div>`;
-    } else if (sl && sl.kind === 'image') {
-      body = `<div class="basis-full flex items-center gap-3 mt-2">${sl.image ? `<img src="${img(sl.image)}" alt="" class="w-40 h-[90px] object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : '<span class="text-sm text-[var(--text-muted)]">画像がまだありません</span>'}
-        <button type="button" data-pick="slide:${sl.id}" class="${BTN_SUB}">画像を選ぶ</button></div>`;
-    }
-    return `<li class="${CARD} p-3 flex flex-wrap items-center gap-3 ${i === cur ? 'border-primary-500/60' : ''}" data-prog-id="${g.id}">
-      <span class="w-8 flex-none text-center text-sm font-bold ${i === cur ? 'text-primary-300' : 'text-[var(--text-muted)]'}">${i + 1}</span>
-      ${badge(g.type === 'draft' ? 'in' : 'wait', sl ? (sl.kind === 'image' ? '画像の資料' : '文字の資料') : TYPE_LABEL[g.type])}
-      <label class="sr-only" for="pl-${g.id}">場面の名前</label><input id="pl-${g.id}" type="text" data-prog-label="${g.id}" value="${esc(g.label)}" maxlength="20" class="w-56 ${INPUT}">
-      ${i === cur ? '<span class="text-xs text-primary-300">いまここ</span>' : ''}
-      <div class="ml-auto flex gap-1">
-        <button type="button" class="${BTN_ICON}" data-prog-move="-1" aria-label="上へ" ${i ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
-        <button type="button" class="${BTN_ICON}" data-prog-move="1" aria-label="下へ" ${i < prog.length - 1 ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
-        <button type="button" class="${BTN_ICON} hover:text-red-300" data-prog-del aria-label="${esc(g.label)} を外す" ${g.type === 'draft' ? 'disabled aria-disabled="true" title="ドラフトは外せません"' : ''}>${ICON.del}</button>
-      </div>${body}</li>`;
-  }).join('');
 }
 // 画像を選ぶ: 背景・ロゴ / 立ち絵 / 画像の資料 で共通の入力
 let pickTarget = null;
@@ -537,11 +687,13 @@ document.addEventListener('click', (e) => {
   else if (t.dataset.progAdd) {
     const k = t.dataset.progAdd;
     if (k === 'text' || k === 'image') act({ type: 'addSlide', kind: k, toProgram: true, at: C.programOf(S).length - 1 });
-    else act({ type: 'addProgram', item: { type: k }, at: k === 'final' ? undefined : C.programOf(S).length - 1 });
+    else act({ type: 'addProgram', item: { type: k }, at: C.programOf(S).length - 1 });
+    selectNewScene = C.programOf(S).length;
   } else if (t.dataset.progMove) act({ type: 'moveProgram', id: t.closest('[data-prog-id]').dataset.progId, dir: +t.dataset.progMove });
   else if (t.dataset.progDel !== undefined) {
     const g = C.programOf(S).find((x) => x.id === t.closest('[data-prog-id]').dataset.progId);
     if (!confirm(`「${g.label}」を進行表から外しますか？${g.type === 'slide' ? '\n(資料の中身も消えます)' : ''}`)) return;
+    ui.selId = null;
     act(g.type === 'slide' ? { type: 'removeSlide', id: g.slideId } : { type: 'removeProgram', id: g.id });
   } else if (t.dataset.progGo) act({ type: 'progGo', idx: +t.dataset.progGo });
   else if (t.id === 'prog-reset') { if (confirm('進行表をひな形に戻しますか？\n（足した資料は進行表から外れます）')) act({ type: 'resetProgram' }); }
@@ -565,6 +717,7 @@ document.addEventListener('change', (e) => {
   else if (t.id === 'opt-transcut') setOption({ transCut: Math.max(0, +t.value || 0) });
   else if (/^opt-flow/.test(t.id)) setOption({ [t.id.slice(4)]: t.checked });
   else if (t.dataset.progLabel) act({ type: 'updateProgram', id: t.dataset.progLabel, patch: { label: t.value.trim() || '（名前なし）' } });
+  else if (t.dataset.progMemo) act({ type: 'updateProgram', id: t.dataset.progMemo, patch: { memo: t.value } });
   else if (t.dataset.slide) act({ type: 'updateSlide', id: t.dataset.slide, patch: t.dataset.slideF === 'lines' ? { lines: t.value.split('\n') } : { title: t.value } });
 });
 
@@ -580,7 +733,7 @@ $('trans-video-file').addEventListener('change', async (e) => {
 /* ---------- スマホ操作 ---------- */
 function renderRemote() {
   const r = remoteInfo;
-  $('remote-label').textContent = r.on ? `スマホ操作: オン（${r.clients}台）` : 'スマホ操作';
+  $('remote-label').textContent = r.on ? `スマホ: オン（${r.clients}台）` : 'スマホ';
   $('remote-body').innerHTML = r.on
     ? `<div class="flex gap-4 items-start">
         <div class="w-44 h-44 flex-none p-2 bg-white rounded-lg [&_svg]:w-full [&_svg]:h-full" role="img" aria-label="スマホ操作の QR コード">${r.qr || ''}</div>
@@ -605,27 +758,24 @@ const optionsOf = () => C.optionsOf(S);
 const setOption = (patch) => act({ type: 'setOption', patch });
 function renderOptions() {
   const o = optionsOf();
-  // 巡ごとの指名のしかた
-  const modes = $('round-modes');
-  if (!modes.contains(document.activeElement)) {
-    modes.innerHTML = Array.from({ length: S.rounds }, (_, i) => {
-      const m = o.roundModes[i] || 'bid';
-      return `<div class="relative"><label class="sr-only" for="rm-${i}">第${i + 1}巡の指名のしかた</label><select id="rm-${i}" data-round-mode="${i}" class="appearance-none w-44 pl-3 pr-10 ${INPUT} cursor-pointer"><option value="bid" ${m === 'bid' ? 'selected' : ''}>第${i + 1}巡: 一斉入札</option><option value="order" ${m === 'order' ? 'selected' : ''}>第${i + 1}巡: 順番指名</option></select>${ICON.chevron}</div>`;
-    }).join('');
-  }
   // 順番指名の巡が1つもなければ、順番の設定は使わない
   setDisabled($('opt-order'), !o.roundModes.slice(0, S.rounds).includes('order'));
   for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
   $('opt-timershow').checked = !!o.timerShow;
   $('opt-timerauto').checked = !!o.timerAuto;
-  // 巡ごとの待ち時間の画像(並べた順に出す)
+  // 巡: 1行に1巡(指名のしかた＋待ち時間の画像)
+  const rows = $('round-rows');
+  if (rows.contains(document.activeElement) && document.activeElement.matches('select')) return;
   const map = o.waitImages || {};
-  $('wait-rounds').innerHTML = Array.from({ length: S.rounds }, (_, i) => {
-    const r = i + 1, list = map[r] || [];
-    return `<div class="flex flex-wrap items-center gap-2"><span class="w-12 flex-none text-sm text-[var(--text-muted)]">第${r}巡</span>
-      ${list.map((f, k) => `<span class="relative"><img src="${img(f)}" alt="第${r}巡の${k + 1}枚目" class="w-28 h-16 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><span class="absolute left-1 top-1 px-1.5 rounded bg-black/70 text-xs text-white">${k + 1}</span>
+  rows.innerHTML = Array.from({ length: S.rounds }, (_, i) => {
+    const r = i + 1, m = o.roundModes[i] || 'bid', list = map[r] || [];
+    const now = r === S.round;
+    return `<div class="flex flex-wrap items-center gap-3 p-3 ${CARD} ${now ? 'border-primary-500/60' : ''}" data-round-row="${r}"><b class="w-16 flex-none text-base text-[var(--text-heading)]">第${r}巡</b>
+      <div class="relative"><label class="sr-only" for="rm-${i}">第${r}巡の指名のしかた</label><select id="rm-${i}" data-round-mode="${i}" class="appearance-none w-36 pl-3 pr-10 ${INPUT} cursor-pointer"><option value="bid" ${m === 'bid' ? 'selected' : ''}>一斉入札</option><option value="order" ${m === 'order' ? 'selected' : ''}>順番指名</option></select>${ICON.chevron}</div>
+      <span class="text-xs text-[var(--text-muted)]">待ち時間の画像</span>
+      ${list.map((f, k) => `<span class="relative"><img src="${img(f)}" alt="第${r}巡の${k + 1}枚目" class="w-24 h-14 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><span class="absolute left-1 top-1 px-1.5 rounded bg-black/70 text-xs text-white">${k + 1}</span>
         <button type="button" data-wait-del="${r}:${k}" aria-label="第${r}巡の${k + 1}枚目を外す" class="absolute -right-2 -top-2 w-7 h-7 inline-flex items-center justify-center rounded-full bg-[var(--bg-page-alt)] border border-[var(--border-strong)] text-[var(--text-default)] cursor-pointer ${FOCUS}"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join('')}
-      <button type="button" data-wait-add="${r}" class="${BTN_SUB}">画像を追加</button></div>`;
+      <button type="button" data-wait-add="${r}" class="${BTN_SUB}">画像を追加</button>${now ? '<span class="ml-auto text-xs text-primary-300">いまの巡</span>' : ''}</div>`;
   }).join('');
 }
 document.addEventListener('change', (e) => {
@@ -643,10 +793,9 @@ document.addEventListener('change', (e) => {
 let waitRound = 1;
 const setWaitList = (r, list) => { const m = { ...(optionsOf().waitImages || {}) }; m[r] = list; setOption({ waitImages: m }); };
 document.addEventListener('click', (e) => {
-  const add = e.target.closest('[data-wait-add]'), del = e.target.closest('[data-wait-del]'), stepB = e.target.closest('[data-wait-step]');
+  const add = e.target.closest('[data-wait-add]'), del = e.target.closest('[data-wait-del]');
   if (add) { waitRound = +add.dataset.waitAdd; $('wait-file').value = ''; $('wait-file').click(); }
   else if (del) { const [r, k] = del.dataset.waitDel.split(':').map(Number); setWaitList(r, (optionsOf().waitImages[r] || []).filter((_, i) => i !== k)); }
-  else if (stepB) { const n = C.waitImagesOf(S).length; if (n) act({ type: 'waitShow', idx: Math.min(n - 1, Math.max(0, (S.waitIdx || 0) + +stepB.dataset.waitStep)) }); }
 });
 $('wait-file').addEventListener('change', async (e) => {
   const files = [...e.target.files].filter((f) => IMG_EXT[f.type]);
@@ -657,14 +806,6 @@ $('wait-file').addEventListener('change', async (e) => {
     setWaitList(waitRound, [...(optionsOf().waitImages[waitRound] || []), ...names]);
   } catch (err) { toast(err.message, true); }
 });
-function renderWaitCtl() {
-  const n = C.waitImagesOf(S).length, i = Math.min(S.waitIdx || 0, Math.max(0, n - 1));
-  $('wait-ctl').classList.toggle('hidden', !n);
-  $('wait-pos').textContent = n ? `${i + 1} / ${n}` : '';
-  setDisabled(document.querySelector('[data-wait-step="-1"]'), i <= 0);
-  setDisabled(document.querySelector('[data-wait-step="1"]'), i >= n - 1);
-}
-
 // 制限時間: 残りは「終わる時刻」から計算して、0.25秒ごとに表示を更新
 const fmt = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 function timerLeft() {

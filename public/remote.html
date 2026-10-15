@@ -14,13 +14,19 @@
 </header>
 
 <main class="px-4 pt-4 pb-[calc(112px+env(safe-area-inset-bottom))] flex flex-col gap-4">
-  <div class="flex items-baseline gap-3">
-    <h2 id="round-title" class="text-2xl font-bold text-[var(--text-heading)]">第1巡</h2>
-    <p id="step-label" class="text-sm text-[var(--text-muted)]"></p>
+  <!-- いまの場面(と次の場面) -->
+  <div class="leading-normal">
+    <p id="scene-pos" class="text-xs text-[var(--text-muted)]"></p>
+    <div class="flex items-baseline gap-3"><h2 id="round-title" class="text-2xl font-bold text-[var(--text-heading)]">第1巡</h2><p id="step-label" class="text-sm text-[var(--text-muted)]"></p></div>
+    <p id="up-next" class="text-xs text-[var(--text-muted)]"></p>
   </div>
 
-  <!-- 次にやること -->
-  <section id="next" class="flex flex-col gap-3 p-4 bg-[var(--bg-surface)] border border-primary-500/40 rounded-xl" aria-live="polite"></section>
+  <!-- 次にやることとメモ(同じ並び) -->
+  <section class="grid grid-cols-2 gap-2">
+    <div class="p-3 rounded-xl border-2 border-primary-500/60 bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-primary-300">次にやること</p><div id="next" class="text-sm text-[var(--text-heading)] [&_b]:text-primary-300 [&_ul]:hidden" aria-live="polite"></div></div>
+    <div class="p-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-[var(--text-muted)]">メモ</p><div id="memo" class="text-sm text-[var(--text-heading)] whitespace-pre-wrap"></div></div>
+  </section>
+  <div id="subs" class="flex flex-col gap-2"></div>
 
   <!-- 配信画面の切り替え -->
   <section class="leading-normal">
@@ -36,15 +42,6 @@
     <button type="button" id="timer-start" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">スタート</button>
     <button type="button" id="timer-stop" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">止める</button>
     <button type="button" id="timer-reset" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リセット</button>
-    </div>
-  </section>
-
-  <!-- 待ち時間の画像(詰将棋の問題 → 答え など) -->
-  <section id="wait-ctl" class="leading-normal hidden">
-    <h3 class="mb-2 text-xs text-[var(--text-muted)]">待ち時間の画像 <span id="wait-pos" class="font-bold text-[var(--text-heading)]"></span></h3>
-    <div class="grid grid-cols-2 gap-2">
-      <button type="button" data-wait-step="-1" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">前へ</button>
-      <button type="button" data-wait-step="1" class="inline-flex items-center justify-center h-11 px-3 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">次へ</button>
     </div>
   </section>
 

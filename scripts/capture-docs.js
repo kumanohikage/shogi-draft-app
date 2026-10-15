@@ -37,7 +37,7 @@ app.whenReady().then(async () => {
   // 管理画面: 上から h ピクセルぶん / 配信画面: 1920×1080 を JPEG で
   const shotC = async (name, h = 900) => {
     await wait(500);
-    ct.setContentSize(1360, h); await wait(300);
+    ct.setContentSize(1360, h - 1); await wait(100); ct.setContentSize(1360, h); await wait(300); // 大きさを変えて描き直させる(同じ大きさだと前の絵のまま撮れることがある)
     fs.writeFileSync(path.join(OUT, name + '.png'), (await ct.webContents.capturePage()).toPNG());
     ct.setContentSize(1360, 900);
     console.log('撮影', name);
@@ -50,18 +50,19 @@ app.whenReady().then(async () => {
   const clickNext = async () => { await cjs("document.querySelector('#next button.h-12').click(); 0"); await wait(400); };
   const L = S.leaders.map((l) => l.id), P = S.players.map((p) => p.id);
 
-  // 1. 登録
-  await cjs("selectTab('roster'); 0");
+  // 1. リーダー(一覧と1人のパネル)
+  await cjs("selectTab('leaders'); 0");
   await shotC('control-roster', 900);
   await cjs("openCrop('L', S.leaders[0].id); 0"); await wait(800);
   await cjs("crop.zoom = 1.4; crop.y = -20; document.getElementById('crop-zoom').value = 1.4; drawCrop(); 0");
   await shotC('control-crop', 900);
-  await cjs("document.getElementById('crop').close(); selectTab('run'); 0");
+  await cjs("document.getElementById('crop').close(); selectTab('prog'); 0");
 
-  // 2. 番組: 進行表・資料・リーダー紹介
-  await cjs("selectTab('show'); 0");
-  await shotC('control-show', 1300);
-  await cjs("selectTab('run'); 0");
+  // 2. 進行表: ドラフトの場面の「⚙ 進め方」と、資料・リーダー紹介の配信画面
+  await act({ type: 'progGo', idx: C.programOf(S).findIndex((g) => g.type === 'draft') });
+  await cjs("selectTab('prog'); ui.draftTab = 'setup'; render(); 0");
+  await shotC('control-show', 1100);
+  await cjs("ui.draftTab = 'live'; render(); 0");
   await act({ type: 'progGo', idx: 1 });
   await shotO('overlay-slide', 1200);
   await act({ type: 'introGo', idx: 0 }); await act({ type: 'progGo', idx: 3 });
@@ -73,7 +74,12 @@ app.whenReady().then(async () => {
   for (const [i, p] of [[0, 0], [1, 7], [2, 0], [3, 13]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
   await shotC('control-nominate', 1000);
   for (const [i, p] of [[4, 21], [5, 7]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
-  await shotC('control-ready', 760);
+  await shotC('control-ready', 900);
+  // 本番ビュー(次にやることとメモ)
+  await act({ type: 'updateProgram', id: C.programOf(S).find((g) => g.type === 'draft').id, patch: { memo: '公開の前に、指名の理由を一言ずつ聞く' } });
+  await cjs("setView('live'); 0"); await wait(600);
+  await shotC('control-live', 900);
+  await cjs("setView('edit'); 0");
 
   // 4. 確認 → 一斉公開 → 重複(2件)
   await clickNext();

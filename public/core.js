@@ -15,7 +15,7 @@
       version: 1,
       title: 'ドラフト会議',
       rounds: 3,
-      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), intro(紹介文) }  ※チーム名はドラフト後に決まるので持たない
+      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), intro(紹介文), introMemo(紹介のメモ。自分用) }  ※チーム名はドラフト後に決まるので持たない
       players: [],          // { id, name, icon, note(ひとこと), absent(欠場) }
       round: 1,             // 今の巡
       // 今の巡の指名: leaderId -> { playerId, revealed }
@@ -209,7 +209,7 @@
         s.players = s.players.filter((p) => p.id !== action.id); break;
       case 'replaceRoster': // CSV 読み込み
         if (action.leaders && action.leaders.length > MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです（CSVに${action.leaders.length}人います）`);
-        if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), name: l.name, short: l.short || '', color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '', stand: l.stand || '', intro: l.intro || '' }));
+        if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), name: l.name, short: l.short || '', color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '', stand: l.stand || '', intro: l.intro || '', introMemo: l.introMemo || '' }));
         if (action.players) s.players = action.players.map((p) => ({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }));
         break;
 
@@ -369,10 +369,10 @@
   }
   const csvCell = (v) => (/[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? ''));
   // 書式: 種類,名前,略称,色,画像ファイル,ひとこと  (種類 = リーダー / 選手)。見出しの列名で読むので、列の順番が違っても読める
-  const CSV_COLS = ['種類', '名前', '略称', '色', '画像ファイル', 'ひとこと'];
+  const CSV_COLS = ['種類', '名前', '略称', '色', '画像ファイル', 'ひとこと', '立ち絵', '紹介文', '紹介のメモ'];
   function rosterToCSV(s) {
     const lines = [CSV_COLS.join(',')];
-    for (const l of s.leaders) lines.push(['リーダー', l.name, l.short || '', l.color, l.icon, ''].map(csvCell).join(','));
+    for (const l of s.leaders) lines.push(['リーダー', l.name, l.short || '', l.color, l.icon, '', l.stand || '', l.intro || '', l.introMemo || ''].map(csvCell).join(','));
     for (const p of s.players) lines.push(['選手', p.name, '', '', p.icon, p.note || ''].map(csvCell).join(','));
     return lines.join('\r\n') + '\r\n';
   }
@@ -384,7 +384,7 @@
       const kind = r[0], get = (c) => (col[c] == null ? '' : r[col[c]] || '');
       if (kind === '種類') { col = Object.fromEntries(r.map((c, i) => [c, i])); continue; }
       const color = /^#[0-9a-f]{6}$/i.test(get('色')) ? get('色') : '';
-      if (/^リーダー|^leader$/i.test(kind)) leaders.push({ name: get('名前'), short: get('略称'), color, icon: get('画像ファイル') });
+      if (/^リーダー|^leader$/i.test(kind)) leaders.push({ name: get('名前'), short: get('略称'), color, icon: get('画像ファイル'), stand: get('立ち絵'), intro: get('紹介文'), introMemo: get('紹介のメモ') });
       else if (/^選手|^player$/i.test(kind)) players.push({ name: get('名前'), icon: get('画像ファイル'), note: get('ひとこと') });
     }
     return { leaders, players };
@@ -409,10 +409,13 @@
     rows.push(['見た目', '背景', o.bgImage], ['見た目', '名前の前につける文字', o.teamPrefix]);
     rows.push(['見た目', '場面の切り替え', TRANSITIONS[o.transition] || 'なし'], ['見た目', '切り替えの長さ（秒）', o.transSec], ['見た目', '切り替えの動画', o.transVideo], ['見た目', '動画で入れ替える秒数', o.transCut || '自動']);
     for (const g of programOf(s)) {
-      if (g.type !== 'slide') { rows.push(['進行表', SCENE_CSV[g.type], g.label]); continue; }
-      const sl = slideById(s, g.slideId) || { kind: 'text', title: '', lines: [] };
-      if (sl.kind === 'image') rows.push(['進行表', '画像の資料', g.label, sl.image || '']);
-      else rows.push(['進行表', sl.rules || sl.id === 'S_draft' ? 'ドラフト説明' : '文字の資料', g.label, sl.title, ...(sl.lines || [])]);
+      if (g.type !== 'slide') rows.push(['進行表', SCENE_CSV[g.type], g.label]);
+      else {
+        const sl = slideById(s, g.slideId) || { kind: 'text', title: '', lines: [] };
+        if (sl.kind === 'image') rows.push(['進行表', '画像の資料', g.label, sl.image || '']);
+        else rows.push(['進行表', sl.rules || sl.id === 'S_draft' ? 'ドラフト説明' : '文字の資料', g.label, sl.title, ...(sl.lines || [])]);
+      }
+      if (g.memo) rows.push(['進行表', 'メモ', g.memo]); // 自分用のメモ(すぐ上の場面のもの)
     }
     return rows.map((r) => r.map((v) => csvCell(v ?? '')).join(',')).join('\r\n') + '\r\n';
   }
@@ -446,6 +449,7 @@
         else if (key === '切り替えの動画') out.options.transVideo = v0;
         else if (key === '動画で入れ替える秒数') out.options.transCut = Math.max(0, +v0 || 0);
       } else if (kind === '進行表') {
+        if (key === 'メモ') { if (prog.length) prog[prog.length - 1].memo = v.join(','); continue; }
         const type = Object.keys(SCENE_CSV).find((t) => SCENE_CSV[t] === key);
         if (type) { if (type !== 'draft' || !prog.some((g) => g.type === 'draft')) prog.push({ id: uid('G'), type, label: v0 || key }); }
         else if (key === '文字の資料' || key === 'ドラフト説明' || key === '画像の資料') {

@@ -62,13 +62,13 @@ app.whenReady().then(async () => {
 
   // 1. 何も登録していない状態
   await check('01-run-empty');
-  await tab('roster'); await check('02-roster-empty');
+  await tab('leaders'); await check('02-leaders-empty');
   // 2. お試しモード(ダミー名簿)
   await send({ type: 'mode', mode: 'demo' });
   // 進行表のドラフトの場面へ(お試しは進行表の最初=オープニングから始まる)
   await act({ type: 'progGo', idx: C.programOf(S).findIndex((g) => g.type === 'draft') });
   await check('03-roster-demo');
-  await tab('run'); await check('04-run-demo-start');
+  await tab('prog'); await check('04-run-demo-start');
   const L = S.leaders.map((l) => l.id), P = S.players.map((p) => p.id);
   // 以降は「次にやること」の大きなボタンを押して進める(主催者の操作と同じ)
   const next = async (expect) => {
@@ -121,7 +121,7 @@ app.whenReady().then(async () => {
   if (S.round !== 2 || S.scene !== 'board') { console.log('✗ 第2巡のはじめ(待ち時間の画像なし→指名ボード)になっていない'); errors++; }
   await check('13-run-round2');
   // 6. 画像の登録: ドロップ → 調整画面 → 位置と大きさを変えて保存 → 開き直すと調整が残っている
-  await tab('roster');
+  await tab('players');
   const before = S.players[0].icon;
   await js(`(async () => {
     const c = document.createElement('canvas'); c.width = 200; c.height = 100;
@@ -145,6 +145,11 @@ app.whenReady().then(async () => {
   await js("document.getElementById('crop').close(); 0");
   await check('15-roster-image');
   await tab('show'); await check('16-show');
+  await tab('leaders'); await check('17-leaders');
+  await tab('prog'); await js("ui.draftTab = 'setup'; render(); 0"); await check('18-draft-setup');
+  await js("ui.draftTab = 'live'; ui.selId = C.programOf(S)[1].id; render(); 0"); await check('19-scene-slide');
+  await js("setView('live'); 0"); await wait(600); await check('20-live');
+  await js("setView('edit'); ui.selId = null; render(); 0");
   await send({ type: 'mode', mode: 'real' });
 
   console.log(`\n合計 error ${errors} / warn ${warns}   (HTML とスクショ: ${OUT})`);

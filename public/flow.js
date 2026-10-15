@@ -99,6 +99,8 @@
     // 待ち時間の画面: 指名を待つ間、オレンジのボタンで画像を順に進める
     const wn = C.waitImagesOf(S).length, wi = Math.min(S.waitIdx || 0, Math.max(0, wn - 1));
     const waitMore = S.scene === 'wait' && wi < wn - 1 ? { key: 'waitNext', label: `次の画像へ（${wi + 2} / ${wn}）` } : null;
+    // 戻すのはオレンジの左の白いボタン(下のバーで送る・戻すをそろえる)
+    if (S.scene === 'wait' && wi > 0) sub.unshift({ key: 'waitPrev', label: '前の画像' });
     // 順番指名の巡: いまの番の人が指名 → 公開(公開した時点で確定)
     const turn = C.currentTurn(S);
     if (turn) {
@@ -149,6 +151,7 @@
       case 'progShow': return { type: 'progGo', idx: i };
       case 'introNext': return { type: 'introGo', idx: (S.introIdx || 0) + 1 };
       case 'waitNext': return { type: 'waitShow', idx: (S.waitIdx || 0) + 1 };
+      case 'waitPrev': return { type: 'waitShow', idx: Math.max(0, (S.waitIdx || 0) - 1) };
       case 'introPrev': return { type: 'introGo', idx: (S.introIdx || 0) - 1 };
       default: return null;
     }

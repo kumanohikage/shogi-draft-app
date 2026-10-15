@@ -48,9 +48,9 @@ assert.deepStrictEqual(Object.values(hits), [1000, 1000, 1000]);
 const csv = C.rosterToCSV(s);
 const back = C.rosterFromCSV(csv);
 assert.strictEqual(back.leaders.length, 6); assert.strictEqual(back.players.length, 20);
-assert.deepStrictEqual(C.rosterFromCSV('種類,名前,色,画像ファイル\n選手,"a,b"\nリーダー,X,#123456,x.png').leaders[0], { name: 'X', short: '', color: '#123456', icon: 'x.png' });
+assert.deepStrictEqual(C.rosterFromCSV('種類,名前,色,画像ファイル\n選手,"a,b"\nリーダー,X,#123456,x.png').leaders[0], { name: 'X', short: '', color: '#123456', icon: 'x.png', stand: '', intro: '', introMemo: '' });
 // 旧書式(チーム名の列あり)も読める
-assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像ファイル\nリーダー,X,チームX,#123456,x.png\n選手,Y,,,y.png'), { leaders: [{ name: 'X', short: '', color: '#123456', icon: 'x.png' }], players: [{ name: 'Y', icon: 'y.png', note: '' }] });
+assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像ファイル\nリーダー,X,チームX,#123456,x.png\n選手,Y,,,y.png'), { leaders: [{ name: 'X', short: '', color: '#123456', icon: 'x.png', stand: '', intro: '', introMemo: '' }], players: [{ name: 'Y', icon: 'y.png', note: '' }] });
 
 // 1人ずつ公開: 全員公開するまでは確定しない(後から重複が出ることがあるため)
 {

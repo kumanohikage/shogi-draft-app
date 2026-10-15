@@ -14,9 +14,11 @@ addEventListener('resize', fit); fit();
 
 // 管理画面に「配信画面が開いている(OBS か ブラウザか、OBS で映っているか)」を知らせる
 const EXPORT = new URLSearchParams(location.search).get('export'); // 画像の書き出し用
+// 管理画面の本番ビューに小さく出すプレビュー: 音を出さない・配信画面として数えない・抽選の完了を送らない
+const PREVIEW = new URLSearchParams(location.search).has('preview');
 const obs = window.obsstudio;
 const presence = { obs: !!obs, visible: null, active: null };
-const sendPresence = () => { if (!EXPORT && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
+const sendPresence = () => { if (!EXPORT && !PREVIEW && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
 if (obs) {
   addEventListener('obsSourceVisibleChanged', (e) => { presence.visible = !!e.detail.visible; sendPresence(); });
   addEventListener('obsSourceActiveChanged', (e) => { presence.active = !!e.detail.active; sendPresence(); });
@@ -52,11 +54,11 @@ function render() {
   sceneSwitch(scene);
   if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
-  SE.setVolume(audio.seVol / 100);
-  BGM.update(audio, S.scene === 'roulette');
+  SE.setVolume(PREVIEW ? 0 : audio.seVol / 100);
+  BGM.update(PREVIEW ? { ...audio, bgmOn: false } : audio, S.scene === 'roulette');
   const f = $('roulette').contentWindow;
   if (f) {
-    f.postMessage({ type: 'volume', v: audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
+    f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
   renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); playLottery(false);
@@ -121,7 +123,7 @@ async function runTransition(o) {
       if (!(v.duration > 0)) await new Promise((r) => { v.onloadedmetadata = r; v.onerror = r; setTimeout(r, 3000); });
       if (!(v.duration > 0)) return swap(); // 読めない動画は切り替えだけ
       const cut = o.transCut > 0 ? Math.min(o.transCut, v.duration) : v.duration / 2;
-      v.currentTime = 0; v.volume = Math.min(1, Object.assign({}, C.DEFAULT_AUDIO, S.audio).seVol / 100);
+      v.currentTime = 0; v.volume = PREVIEW ? 0 : Math.min(1, Object.assign({}, C.DEFAULT_AUDIO, S.audio).seVol / 100); v.muted = PREVIEW;
       v.style.display = 'block';
       await v.play().catch(() => {});
       await later(cut * 1000);
@@ -385,7 +387,7 @@ function playLottery(force) {
 addEventListener('message', (e) => {
   const m = e.data || {};
   if (m.type === 'roulette-ready') { rouletteReady = true; if (S) playLottery(false); }
-  else if (m.type === 'roulette-done' && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
+  else if (m.type === 'roulette-done' && !PREVIEW && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
 });
 
 connect();

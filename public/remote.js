@@ -30,20 +30,26 @@ function render() {
   $('title').textContent = S.title || 'ドラフト会議';
   const done = C.draftComplete(S);
   const item = C.progItem(S), inDraft = !item || item.type === 'draft';
-  $('round-title').textContent = !inDraft ? item.label : done ? 'ドラフト終了' : `第${S.round}巡`;
+  const prog = C.programOf(S), pi = C.progIdxOf(S);
+  const isIntro = item && item.type === 'intro', k = Math.min(S.introIdx || 0, S.leaders.length - 1), l = isIntro ? S.leaders[k] : null;
+  $('scene-pos').textContent = `いまの場面（${pi + 1} / ${prog.length}）`;
+  $('round-title').textContent = !inDraft ? (l ? `${item.label}　${l.name}` : item.label) : done ? 'ドラフト終了' : `ドラフト　第${S.round}巡`;
+  const nl = isIntro ? S.leaders[k + 1] : null, ng = prog[pi + 1];
+  $('up-next').textContent = `次: ${nl ? nl.name : ng ? ng.label : '（最後の場面）'}`;
+  const memo = [l && l.introMemo ? `${l.name}: ${l.introMemo}` : '', item && item.memo ? item.memo : ''].filter(Boolean).join('\n');
+  $('memo').textContent = memo || '（なし）';
+  $('memo').classList.toggle('text-[var(--text-muted)]', !memo);
   const n = F.nextStep(S, { demo });
   $('step-label').textContent = n.step >= 0 && n.step < F.STEPS.length ? F.STEPS[n.step] : '';
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''}>${b.label}</button>`;
-  $('next').innerHTML = `<p class="text-xs text-[var(--text-muted)]">次にやること</p>
-    <div class="text-base text-[var(--text-heading)] leading-normal [&_b]:text-primary-300">${n.text}</div>
-    ${(n.sub || []).filter((b) => b.key !== 'auto').map((b) => btn(b, BTN_SUB)).join('')}`;
-  // メインのボタン(オレンジ)は画面の下に固定。押すことがないときは説明だけ
-  $('bar').innerHTML = n.main ? btn(n.main, BTN_PRIMARY) : `<p class="h-14 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
-  const wn = C.waitImagesOf(S).length, wi = Math.min(S.waitIdx || 0, Math.max(0, wn - 1));
-  $('wait-ctl').classList.toggle('hidden', !wn);
-  $('wait-pos').textContent = wn ? `${wi + 1} / ${wn}` : '';
-  setDisabled(document.querySelector('[data-wait-step="-1"]'), wi <= 0);
-  setDisabled(document.querySelector('[data-wait-step="1"]'), wi >= wn - 1);
+  $('next').innerHTML = n.text || '';
+  // 下のバー: 戻す系(前の画像・前へ・前の人へ)は白でオレンジの左。ほかのサブはその上に
+  const BACK = ['waitPrev', 'progPrev', 'introPrev'];
+  const subs = (n.sub || []).filter((b) => b.key !== 'auto');
+  const back = subs.find((b) => BACK.includes(b.key));
+  $('subs').innerHTML = subs.filter((b) => b !== back).map((b) => btn(b, BTN_SUB)).join('');
+  const main = n.main ? btn(n.main, BTN_PRIMARY) : `<p class="h-14 flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
+  $('bar').innerHTML = `<div class="flex gap-2">${back ? btn(back, BTN_SUB.replace('w-full h-11', 'flex-none h-14')) : ''}<div class="flex-1 min-w-0">${main}</div></div>`;
   $('scenes').innerHTML = SCENES.map(([k, t]) => `<button type="button" data-scene="${k}" aria-pressed="${S.scene === k}" class="h-11 px-2 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${S.scene === k ? 'bg-[var(--bg-page-alt)] border-primary-400 text-[var(--text-heading)]' : 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]'}">${t}</button>`).join('');
   renderNoms();
   setDisabled($('undo'), !canUndo);
@@ -93,7 +99,6 @@ document.addEventListener('click', (e) => {
   if (!b || b.disabled) return;
   const key = b.dataset.next, arg = b.dataset.arg;
   if (b.dataset.scene) act({ type: 'setScene', scene: b.dataset.scene });
-  else if (b.dataset.waitStep) act({ type: 'waitShow', idx: Math.max(0, (S.waitIdx || 0) + +b.dataset.waitStep) });
   else if (key && DraftFlow.actionFor(key, arg, S)) act(DraftFlow.actionFor(key, arg, S));
   else if (key === 'roster') toast('名簿の登録はパソコンのアプリで行ってください');
   else if (b.id === 'timer-start') act({ type: 'timer', cmd: 'start' });

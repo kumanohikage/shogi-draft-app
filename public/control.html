@@ -7,138 +7,205 @@
 <link rel="stylesheet" href="control.css">
 </head>
 <body class="min-h-screen bg-[var(--bg-page)] text-[var(--text-default)] font-sans">
-<header class="sticky top-0 z-10 flex items-center gap-6 px-6 h-16 bg-[var(--bg-page)] border-b border-[var(--border-default)]">
-  <h1 id="title" class="text-lg font-bold text-primary-400 truncate">ドラフト会議</h1>
-  <nav aria-label="画面の切り替え" class="flex items-end h-16 gap-2" role="tablist">
-    <button type="button" role="tab" data-tab="run" aria-selected="true" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">進行</button>
-    <button type="button" role="tab" data-tab="show" aria-selected="false" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">番組</button>
-    <button type="button" role="tab" data-tab="roster" aria-selected="false" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">登録</button>
+<!-- ヘッダー: 大会名・メインオブジェクトのタブ(進行表 / リーダー / 選手 / 大会)・どこからでも使う道具 -->
+<header class="sticky top-0 z-30 flex items-center gap-6 px-6 h-16 bg-[var(--bg-page)] border-b border-[var(--border-default)]">
+  <h1 id="title" class="max-w-60 text-lg font-bold text-primary-400 truncate">ドラフト会議</h1>
+  <nav id="tabs" aria-label="画面の切り替え" class="flex items-end h-16 gap-2" role="tablist">
+    <button type="button" role="tab" data-tab="prog" aria-selected="true" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">進行表</button>
+    <button type="button" role="tab" data-tab="leaders" aria-selected="false" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リーダー</button>
+    <button type="button" role="tab" data-tab="players" aria-selected="false" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">選手</button>
+    <button type="button" role="tab" data-tab="show" aria-selected="false" class="tab h-16 px-4 text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">大会</button>
   </nav>
-  <div class="ml-auto flex items-center gap-4">
-    <button type="button" id="demo-enter" title="ダミーの名簿で流れを試せます。本番のデータとは別に保存されます" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7 15h10"/></svg>
-      お試しモード
-    </button>
-    <button type="button" id="remote-open" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
-      <span id="remote-label">スマホ操作</span>
-    </button>
-    <span id="overlay-st" class="text-xs text-[var(--text-muted)]" aria-live="polite"></span>
-    <span id="conn" class="text-xs text-[var(--text-muted)]" aria-live="polite">接続中…</span>
-    <button type="button" id="undo" title="直前の操作を取り消す (Ctrl+Z)" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
-      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
-      1つ戻す
-    </button>
+  <!-- 本番ビューのときはタブの代わりに「本番中」 -->
+  <div id="live-head" class="hidden items-center gap-3">
+    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/[.12] text-red-300 text-sm font-bold"><span class="w-2 h-2 rounded-full bg-red-400" aria-hidden="true"></span>本番中</span>
+    <span id="live-pos" class="text-sm text-[var(--text-muted)] tabular-nums"></span>
+  </div>
+  <div class="ml-auto flex items-center gap-2">
+    <button type="button" id="copy-url" title="配信画面の URL をコピー（OBS のブラウザソースに入れる）" class="inline-flex items-center gap-2 h-11 px-3 rounded-lg text-xs hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><span id="overlay-st" aria-live="polite">配信画面</span><svg class="w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span class="sr-only">配信画面の URL をコピー</span></button>
+    <div class="relative">
+      <button type="button" id="audio-open" aria-expanded="false" aria-controls="audio-pop" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>音</button>
+      <!-- 音(BGM・音量): どの画面からでも開ける小さな窓 -->
+      <div id="audio-pop" class="hidden absolute right-0 top-[52px] w-[360px] p-4 flex flex-col gap-4 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-xl shadow-xl">
+        <div class="flex items-end gap-2">
+          <div class="leading-normal flex-1 min-w-0"><label for="bgm-track" class="block mb-2 text-xs text-[var(--text-muted)]">BGM</label>
+            <div class="relative"><select id="bgm-track" class="appearance-none w-full h-11 pl-3 pr-10 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400/50"></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+          <button type="button" id="bgm-toggle" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"></button>
+        </div>
+        <div class="leading-normal"><label for="bgm-vol" class="block mb-2 text-xs text-[var(--text-muted)]">BGM <span id="bgm-vol-v"></span></label><input id="bgm-vol" type="range" min="0" max="100" step="1" class="block w-full h-11 accent-primary-500 cursor-pointer"></div>
+        <div class="leading-normal"><label for="se-vol" class="block mb-2 text-xs text-[var(--text-muted)]">効果音 <span id="se-vol-v"></span></label><input id="se-vol" type="range" min="0" max="100" step="1" class="block w-full h-11 accent-primary-500 cursor-pointer"></div>
+        <div class="leading-normal"><label for="rl-vol" class="block mb-2 text-xs text-[var(--text-muted)]">ルーレット <span id="rl-vol-v"></span></label><input id="rl-vol" type="range" min="0" max="100" step="1" class="block w-full h-11 accent-primary-500 cursor-pointer"></div>
+        <div class="flex items-center gap-2"><button type="button" id="bgm-add" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">曲を追加</button></div>
+        <p id="bgm-hint" class="text-xs text-[var(--text-muted)]"></p>
+        <input id="bgm-file" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a" multiple hidden aria-label="BGMの音声ファイル">
+      </div>
+    </div>
+    <button type="button" id="remote-open" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg><span id="remote-label">スマホ</span></button>
+    <button type="button" id="demo-enter" title="ダミーの名簿で流れを試せます。本番のデータとは別に保存されます" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 18.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7 15h10"/></svg>お試し</button>
+    <button type="button" id="undo" title="直前の操作を取り消す (Ctrl+Z)" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>1つ戻す</button>
+    <button type="button" id="live-exit" class="hidden inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>編集に戻る</button>
+    <span id="conn" class="sr-only" aria-live="polite">接続中…</span>
   </div>
 </header>
 
-<main class="max-w-[1280px] mx-auto px-6 pt-6 pb-16">
+<main class="max-w-[1360px] mx-auto px-6 pt-6 pb-10">
   <!-- お試しモード中のお知らせ -->
   <div id="demo-banner" class="hidden flex-wrap items-center gap-4 p-4 mb-6 bg-primary-500/[.12] border border-primary-500/40 rounded-lg" role="status">
     <p class="text-sm text-[var(--text-heading)]"><span class="font-bold text-primary-300">お試しモード中</span>　ダミーの名簿で動いています。本番のデータとは別に保存されています。</p>
     <div class="ml-auto flex gap-2">
-      <button type="button" id="demo-reset" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">お試しを最初から</button>
-      <button type="button" id="demo-exit" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-primary-500 text-slate-900 rounded-lg hover:bg-primary-600 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">本番に戻る</button>
+      <button type="button" id="demo-reset" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">お試しを最初から</button>
+      <button type="button" id="demo-exit" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-primary-500 text-slate-900 rounded-lg hover:bg-primary-600 cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">本番に戻る</button>
     </div>
   </div>
 
-  <!-- 進行 -->
-  <section id="tab-run" class="tab-body" role="tabpanel" aria-label="進行">
-    <div class="flex flex-wrap items-center gap-4">
-      <span class="text-sm text-[var(--text-muted)]" id="scene-label">配信画面</span>
-      <div class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-default)]" role="group" aria-labelledby="scene-label">
-        <button type="button" data-scene="board" class="scene h-11 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">指名ボード</button>
-        <button type="button" data-scene="roulette" class="scene h-11 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">抽選ルーレット</button>
-        <button type="button" data-scene="teams" class="scene h-11 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">チーム表</button>
-        <button type="button" data-scene="wait" class="scene h-11 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="待ち時間の画像とタイマー">待ち時間</button>
-        <button type="button" data-scene="blank" class="scene h-11 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">何も出さない</button>
-      </div>
-      <button type="button" id="copy-url" title="OBS のブラウザソースに入れる URL" class="ml-auto inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        配信画面URLをコピー
-      </button>
-    </div>
-
-    <!-- 音(BGM・効果音) -->
-    <div class="flex flex-wrap items-end gap-4 mt-4 px-4 py-3 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-      <div class="leading-normal">
-        <label for="bgm-track" class="block mb-2 text-xs text-[var(--text-muted)]">BGM</label>
-        <div class="relative">
-          <select id="bgm-track" class="appearance-none w-72 h-11 pl-3 pr-10 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400/50"></select>
-          <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  <!-- ===== 進行表(編集 / 本番) ===== -->
+  <section id="tab-prog" class="tab-body" role="tabpanel" aria-label="進行表">
+    <!-- 編集: 左に場面の一覧、右に選んだ場面 -->
+    <div id="prog-edit" class="grid grid-cols-[260px_minmax(0,1fr)] gap-6">
+      <aside class="flex flex-col gap-2">
+        <div class="flex items-center justify-between"><h2 class="text-base font-bold text-[var(--text-heading)]">進行表</h2><button type="button" id="prog-reset" class="h-11 px-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-default)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ひな形に戻す</button></div>
+        <ol id="prog-rail" class="flex flex-col gap-2"></ol>
+        <p class="mt-2 text-xs text-[var(--text-muted)]">場面を足す</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" data-prog-add="text" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50 px-2 text-sm">文字の資料</button>
+          <button type="button" data-prog-add="image" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50 px-2 text-sm">画像の資料</button>
+          <button type="button" data-prog-add="logo" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50 px-2 text-sm">ロゴ</button>
+          <button type="button" data-prog-add="blank" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50 px-2 text-sm">何も出さない</button>
+        </div>
+        <button type="button" id="live-start" class="mt-4 inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-primary-500 text-slate-900 rounded-lg hover:bg-primary-600 cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50 gap-2"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>本番を始める</button>
+      </aside>
+      <div id="scene-pane" class="min-w-0 flex flex-col gap-4">
+        <!-- はじめて(名簿が空のとき) -->
+        <div id="first-run" class="hidden p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl flex-col gap-2"></div>
+        <!-- 選んだ場面の見出し(種類・名前・並べ替え・外す・映す) -->
+        <div id="scene-head" class="flex flex-wrap items-center gap-3"></div>
+        <!-- ドラフト以外の場面の中身 -->
+        <div id="scene-edit" class="flex flex-col gap-4"></div>
+        <!-- ドラフトの場面: 本番 -->
+        <div id="draft-live" class="flex flex-col gap-4">
+          <div class="flex flex-wrap items-center gap-x-8 gap-y-3">
+            <h2 id="round-title" class="text-3xl font-bold text-[var(--text-heading)]">第1巡</h2>
+            <span id="scene-label" class="sr-only">配信画面</span>
+            <div class="ml-auto inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-default)]" role="group" aria-labelledby="scene-label">
+              <button type="button" data-scene="board" class="scene h-11 px-3 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">指名ボード</button><button type="button" data-scene="roulette" class="scene h-11 px-3 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">抽選ルーレット</button><button type="button" data-scene="teams" class="scene h-11 px-3 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">チーム表</button><button type="button" data-scene="wait" class="scene h-11 px-3 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">待ち時間</button><button type="button" data-scene="blank" class="scene h-11 px-3 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">何も出さない</button>
+            </div>
+          </div>
+          <ol id="steps" class="flex items-center gap-2" aria-label="この巡の流れ"></ol>
+          <!-- この巡の設定(1行の要約)と、制限時間 -->
+          <div class="flex flex-wrap items-center gap-3">
+            <p id="round-summary" class="text-sm text-[var(--text-muted)]"></p>
+            <button type="button" id="round-edit" class="h-11 px-2 text-sm font-medium text-primary-300 hover:underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">変更</button>
+            <div id="timer-row" class="ml-auto flex flex-wrap items-center gap-3">
+              <span class="text-sm text-[var(--text-muted)]">制限時間</span>
+              <span id="timer-left" class="min-w-[4.5rem] text-2xl font-bold tabular-nums text-[var(--text-heading)]" aria-live="off">5:00</span>
+              <button type="button" id="timer-start" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">スタート</button>
+              <button type="button" id="timer-stop" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">止める</button>
+              <button type="button" id="timer-reset" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リセット</button>
+              <span id="timer-note" class="sr-only"></span>
+            </div>
+          </div>
+          <div id="conflicts" class="flex flex-col gap-2"></div>
+          <div id="noms" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"></div>
+          <details class="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">チーム</summary>
+            <div class="px-4 pb-4 flex flex-col gap-3">
+              <div><a id="export-teams" href="/api/export/teams.png" download class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="配信画面のチーム表を 1920×1080 の画像で保存します">チーム表を画像で保存</a></div>
+              <div id="teams" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"></div>
+            </div>
+          </details>
+          <details class="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">抽選の記録 <span id="lottery-log-count" class="text-sm font-normal text-[var(--text-muted)]"></span></summary>
+            <ul id="lottery-log" class="px-4 pb-3 divide-y divide-[var(--border-default)]"></ul>
+          </details>
+        </div>
+        <!-- ドラフトの場面: ⚙ 進め方(巡の数・巡ごとの設定・順番・抽選・時間・流れ) -->
+        <div id="draft-setup" class="flex flex-col gap-6">
+          <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="in-rounds">巡の数</label><input id="in-rounds" type="number" min="1" max="5" class="w-24 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-order">順番指名の順番</label><div class="relative"><select id="opt-order" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="snake">スネーク</option><option value="waiver">ウェーバー</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-lottery">抽選の演出</label><div class="relative"><select id="opt-lottery" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="full">通常</option><option value="short">短い</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <h3 class="text-base font-bold text-[var(--text-heading)]">巡</h3>
+            <div id="round-rows" class="flex flex-col gap-2"></div>
+            <input id="wait-file" type="file" accept="image/*" multiple hidden aria-label="待ち時間の画像">
+          </div>
+          <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-timer">制限時間（秒）</label><input id="opt-timer" type="number" min="10" max="3600" step="10" class="w-28 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+            <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timerauto" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡のはじめに自動でスタート</label>
+            <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timershow" type="checkbox" class="w-5 h-5 accent-primary-500"> 配信画面に出す</label>
+          </div>
+          <div class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">各巡の流れ</span>
+            <div class="flex flex-wrap gap-x-6"><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowWait" type="checkbox" class="w-5 h-5 accent-primary-500"> 待ち時間の画面</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowStand" type="checkbox" class="w-5 h-5 accent-primary-500"> ピックアップ前の立ち絵</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowTeams" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡の終わりのチーム表</label></div></div>
+          <div class="flex"><button type="button" data-reset class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-red-300 border border-red-500/50 rounded-lg hover:bg-red-500/[.12] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="名簿はそのままで、指名と抽選の結果だけを消します">ドラフトを最初から</button></div>
         </div>
       </div>
-      <button type="button" id="bgm-toggle" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"></button>
-      <div class="leading-normal">
-        <label for="bgm-vol" class="block mb-2 text-xs text-[var(--text-muted)]">BGM音量 <span id="bgm-vol-v"></span></label>
-        <input id="bgm-vol" type="range" min="0" max="100" step="1" class="block w-40 h-11 accent-primary-500 cursor-pointer">
+    </div>
+
+    <!-- 本番: 左に映している場面、右に「次にやること」と「メモ」、その下に次の場面 -->
+    <div id="prog-live" class="hidden grid grid-cols-[minmax(0,1fr)_340px] gap-6">
+      <div id="live-main" class="min-w-0 flex flex-col gap-4">
+        <div class="flex items-center gap-3"><span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-500/[.12] text-red-300">映している</span><h2 id="live-title" class="text-xl font-bold text-[var(--text-heading)]"></h2></div>
+        <div id="live-preview" class="relative w-full aspect-video overflow-hidden rounded-xl border border-[var(--border-default)] bg-black"><iframe id="preview-frame" title="配信画面のプレビュー" class="absolute left-0 top-0 w-[1920px] h-[1080px] origin-top-left border-0 pointer-events-none" tabindex="-1"></iframe></div>
       </div>
-      <div class="leading-normal">
-        <label for="se-vol" class="block mb-2 text-xs text-[var(--text-muted)]">効果音 <span id="se-vol-v"></span></label>
-        <input id="se-vol" type="range" min="0" max="100" step="1" class="block w-40 h-11 accent-primary-500 cursor-pointer">
-      </div>
-      <div class="leading-normal">
-        <label for="rl-vol" class="block mb-2 text-xs text-[var(--text-muted)]">ルーレットの音量 <span id="rl-vol-v"></span></label>
-        <input id="rl-vol" type="range" min="0" max="100" step="1" class="block w-40 h-11 accent-primary-500 cursor-pointer">
-      </div>
-      <button type="button" id="bgm-add" class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">曲を追加</button>
-      <input id="bgm-file" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a" multiple hidden aria-label="BGMの音声ファイル">
-      <p id="bgm-hint" class="basis-full text-xs text-[var(--text-muted)]">抽選ルーレットの間は BGM がゆっくり消え、ほかの画面に戻るとゆっくり戻ります。</p>
+      <aside id="live-side" class="flex flex-col gap-4">
+        <div class="p-4 rounded-xl border-2 border-primary-500/60 bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-primary-300">次にやること</p><div id="live-next" class="text-base text-[var(--text-heading)] [&_b]:text-primary-300" aria-live="polite"></div></div>
+        <div class="p-4 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-[var(--text-muted)]">メモ</p><div id="live-memo" class="text-base text-[var(--text-heading)] whitespace-pre-wrap"></div></div>
+        <div id="live-timer"></div>
+        <div class="leading-normal"><p class="mb-1 text-xs text-[var(--text-muted)]">次</p><p id="live-upnext" class="px-4 py-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm text-[var(--text-heading)]"></p></div>
+      </aside>
     </div>
 
-    <!-- 番組の進行表(いまの場面。押すとその場面へ) -->
-    <nav aria-label="番組の進行表" class="mt-6">
-      <ol id="prog-bar" class="flex flex-wrap items-center gap-2"></ol>
-    </nav>
-
-    <div class="flex flex-wrap items-center gap-x-10 gap-y-4 mt-6">
-      <h2 id="round-title" class="text-3xl font-bold text-[var(--text-heading)]">第1巡</h2>
-      <!-- この巡の進み具合 -->
-      <ol id="steps" class="flex flex-1 items-center gap-2 min-w-[560px]" aria-label="この巡の流れ"></ol>
+    <!-- 次にやること(押せば次へ進む大きなボタン)。進行表の下に固定 -->
+    <div id="next-bar" class="sticky bottom-0 z-20 mt-6 -mx-6 px-6 py-4 bg-[var(--bg-page)] border-t border-primary-500/40">
+      <div id="next" class="flex flex-wrap items-center gap-4" aria-live="polite"></div>
     </div>
-
-    <!-- 指名の制限時間 -->
-    <div class="flex flex-wrap items-center gap-3 mt-4">
-      <span class="text-sm text-[var(--text-muted)]">制限時間</span>
-      <span id="timer-left" class="min-w-[4.5rem] text-2xl font-bold tabular-nums text-[var(--text-heading)]" aria-live="off">5:00</span>
-      <button type="button" id="timer-start" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">スタート</button>
-      <button type="button" id="timer-stop" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">止める</button>
-      <button type="button" id="timer-reset" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リセット</button>
-      <span id="timer-note" class="text-xs text-[var(--text-muted)]"></span>
-      <span class="ml-auto flex items-center gap-2" id="wait-ctl">
-        <span class="text-sm text-[var(--text-muted)]">待ち時間の画像</span>
-        <span id="wait-pos" class="text-sm font-bold text-[var(--text-heading)] tabular-nums"></span>
-        <button type="button" data-wait-step="-1" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" aria-label="前の画像">前へ</button>
-        <button type="button" data-wait-step="1" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" aria-label="次の画像">次へ</button>
-      </span>
-    </div>
-
-    <!-- 次にやること(押せば次へ進む大きなボタン) -->
-    <div id="next" class="flex flex-wrap items-center gap-4 mt-4 p-6 bg-[var(--bg-surface)] border border-primary-500/40 rounded-xl shadow-sm" aria-live="polite"></div>
-
-    <div id="conflicts" class="flex flex-col gap-2 mt-4"></div>
-    <div id="noms" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mt-4"></div>
-
-    <div class="flex flex-wrap items-center gap-4 mt-10 mb-4">
-      <h3 class="text-xl font-bold text-[var(--text-heading)]">チーム</h3>
-      <a id="export-teams" href="/api/export/teams.png" download class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="配信画面のチーム表を 1920×1080 の画像で保存します">チーム表を画像で保存</a>
-    </div>
-    <div id="teams" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"></div>
-
-    <!-- 抽選の記録(取り消した抽選も残る) -->
-    <details class="mt-10 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-      <summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">抽選の記録 <span id="lottery-log-count" class="text-sm font-normal text-[var(--text-muted)]"></span></summary>
-      <ul id="lottery-log" class="px-4 pb-3 divide-y divide-[var(--border-default)]"></ul>
-    </details>
   </section>
 
-  <!-- 番組(大会・進め方・見た目・進行表) -->
-  <section id="tab-show" class="tab-body hidden" role="tabpanel" aria-label="番組">
+  <!-- ===== リーダー: 一覧と、選んだ1人のパネル ===== -->
+  <section id="tab-leaders" class="tab-body hidden" role="tabpanel" aria-label="リーダー">
     <div class="flex flex-wrap items-center gap-4 mb-4">
-      <h3 class="text-xl font-bold text-[var(--text-heading)]">大会</h3>
+      <h2 class="text-xl font-bold text-[var(--text-heading)]">リーダー</h2>
+      <span id="leader-count" class="text-sm text-[var(--text-muted)]"></span>
+      <button type="button" id="add-leader" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>追加</button>
       <div class="ml-auto flex gap-2">
-        <button type="button" id="show-csv-in" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="大会・進め方・見た目・進行表を読み込みます">CSV読み込み</button>
-        <button type="button" id="show-csv-out" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">CSV書き出し</button>
+        <button type="button" data-csv-in class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="列: 種類（リーダー / 選手）, 名前, 略称, 色, 画像ファイル, ひとこと, 立ち絵, 紹介文, 紹介のメモ">名簿の CSV 読み込み</button>
+        <button type="button" data-csv-out class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">名簿の CSV 書き出し</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-[minmax(0,1fr)_380px] gap-6">
+      <ol id="leaders" class="flex flex-col gap-2"></ol>
+      <aside id="leader-panel" class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl flex flex-col gap-4 self-start"></aside>
+    </div>
+  </section>
+
+  <!-- ===== 選手: 状態で絞り込む一覧 ===== -->
+  <section id="tab-players" class="tab-body hidden" role="tabpanel" aria-label="選手">
+    <div class="flex flex-wrap items-center gap-4 mb-4">
+      <h2 class="text-xl font-bold text-[var(--text-heading)]">エントリー選手</h2>
+      <span id="player-count" class="text-sm text-[var(--text-muted)]"></span>
+      <div id="player-filter" class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-page)] border border-[var(--border-strong)]" role="group" aria-label="絞り込み"></div>
+      <label class="sr-only" for="player-search">選手を探す</label><input id="player-search" type="search" placeholder="名前で探す" class="w-48 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400">
+      <div class="ml-auto flex gap-2">
+        <button type="button" data-csv-in class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="列: 種類（リーダー / 選手）, 名前, 略称, 色, 画像ファイル, ひとこと, 立ち絵, 紹介文, 紹介のメモ">名簿の CSV 読み込み</button>
+        <button type="button" data-csv-out class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">名簿の CSV 書き出し</button>
+      </div>
+      <input id="csv-file" type="file" accept=".csv,text/csv" hidden aria-label="名簿のCSVファイル">
+    </div>
+    <div class="flex flex-wrap items-end gap-4">
+      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="bulk-players">まとめて追加</label><textarea id="bulk-players" rows="3" placeholder="1行に1人（名前,ひとこと）" class="w-[420px] block px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></textarea></div>
+      <button type="button" id="add-players" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">まとめて追加</button>
+    </div>
+    <div id="players" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2 mt-4"></div>
+  </section>
+
+  <!-- ===== 大会: 顔と見た目 ===== -->
+  <section id="tab-show" class="tab-body hidden" role="tabpanel" aria-label="大会">
+    <div class="flex flex-wrap items-center gap-4 mb-4">
+      <h2 class="text-xl font-bold text-[var(--text-heading)]">大会</h2>
+      <div class="ml-auto flex gap-2">
+        <button type="button" id="show-csv-in" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="大会・見た目・進行表・ドラフトの進め方を読み込みます">番組の CSV 読み込み</button>
+        <button type="button" id="show-csv-out" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">番組の CSV 書き出し</button>
       </div>
       <input id="show-csv-file" type="file" accept=".csv,text/csv" hidden aria-label="番組のCSVファイル">
     </div>
@@ -146,33 +213,9 @@
       <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="in-title">大会名</label><input id="in-title" type="text" maxlength="40" class="w-80 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
       <div class="leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]" id="title-mode-label">表示</span>
         <div class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-page)] border border-[var(--border-strong)]" role="group" aria-labelledby="title-mode-label">
-          <button type="button" data-title-mode="text" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">文字</button>
-          <button type="button" data-title-mode="logo" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ロゴ画像</button>
-        </div></div>
+          <button type="button" data-title-mode="text" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">文字</button><button type="button" data-title-mode="logo" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ロゴ画像</button></div></div>
       <div class="leading-normal" id="logo-f"><span class="block mb-2 text-xs text-[var(--text-muted)]">ロゴ画像</span><div class="flex items-center gap-2"><img id="logo-thumb" alt="" class="hidden w-28 h-11 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><button type="button" data-look-pick="logoImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">画像を選ぶ</button></div></div>
-      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="in-rounds">巡の数</label><input id="in-rounds" type="number" min="1" max="5" class="w-24 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
-      <button type="button" data-reset class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-red-300 border border-red-500/50 rounded-lg hover:bg-red-500/[.12] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="名簿はそのままで、指名と抽選の結果だけを消します">ドラフトを最初から</button>
     </div>
-
-    <h3 class="mt-10 mb-4 text-xl font-bold text-[var(--text-heading)]">進め方</h3>
-    <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-      <div class="leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]" id="modes-label">巡ごとの指名のしかた</span><div id="round-modes" class="flex flex-wrap gap-2" role="group" aria-labelledby="modes-label"></div></div>
-      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-order">順番指名の順番</label><div class="relative"><select id="opt-order" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="snake">スネーク</option><option value="waiver">ウェーバー</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
-      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-lottery">抽選の演出</label><div class="relative"><select id="opt-lottery" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="full">通常</option><option value="short">短い</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
-      <div class="basis-full flex flex-wrap items-end gap-6">
-        <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-timer">制限時間（秒）</label><input id="opt-timer" type="number" min="10" max="3600" step="10" class="w-28 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
-        <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timerauto" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡のはじめに自動でスタート</label>
-        <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timershow" type="checkbox" class="w-5 h-5 accent-primary-500"> 配信画面に出す</label>
-      </div>
-      <div class="basis-full leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">各巡の流れ</span>
-        <div class="flex flex-wrap gap-x-6"><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowWait" type="checkbox" class="w-5 h-5 accent-primary-500"> 待ち時間の画面</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowStand" type="checkbox" class="w-5 h-5 accent-primary-500"> ピックアップ前の立ち絵</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowTeams" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡の終わりのチーム表</label></div></div>
-      <div class="basis-full leading-normal">
-        <span class="block mb-2 text-xs text-[var(--text-muted)]">待ち時間の画像</span>
-        <div id="wait-rounds" class="flex flex-col gap-2"></div>
-        <input id="wait-file" type="file" accept="image/*" multiple hidden aria-label="待ち時間の画像">
-      </div>
-    </div>
-
     <h3 class="mt-10 mb-4 text-xl font-bold text-[var(--text-heading)]">見た目</h3>
     <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
       <div class="leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">背景</span><div class="flex items-end gap-2"><img id="bg-thumb" alt="" class="hidden w-40 h-[90px] object-cover rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><button type="button" data-look-pick="bgImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">画像を選ぶ</button><button type="button" data-look-clear="bgImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">外す</button></div></div>
@@ -186,51 +229,10 @@
         <input id="trans-video-file" type="file" accept="video/webm,video/mp4,.webm,.mp4" hidden aria-label="切り替えの動画">
       </div>
     </div>
-
-    <div class="flex flex-wrap items-center gap-4 mt-10 mb-4">
-      <h3 class="text-xl font-bold text-[var(--text-heading)]">進行表</h3>
-      <button type="button" id="prog-reset" class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ひな形に戻す</button>
-    </div>
-    <ol id="prog-list" class="flex flex-col gap-2"></ol>
-    <div class="flex flex-wrap items-center gap-2 mt-3">
-      <span class="text-sm text-[var(--text-muted)]">場面を足す</span>
-      <button type="button" data-prog-add="text" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">文字の資料</button>
-      <button type="button" data-prog-add="image" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">画像の資料</button>
-      <button type="button" data-prog-add="logo" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ロゴ</button>
-      <button type="button" data-prog-add="blank" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">何も出さない</button>
-    </div>
-  </section>
-
-  <!-- 登録(リーダーと選手) -->
-  <section id="tab-roster" class="tab-body hidden" role="tabpanel" aria-label="登録">
-    <div class="flex flex-wrap items-center gap-4 mb-4">
-      <h3 class="text-xl font-bold text-[var(--text-heading)]">リーダー</h3>
-      <span id="leader-count" class="text-sm text-[var(--text-muted)]"></span>
-      <button type="button" id="add-leader" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        追加
-      </button>
-      <div class="ml-auto flex gap-2">
-        <button type="button" id="csv-in" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="列: 種類（リーダー / 選手）, 名前, 略称, 色, 画像ファイル, ひとこと">CSV読み込み</button>
-        <button type="button" id="csv-out" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">CSV書き出し</button>
-      </div>
-      <input id="csv-file" type="file" accept=".csv,text/csv" hidden aria-label="CSVファイル">
-    </div>
-    <div id="leaders" class="flex flex-col gap-2"></div>
-
-    <div class="flex items-center gap-4 mt-10 mb-4">
-      <h3 class="text-xl font-bold text-[var(--text-heading)]">エントリー選手</h3>
-      <span id="player-count" class="text-sm text-[var(--text-muted)]"></span>
-    </div>
-    <div class="flex flex-wrap items-end gap-4">
-      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="bulk-players">まとめて追加</label><textarea id="bulk-players" rows="3" placeholder="1行に1人（名前,ひとこと）" class="block w-[420px] px-3 py-2 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></textarea></div>
-      <button type="button" id="add-players" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">まとめて追加</button>
-    </div>
-    <div id="players" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2 mt-4"></div>
   </section>
 </main>
 
-<div id="toast" class="fixed left-1/2 bottom-6 -translate-x-1/2 z-20 hidden px-4 py-3 rounded-lg shadow-xl text-sm" role="status" aria-live="polite"></div>
+<div id="toast" class="fixed left-1/2 bottom-28 -translate-x-1/2 z-40 hidden px-4 py-3 rounded-lg shadow-xl text-sm" role="status" aria-live="polite"></div>
 <input id="img-file" type="file" accept="image/*" hidden aria-label="画像ファイル">
 
 <!-- スマホ操作(同じ Wi-Fi のスマホから) -->
