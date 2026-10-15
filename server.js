@@ -22,7 +22,7 @@ const MIME = {
 };
 const HISTORY_MAX = 200;
 // 「戻す」の対象にしない操作と、戻しても変えない状態
-const NO_UNDO = new Set(['lotteryDone', 'setAudio', 'setOption', 'timer']);
+const NO_UNDO = new Set(['lotteryDone', 'setAudio', 'setOption', 'timer', 'waitShow']);
 const KEEP_ON_UNDO = ['audio', 'options', 'timer', 'lotteryLog'];
 const IMG_RE = /\.(png|jpe?g|gif|webp)$/i;
 const AUDIO_RE = /\.(mp3|ogg|oga|opus|wav|m4a|aac|flac)$/i;

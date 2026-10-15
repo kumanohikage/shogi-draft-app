@@ -23,7 +23,7 @@ function connect() {
   };
 }
 const act = (action) => ws.send(JSON.stringify({ type: 'action', action }));
-function toast(t) { const el = $('toast'); el.textContent = t; el.className = 'fixed left-4 right-4 bottom-4 z-20 px-4 py-3 rounded-lg shadow-xl text-sm border border-red-500/60 bg-[var(--bg-surface)] text-red-300'; clearTimeout(toast.t); toast.t = setTimeout(() => { el.className = 'hidden'; }, 5000); }
+function toast(t) { const el = $('toast'); el.textContent = t; el.className = 'fixed left-4 right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-30 px-4 py-3 rounded-lg shadow-xl text-sm border border-red-500/60 bg-[var(--bg-surface)] text-red-300'; clearTimeout(toast.t); toast.t = setTimeout(() => { el.className = 'hidden'; }, 5000); }
 function setDisabled(el, v) { el.disabled = v; if (v) el.setAttribute('aria-disabled', 'true'); else el.removeAttribute('aria-disabled'); }
 
 function render() {
@@ -35,8 +35,14 @@ function render() {
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''}>${b.label}</button>`;
   $('next').innerHTML = `<p class="text-xs text-[var(--text-muted)]">次にやること</p>
     <div class="text-base text-[var(--text-heading)] leading-normal [&_b]:text-primary-300">${n.text}</div>
-    ${n.main ? btn(n.main, BTN_PRIMARY) : ''}
     ${(n.sub || []).filter((b) => b.key !== 'auto').map((b) => btn(b, BTN_SUB)).join('')}`;
+  // メインのボタン(オレンジ)は画面の下に固定。押すことがないときは説明だけ
+  $('bar').innerHTML = n.main ? btn(n.main, BTN_PRIMARY) : `<p class="h-14 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
+  const wn = C.waitImagesOf(S).length, wi = Math.min(S.waitIdx || 0, Math.max(0, wn - 1));
+  $('wait-ctl').classList.toggle('hidden', !wn);
+  $('wait-pos').textContent = wn ? `${wi + 1} / ${wn}` : '';
+  setDisabled(document.querySelector('[data-wait-step="-1"]'), wi <= 0);
+  setDisabled(document.querySelector('[data-wait-step="1"]'), wi >= wn - 1);
   $('scenes').innerHTML = SCENES.map(([k, t]) => `<button type="button" data-scene="${k}" aria-pressed="${S.scene === k}" class="h-11 px-2 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${S.scene === k ? 'bg-[var(--bg-page-alt)] border-primary-400 text-[var(--text-heading)]' : 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]'}">${t}</button>`).join('');
   renderNoms();
   setDisabled($('undo'), !canUndo);
@@ -86,6 +92,7 @@ document.addEventListener('click', (e) => {
   if (!b || b.disabled) return;
   const key = b.dataset.next, arg = b.dataset.arg;
   if (b.dataset.scene) act({ type: 'setScene', scene: b.dataset.scene });
+  else if (b.dataset.waitStep) act({ type: 'waitShow', idx: Math.max(0, (S.waitIdx || 0) + +b.dataset.waitStep) });
   else if (key === 'confirm') act({ type: 'confirmNoms' });
   else if (key === 'reveal') act({ type: 'reveal' });
   else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });

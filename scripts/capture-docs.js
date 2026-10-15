@@ -64,7 +64,7 @@ app.whenReady().then(async () => {
 
   // 3. 確認 → 一斉公開 → 重複(2件)
   await clickNext();
-  await clickNext();
+  await cjs("[...document.querySelectorAll('#next button')].find((b) => /一斉公開|再指名を公開/.test(b.textContent)).click(); 0"); await wait(400);
   await shotO('overlay-board', 3500);
   await shotC('control-conflict', 900);
 
@@ -84,7 +84,7 @@ app.whenReady().then(async () => {
   const losers = S.lotteries.flatMap((x) => x.leaders.filter((id) => id !== x.winner));
   for (const [i, id] of losers.entries()) await act({ type: 'nominate', leaderId: id, playerId: P[30 + i] });
   await clickNext();
-  await clickNext();
+  await cjs("[...document.querySelectorAll('#next button')].find((b) => /一斉公開|再指名を公開/.test(b.textContent)).click(); 0"); await wait(400);
   await shotO('overlay-board-done', 3500);
 
   // 6. チーム表

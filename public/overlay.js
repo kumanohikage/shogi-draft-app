@@ -177,7 +177,8 @@ function renderSpot(onBoard) {
 function renderWait() {
   const o = C.optionsOf(S);
   $('wait-title').innerHTML = `${esc(S.title)}<small>第${S.round}巡 指名中</small>`;
-  $('wait-img').setAttribute('src', o.waitImage ? img(o.waitImage) : '');
+  const list = C.waitImagesOf(S), f = list[Math.min(S.waitIdx || 0, list.length - 1)];
+  $('wait-img').setAttribute('src', f ? img(f) : '');
 }
 let timerEnded = false;
 function renderTimer() {

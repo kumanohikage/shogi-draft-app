@@ -46,7 +46,9 @@
   const MAX_ROUNDS = 5; // チーム表が1画面に収まる上限
   // 進め方の設定。roundModes[巡-1] = 'bid'(一斉入札) | 'order'(順番指名)。orderStyle: 'snake'(順番指名の巡ごとに逆順) | 'waiver'(毎回同じ順)
   // lotteryStyle: 'full' | 'short'(短い抽選演出)。timerSec: 制限時間(秒)。timerShow: 配信画面にタイマーを出すか。waitImage: 待ち時間画面の画像
-  const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 120, timerShow: true, waitImage: '' };
+  // waitImages: { 巡: [画像ファイル名, ...] } 待ち時間画面で出す画像(詰将棋の問題 → 答え など)。waitImage は前の版の1枚だけの設定(全部の巡で使う)
+  const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 120, timerShow: true, waitImages: {}, waitImage: '' };
+  const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
   const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options);
   const roundMode = (s, r = s.round) => optionsOf(s).roundModes[r - 1] || 'bid';
   // 順番指名の巡の順番: 登録順。スネークなら、順番指名の巡を数えて奇数回目は逆順
@@ -158,6 +160,7 @@
       // ピックアップ公開: spotShow でその人のカードを裏のまま大きく出す → reveal(spot: true) でめくる → spotEnd で一覧へ
       case 'spotShow': s.spot = action.leaderId; s.scene = 'board'; break;
       case 'spotEnd': s.spot = null; break;
+      case 'waitShow': s.waitIdx = Math.max(0, action.idx | 0); break; // 待ち時間画面の何枚目を出すか
       case 'confirmNoms': s.confirmedKey = confirmKey(s); break; // 公開前の確認をした
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
         const c = conflicts(s).find((x) => x.playerId === action.playerId);
@@ -176,14 +179,14 @@
       case 'nextRound':
         if (!roundComplete(s)) throw new Error('この巡はまだ全員の指名が確定していません');
         if (s.round >= s.rounds) throw new Error('最後の巡です');
-        s.round += 1; s.noms = {}; s.lottery = null; s.scene = 'board'; s.spot = null;
+        s.round += 1; s.noms = {}; s.lottery = null; s.scene = 'board'; s.spot = null; s.waitIdx = 0;
         break;
       case 'setScene': s.scene = action.scene; break;
       // 音(BGM・効果音)の設定。「戻す」の対象外
       case 'setAudio': s.audio = Object.assign({}, DEFAULT_AUDIO, s.audio, action.patch); break;
       // ドラフトを最初から(名簿・画像・音・設定はそのまま。抽選の記録には「リセット」を残す)
       case 'resetDraft':
-        s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; s.spot = null; s.timer = { endsAt: null, left: null };
+        s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; s.spot = null; s.timer = { endsAt: null, left: null }; s.waitIdx = 0;
         s.lotteryLog = [...(s.lotteryLog || []), { reset: true, at: Date.now() }];
         break;
       // 設定(進め方・抽選演出・タイマー・待ち時間の画像)。「戻す」の対象外
@@ -237,5 +240,5 @@
     return { leaders, players };
   }
 
-  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey };
+  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf };
 }));

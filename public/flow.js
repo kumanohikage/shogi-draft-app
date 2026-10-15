@@ -63,7 +63,7 @@
     const label = renom ? '再指名を公開' : '一斉公開';
     if (waiting.length) {
       if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
-      return { step: renom ? 2 : 0, text: `${renom ? '外れたリーダーの再指名' : '各リーダーの指名'}を下で入力してください（あと${waiting.length}人）`, main: { label, off: true }, sub };
+      return { step: renom ? 2 : 0, text: `${renom ? '外れたリーダーの再指名' : '各リーダーの指名'}を下で入力してください（あと${waiting.length}人）`, main: { label: 'ピックアップで公開', off: true }, sub };
     }
     if (toReveal.length) {
       // 1人ずつ公開もできる(並び順で次の人)
@@ -75,8 +75,8 @@
         return { step: renom ? 2 : 1, text: `公開する前に、指名に間違いがないか確認してください<ul class="mt-2 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-6 gap-y-1 text-base">${list}</ul>`, main: { key: 'confirm', label: '確認した' } };
       }
       return partial
-        ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot] }
-        : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [spot] };
+        ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: spot, sub: [{ key: 'reveal', label: '残りを一斉公開' }] }
+        : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。1人ずつ配信画面で公開します`, main: spot, sub: [{ key: 'reveal', label }] };
     }
     return { step: 0, text: '' };
   }

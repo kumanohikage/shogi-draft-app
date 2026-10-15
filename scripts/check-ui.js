@@ -72,6 +72,12 @@ app.whenReady().then(async () => {
     if (expect && !label.includes(expect)) { console.log(`✗ 次のボタンが「${label}」（期待: ${expect}）`); errors++; }
     await js("document.querySelector('#next button.h-12').click()"); await wait(400);
   };
+  // サブのボタン(白枠)を文字で探して押す
+  const sub = async (label) => {
+    const ok = await js(`(() => { const b = [...document.querySelectorAll('#next button')].find((x) => x.textContent.includes(${JSON.stringify(label)})); if (b) b.click(); return !!b; })()`);
+    if (!ok) { console.log(`✗ 「${label}」のボタンがない`); errors++; }
+    await wait(400);
+  };
   // 3. 指名を入れる(選手A に3人、選手E に2人の重複が2件)
   for (const [i, p] of [[0, 0], [1, 0], [2, 0], [3, 3], [4, 4]]) await act({ type: 'nominate', leaderId: L[i], playerId: P[p] });
   await check('05-run-entering');
@@ -81,7 +87,7 @@ app.whenReady().then(async () => {
   await js("document.querySelector('#noms [data-next=\"revealOne\"]').click(); 0"); await wait(400);
   if (S.picks.length !== 0 || Object.values(S.noms).filter((n) => n.revealed).length !== 1) { console.log('✗ 1人ずつ公開が想定どおりでない'); errors++; }
   await check('06b-run-partial');
-  await next('残りを一斉公開');
+  await sub('残りを一斉公開');
   await check('07-run-conflict');
   // 4. 抽選1件目(演出中 → 結果)→ ボードに戻らずに2件目の抽選へ
   const losers = [];
@@ -102,7 +108,7 @@ app.whenReady().then(async () => {
   // 5. 外れた全員でまとめて再指名 → 公開 → チーム表 → 次の巡
   for (const [i, id] of losers.entries()) await act({ type: 'nominate', leaderId: id, playerId: P[10 + i] });
   await next('確認した'); await check('10b-run-confirm');
-  await next('再指名を公開');
+  await sub('再指名を公開');
   await check('11-run-round-complete');
   await next('チーム表を映す');
   if (S.scene !== 'teams') { console.log('✗ チーム表になっていない'); errors++; }

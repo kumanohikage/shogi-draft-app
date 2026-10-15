@@ -95,6 +95,7 @@ function render() {
   renderLotteryLog();
   renderOptions();
   renderTimer();
+  renderWaitCtl();
 }
 
 /* ---------- 次にやること(flow.js と共用) ---------- */
@@ -468,9 +469,16 @@ function renderOptions() {
   }
   for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
   $('opt-timershow').checked = !!o.timerShow;
-  $('wait-img').classList.toggle('hidden', !o.waitImage);
-  if (o.waitImage) $('wait-img').src = img(o.waitImage);
-  setDisabled($('wait-clear'), !o.waitImage);
+  // 巡ごとの待ち時間の画像(並べた順に出す)
+  const map = o.waitImages || {};
+  $('wait-rounds').innerHTML = Array.from({ length: S.rounds }, (_, i) => {
+    const r = i + 1, list = map[r] || [];
+    return `<div class="flex flex-wrap items-center gap-2"><span class="w-12 flex-none text-sm text-[var(--text-muted)]">第${r}巡</span>
+      ${list.map((f, k) => `<span class="relative"><img src="${img(f)}" alt="第${r}巡の${k + 1}枚目" class="w-28 h-16 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><span class="absolute left-1 top-1 px-1.5 rounded bg-black/70 text-xs text-white">${k + 1}</span>
+        <button type="button" data-wait-del="${r}:${k}" aria-label="第${r}巡の${k + 1}枚目を外す" class="absolute -right-2 -top-2 w-7 h-7 inline-flex items-center justify-center rounded-full bg-[var(--bg-page-alt)] border border-[var(--border-strong)] text-[var(--text-default)] cursor-pointer ${FOCUS}"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join('')}
+      <button type="button" data-wait-add="${r}" class="${BTN_SUB}">画像を追加</button></div>`;
+  }).join('');
+  if (o.waitImage && !Object.values(map).some((l) => l.length)) $('wait-rounds').insertAdjacentHTML('beforeend', '<p class="text-xs text-[var(--text-muted)]">（前の版で選んだ画像は、どの巡でも出ます）</p>');
 }
 document.addEventListener('change', (e) => {
   const t = e.target;
@@ -482,13 +490,31 @@ document.addEventListener('change', (e) => {
   else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 120)) });
   else if (t.id === 'opt-timershow') setOption({ timerShow: t.checked });
 });
-$('wait-pick').addEventListener('click', () => { $('wait-file').value = ''; $('wait-file').click(); });
-$('wait-clear').addEventListener('click', () => setOption({ waitImage: '' }));
-$('wait-file').addEventListener('change', async (e) => {
-  const f = e.target.files[0];
-  if (!f || !IMG_EXT[f.type]) return toast('PNG / JPEG / GIF / WebP の画像を選んでください', true);
-  try { setOption({ waitImage: await upload(`wait_${Date.now()}${IMG_EXT[f.type]}`, f) }); } catch (err) { toast(err.message, true); }
+// 待ち時間の画像: 巡ごとに追加(複数まとめて選べる)・外す
+let waitRound = 1;
+const setWaitList = (r, list) => { const m = { ...(optionsOf().waitImages || {}) }; m[r] = list; setOption({ waitImages: m }); };
+document.addEventListener('click', (e) => {
+  const add = e.target.closest('[data-wait-add]'), del = e.target.closest('[data-wait-del]'), stepB = e.target.closest('[data-wait-step]');
+  if (add) { waitRound = +add.dataset.waitAdd; $('wait-file').value = ''; $('wait-file').click(); }
+  else if (del) { const [r, k] = del.dataset.waitDel.split(':').map(Number); setWaitList(r, (optionsOf().waitImages[r] || []).filter((_, i) => i !== k)); }
+  else if (stepB) { const n = C.waitImagesOf(S).length; if (n) act({ type: 'waitShow', idx: Math.min(n - 1, Math.max(0, (S.waitIdx || 0) + +stepB.dataset.waitStep)) }); }
 });
+$('wait-file').addEventListener('change', async (e) => {
+  const files = [...e.target.files].filter((f) => IMG_EXT[f.type]);
+  if (!files.length) return toast('PNG / JPEG / GIF / WebP の画像を選んでください', true);
+  try {
+    const names = [];
+    for (const [i, f] of files.entries()) names.push(await upload(`wait_${waitRound}_${Date.now()}_${i}${IMG_EXT[f.type]}`, f));
+    setWaitList(waitRound, [...(optionsOf().waitImages[waitRound] || []), ...names]);
+  } catch (err) { toast(err.message, true); }
+});
+function renderWaitCtl() {
+  const n = C.waitImagesOf(S).length, i = Math.min(S.waitIdx || 0, Math.max(0, n - 1));
+  $('wait-ctl').classList.toggle('hidden', !n);
+  $('wait-pos').textContent = n ? `${i + 1} / ${n}` : '';
+  setDisabled(document.querySelector('[data-wait-step="-1"]'), i <= 0);
+  setDisabled(document.querySelector('[data-wait-step="1"]'), i >= n - 1);
+}
 
 // 制限時間: 残りは「終わる時刻」から計算して、0.25秒ごとに表示を更新
 const fmt = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
