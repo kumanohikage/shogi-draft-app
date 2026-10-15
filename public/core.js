@@ -27,6 +27,7 @@
       // 抽選中: { id, playerId, leaders, winner, done }
       lottery: null,
       scene: 'board',       // 配信画面: 'board' | 'roulette' | 'teams' | 'blank'
+      spot: null,           // ピックアップ公開中のリーダー(配信画面に1人だけ大きく出す)。null なら指名ボード
       audio: { ...DEFAULT_AUDIO },
     };
   }
@@ -36,7 +37,7 @@
   const playerById = (s, id) => s.players.find((p) => p.id === id);
   const pickedIds = (s) => new Set(s.picks.map((p) => p.playerId));
   const pickOf = (s, leaderId, round) => s.picks.find((p) => p.leaderId === leaderId && p.round === round);
-  const DEFAULT_AUDIO = { bgm: '', bgmOn: true, bgmVol: 30, seVol: 70 }; // bgm = bgm フォルダの曲のファイル名
+  const DEFAULT_AUDIO = { bgm: '', bgmOn: true, bgmVol: 30, seVol: 70, rlVol: 70 }; // bgm = bgm フォルダの曲のファイル名 / seVol = 指名ボード・チーム表の効果音 / rlVol = 抽選ルーレットの音
   const MAX_ROUNDS = 5; // チーム表が1画面に収まる上限
   const teamOf = (s, leaderId) => s.picks.filter((p) => p.leaderId === leaderId).sort((a, b) => a.round - b.round);
 
@@ -113,13 +114,16 @@
         s.noms[action.leaderId] = { playerId: action.playerId || null, revealed: false };
         break;
       }
-      case 'reveal': { // 入力済みの指名を一斉公開 → 単独指名は確定
+      case 'reveal': { // 入力済みの指名を一斉公開 → 単独指名は確定。leaderId を付けると1人だけ公開
         const ids = action.leaderId ? [action.leaderId] : pendingLeaders(s).map((l) => l.id);
         for (const id of ids) { const n = s.noms[id]; if (n && n.playerId) n.revealed = true; }
         confirmSingles(s);
         s.scene = 'board'; // 公開はボードで見せる
+        // spot: true なら、その人を配信画面に大きく出す(ピックアップ公開)
+        s.spot = action.spot && action.leaderId ? action.leaderId : null;
         break;
       }
+      case 'spotEnd': s.spot = null; break; // ピックアップ公開を終えて指名ボード(一覧)に戻す
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
         const c = conflicts(s).find((x) => x.playerId === action.playerId);
         if (!c) throw new Error('この選手の重複はありません');
@@ -129,19 +133,19 @@
         s.picks.push({ round: s.round, leaderId: winner, playerId: c.playerId, by: 'lottery' });
         // 外れたリーダーは再指名(指名を空に戻す)
         for (const id of c.leaders) if (id !== winner) s.noms[id] = { playerId: null, revealed: false };
-        s.scene = 'roulette';
+        s.scene = 'roulette'; s.spot = null;
         break;
       }
       case 'lotteryDone': if (s.lottery && s.lottery.id === action.id) s.lottery.done = true; break;
       case 'nextRound':
         if (!roundComplete(s)) throw new Error('この巡はまだ全員の指名が確定していません');
         if (s.round >= s.rounds) throw new Error('最後の巡です');
-        s.round += 1; s.noms = {}; s.lottery = null; s.scene = 'board';
+        s.round += 1; s.noms = {}; s.lottery = null; s.scene = 'board'; s.spot = null;
         break;
       case 'setScene': s.scene = action.scene; break;
       // 音(BGM・効果音)の設定。「戻す」の対象外
       case 'setAudio': s.audio = Object.assign({}, DEFAULT_AUDIO, s.audio, action.patch); break;
-      case 'resetDraft': s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; break;
+      case 'resetDraft': s.round = 1; s.noms = {}; s.picks = []; s.lotteries = []; s.lottery = null; s.scene = 'board'; s.spot = null; break;
       default: throw new Error('不明な操作: ' + action.type);
     }
     return s;

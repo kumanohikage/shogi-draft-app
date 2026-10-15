@@ -26,11 +26,15 @@ rep('  const push = chance(PUSH_RATE[heat]);', '  const push = false; // アプ�
 rep('    plan.push = true; plan.mash = true; plan.heat = \'rainbow\';', '    plan.push = false; plan.mash = false; plan.heat = \'rainbow\';');
 
 // 効果音の音量はアプリの「効果音」音量に合わせる(window.__embedVol: 0〜1)
-rep('      this.master.gain.value = 0.75;', '      this.master.gain.value = 0.75 * (window.__embedVol ?? 1);');
+// ほかの画面に切り替えたら音を消す(window.__embedSilent)
+rep('      this.master.gain.value = 0.75;', '      this.master.gain.value = window.__embedSilent ? 0 : 0.75 * (window.__embedVol ?? 1);');
 
 // 評価値バーの色は「人数が変わったとき」しか作り直されないので、同じ人数で別のリーダーになると前の色が残る。色が変わったら作り直す
 rep('  if (track.children.length !== P.length) {\n    track.textContent = \'\';',
   '  const colorKey = P.map((_, i) => leaderColor(i)).join();\n  if (track.dataset.colors !== colorKey) {\n    track.dataset.colors = colorKey;\n    track.textContent = \'\';');
+
+// 紹介動画の録画用: 演出を指定できる(普段は使わない)
+rep('  const plan = PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);', "  const plan = EMBED.plan === 'zenkai' ? zenkaiPlan() : PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);");
 
 // 結果が出たらアプリに知らせる
 rep('  showResult(winner);\n', '  showResult(winner);\n  parent.postMessage({ type: \'roulette-done\', id: EMBED.id }, \'*\');\n');
@@ -68,11 +72,20 @@ window.addEventListener('message', (e) => {
     } else if (m.type === 'spin') {
       if (isSpinning) return;
       closeResult();
-      EMBED.id = m.id; EMBED.winner = m.winner;
+      EMBED.id = m.id; EMBED.winner = m.winner; EMBED.plan = m.plan || '';
       startSpin();
     } else if (m.type === 'volume') {
       window.__embedVol = m.v;
-      if (sound.master) sound.master.gain.value = 0.75 * m.v;
+      if (sound.master && !window.__embedSilent) sound.master.gain.value = 0.75 * m.v;
+    } else if (m.type === 'silence') {
+      // ルーレット以外の画面のときは音を消す(演出はそのまま進む)。戻ったら音量を戻す
+      if (!!m.on === !!window.__embedSilent) return;
+      window.__embedSilent = !!m.on;
+      if (sound.master && sound.ctx) {
+        const g = sound.master.gain, t = sound.ctx.currentTime;
+        g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+        g.linearRampToValueAtTime(m.on ? 0 : 0.75 * (window.__embedVol ?? 1), t + 0.4);
+      }
     } else if (m.type === 'reset') {
       if (!isSpinning) closeResult();
     }

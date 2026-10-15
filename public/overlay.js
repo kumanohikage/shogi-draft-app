@@ -51,62 +51,108 @@ function render() {
   SE.setVolume(audio.seVol / 100);
   BGM.update(audio, S.scene === 'roulette');
   const f = $('roulette').contentWindow;
-  if (f) f.postMessage({ type: 'volume', v: audio.seVol / 100 }, '*');
+  if (f) {
+    f.postMessage({ type: 'volume', v: audio.rlVol / 100 }, '*');
+    f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
+  }
   renderBoard(); renderTeams(); playLottery(false);
   first = false;
 }
 
 /* ---------- 指名ボード ---------- */
 let prevOpen = new Set(), prevStamp = new Set(), prevDup = new Set();
+// 指名カード1枚(指名ボードとピックアップで共通)
+function cardHtml(l, playerId, stamp, dup, pop) {
+  const p = playerId && C.playerById(S, playerId);
+  return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(l.color)}"><div class="in">
+      <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(l.name)}</div></div>
+        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<b>${esc(p ? p.name : '')}</b></div>
+        ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
+      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(l.name)}</div><div class="koma">指</div><div class="wait">指名待ち</div></div>
+    </div></div>`;
+}
+// めくる: 裏の状態から少し待って表へ(3D はめくっている間だけ)
+function flipIn(c, delay, sound) {
+  c.classList.remove('open'); c.classList.add('anim');
+  setTimeout(() => { c.classList.add('open'); setTimeout(() => c.classList.remove('anim'), 900); if (sound) SE.flip(); }, delay);
+}
+
+let prevSpot = null;
 function renderBoard() {
   $('board-title').innerHTML = `${esc(S.title)}<small>第${S.round}巡 指名選手</small>`;
   const g = $('grid');
   g.style.gridTemplateColumns = `repeat(${cols(S.leaders.length)}, 520px)`;
   const dupIds = new Set(C.conflicts(S).flatMap((c) => c.leaders));
-  const open = new Set(), stamped = new Set(), dups = new Set();
+  // ピックアップ公開中は、1人ずつ大きく見せる。確定・競合の判定は一覧に戻ってから順に出す
+  const spotting = !!S.spot, endingSpot = !!prevSpot && !spotting && !first;
+  const open = new Set(), stamped = new Set(), dups = new Set(), lateDup = [];
   const html = S.leaders.map((l) => {
     const pick = C.pickOf(S, l.id, S.round);
     const n = S.noms[l.id] || {};
     let playerId = null, stamp = '', dup = false;
     // 抽選の演出が終わるまでは、外れたリーダーも「競合」のまま見せる(先に指名待ちに戻るとネタバレになる)
     const inLottery = S.lottery && !S.lottery.done && S.lottery.leaders.includes(l.id);
-    if (pick && !hiddenPick(pick)) { playerId = pick.playerId; stamp = 'ok'; stamped.add(l.id); }
-    else if (inLottery) { playerId = S.lottery.playerId; dup = true; stamp = 'dup'; dups.add(l.id); }
+    if (pick && !hiddenPick(pick)) { playerId = pick.playerId; stamp = 'ok'; }
+    else if (inLottery) { playerId = S.lottery.playerId; stamp = 'dup'; dup = true; }
     else if (pick || (n.revealed && n.playerId)) {
       playerId = pick ? pick.playerId : n.playerId;
       // 1人ずつ公開の途中で、まだ重複していないものはハンコなし
-      if (dupIds.has(l.id) || pick) { dup = true; stamp = 'dup'; dups.add(l.id); }
+      if (dupIds.has(l.id) || pick) { stamp = 'dup'; dup = true; }
     }
+    if (spotting) { stamp = ''; dup = false; }
+    if (stamp === 'ok') stamped.add(l.id);
+    if (stamp === 'dup') dups.add(l.id);
     if (playerId) open.add(l.id);
-    const p = playerId && C.playerById(S, playerId);
-    const isNewStamp = stamp && !first && !(stamp === 'ok' ? prevStamp : prevDup).has(l.id) && prevOpen.has(l.id);
-    return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(l.color)}"><div class="in">
-      <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(l.name)}</div></div>
-        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<b>${esc(p ? p.name : '')}</b></div>
-        ${stamp ? `<div class="stamp ${stamp} ${isNewStamp ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
-      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(l.name)}</div><div class="koma">指</div><div class="wait">指名待ち</div></div>
-    </div></div>`;
+    const isNew = stamp && !first && !(stamp === 'ok' ? prevStamp : prevDup).has(l.id) && prevOpen.has(l.id);
+    // 一覧に戻ったときの競合の光は、判定の順番が来てから
+    if (endingSpot && dup && isNew) { lateDup.push(l.id); dup = false; }
+    return cardHtml(l, playerId, stamp, dup, isNew);
   }).join('');
   g.innerHTML = html;
+  g.classList.toggle('hide', spotting);
   const onBoard = S.scene === 'board' && !first;
-  // めくれる瞬間を見せるため、いったん閉じた状態で描いてから順にめくる(開いた直後はめくらない)
-  const newly = first ? [] : [...open].filter((id) => !prevOpen.has(id));
-  g.querySelectorAll('.card').forEach((c) => { if (newly.includes(c.dataset.id)) { c.classList.remove('open'); c.classList.add('anim'); } });
+  // めくれる瞬間を見せるため、いったん閉じた状態で描いてから順にめくる(開いた直後・ピックアップ中はめくらない)
+  const newly = first || spotting ? [] : [...open].filter((id) => !prevOpen.has(id));
+  const cardOf = (id) => g.querySelector(`.card[data-id="${id}"]`);
+  newly.forEach((id) => { const c = cardOf(id); c.classList.remove('open'); c.classList.add('anim'); });
   // 大きさの計算は、めくる前の状態にしてから(先に計算すると、開いた状態から一度裏返る動きが出る)
   fitArea(g);
-  newly.forEach((id, i) => setTimeout(() => {
-    const c = g.querySelector(`.card[data-id="${id}"]`);
-    if (c) { c.classList.add('open'); setTimeout(() => c.classList.remove('anim'), 900); }
-    if (onBoard) SE.flip();
-  }, 120 + i * 260));
-  // めくり終わったあとに、競合なら「ジャーン」、確定なら「ドン」
+  newly.forEach((id, i) => flipIn(cardOf(id), 120 + i * 260, onBoard));
   const after = 120 + newly.length * 260 + 450;
-  const newDup = [...dups].some((id) => !prevDup.has(id));
-  const newStamp = [...stamped].some((id) => !prevStamp.has(id));
-  g.querySelectorAll('.stamp.pop').forEach((e) => { e.style.animationDelay = after + 'ms'; });
-  if (onBoard && newDup) setTimeout(() => SE.conflict(), after);
-  else if (onBoard && newStamp) setTimeout(() => SE.stamp(), after);
-  prevOpen = open; prevStamp = stamped; prevDup = dups;
+  if (endingSpot) {
+    // ピックアップのあと: 一覧を出してから、判定を1枚ずつ
+    const order = S.leaders.map((l) => l.id).filter((id) => g.querySelector(`.card[data-id="${id}"] .stamp.pop`));
+    let firstDup = true;
+    order.forEach((id, k) => {
+      const d = 600 + k * 380, el = g.querySelector(`.card[data-id="${id}"] .stamp.pop`);
+      el.style.animationDelay = d + 'ms';
+      setTimeout(() => {
+        if (lateDup.includes(id)) cardOf(id)?.classList.add('dup');
+        if (!onBoard) return;
+        if (el.classList.contains('dup')) { if (firstDup) SE.conflict(); firstDup = false; } else SE.stamp();
+      }, d);
+    });
+  } else {
+    // めくり終わったあとに、競合なら「ジャーン」、確定なら「ドン」
+    const newDup = [...dups].some((id) => !prevDup.has(id));
+    const newStamp = [...stamped].some((id) => !prevStamp.has(id));
+    g.querySelectorAll('.stamp.pop').forEach((e) => { e.style.animationDelay = after + 'ms'; });
+    if (onBoard && newDup) setTimeout(() => SE.conflict(), after);
+    else if (onBoard && newStamp) setTimeout(() => SE.stamp(), after);
+  }
+  renderSpot(onBoard);
+  prevOpen = open; prevStamp = stamped; prevDup = dups; prevSpot = S.spot;
+}
+
+// ピックアップ: 公開した1人のカードを大きく出す(めくり方はボードと同じ)
+function renderSpot(onBoard) {
+  const sp = $('spot');
+  sp.classList.toggle('on', !!S.spot);
+  if (!S.spot || S.spot === prevSpot) return;
+  const l = C.leaderById(S, S.spot), n = S.noms[S.spot] || {};
+  if (!l) return;
+  sp.innerHTML = `<div class="spotcard">${cardHtml(l, n.playerId, '', false, false)}</div>`;
+  if (!first) flipIn(sp.querySelector('.card'), 250, onBoard);
 }
 
 /* ---------- チーム表 ---------- */
@@ -147,7 +193,7 @@ function playLottery(force) {
   const leaders = L.leaders.map((id) => C.leaderById(S, id));
   const f = $('roulette').contentWindow;
   f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: leaders.map((l) => l.name), colors: leaders.map((l) => l.color) }, '*');
-  setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.leaders.indexOf(L.winner) }, '*'), 700);
+  setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.leaders.indexOf(L.winner), plan: window.__recPlan || '' }, '*') /* __recPlan: 紹介動画の録画用 */, 700);
 }
 addEventListener('message', (e) => {
   const m = e.data || {};

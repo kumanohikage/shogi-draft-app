@@ -648,7 +648,7 @@ class SoundEngine {
       this.ctx = new AC();
       const comp = this.ctx.createDynamicsCompressor();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.75 * (window.__embedVol ?? 1);
+      this.master.gain.value = window.__embedSilent ? 0 : 0.75 * (window.__embedVol ?? 1);
       this.master.connect(comp); comp.connect(this.ctx.destination);
       const len = this.ctx.sampleRate;
       this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -1992,7 +1992,7 @@ async function startSpin() {
   const winner = EMBED.winner;
 
   // ===== ここから下は演出だけ。winner は二度と書き換えない =====
-  const plan = PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);
+  const plan = EMBED.plan === 'zenkai' ? zenkaiPlan() : PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);
   evalReset(n);
   // 止まるマス: 勝者のマスのどれか
   const landIdx = winner + n * Math.floor(Math.random() * (total / n));
@@ -2856,11 +2856,20 @@ window.addEventListener('message', (e) => {
     } else if (m.type === 'spin') {
       if (isSpinning) return;
       closeResult();
-      EMBED.id = m.id; EMBED.winner = m.winner;
+      EMBED.id = m.id; EMBED.winner = m.winner; EMBED.plan = m.plan || '';
       startSpin();
     } else if (m.type === 'volume') {
       window.__embedVol = m.v;
-      if (sound.master) sound.master.gain.value = 0.75 * m.v;
+      if (sound.master && !window.__embedSilent) sound.master.gain.value = 0.75 * m.v;
+    } else if (m.type === 'silence') {
+      // ルーレット以外の画面のときは音を消す(演出はそのまま進む)。戻ったら音量を戻す
+      if (!!m.on === !!window.__embedSilent) return;
+      window.__embedSilent = !!m.on;
+      if (sound.master && sound.ctx) {
+        const g = sound.master.gain, t = sound.ctx.currentTime;
+        g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+        g.linearRampToValueAtTime(m.on ? 0 : 0.75 * (window.__embedVol ?? 1), t + 0.4);
+      }
     } else if (m.type === 'reset') {
       if (!isSpinning) closeResult();
     }

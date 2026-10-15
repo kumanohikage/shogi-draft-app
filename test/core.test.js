@@ -92,4 +92,22 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
   assert.strictEqual(t.noms[L[1]].playerId, pc);
 }
 
+// ピックアップ公開: 1人ずつ spot に出る。全員出るまで確定しない。spotEnd で一覧へ
+{
+  let t = C.initialState();
+  for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
+  t = C.apply(t, { type: 'addPlayers', players: ['a', 'b', 'c'].map((name) => ({ name })) });
+  const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
+  for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'nominate', leaderId: L[i], playerId: P[i] });
+  t = C.apply(t, { type: 'reveal', leaderId: L[0], spot: true });
+  assert.strictEqual(t.spot, L[0]);
+  assert.strictEqual(t.picks.length, 0);
+  t = C.apply(t, { type: 'reveal', leaderId: L[1], spot: true });
+  t = C.apply(t, { type: 'reveal', leaderId: L[2], spot: true });
+  assert.strictEqual(t.spot, L[2]);
+  assert.strictEqual(t.picks.length, 3);
+  t = C.apply(t, { type: 'spotEnd' });
+  assert.strictEqual(t.spot, null);
+}
+
 console.log('core OK');

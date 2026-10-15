@@ -114,6 +114,11 @@ function nextStep() {
     if (confs.length) return { step: 2, text: `${res}。続けて <b>${name(confs[0].playerId)}</b> の重複を抽選します`, main: { key: 'draw', arg: confs[0].playerId, label: '次の抽選へ' }, sub: [{ key: 'board', label: '指名ボードに戻す' }] };
     return { step: 2, text: `${res}${waiting.length ? '。外れたリーダーの再指名に進みます' : ''}`, main: { key: 'board', label: '指名ボードに戻す' } };
   }
+  // ピックアップ公開中: 1人ずつ「次へ」→ 全員出たら「一覧を表示」で指名ボードに戻して判定を見せる
+  if (S.spot) {
+    if (toReveal.length) return { step: renom ? 2 : 1, text: `ピックアップで公開しています（あと${toReveal.length}人）`, main: { key: 'spotNext', arg: toReveal[0].id, label: `次へ（${lname(toReveal[0].id)}）` }, sub: [{ key: 'reveal', label: '残りを一斉公開' }] };
+    return { step: renom ? 2 : 1, text: '全員の指名が出ました。一覧を出して、確定と競合を見せます', main: { key: 'spotEnd', label: '一覧を表示' } };
+  }
   if (confs.length && C.allRevealed(S)) {
     const c = confs[0];
     return { step: 2, text: `<b>${name(c.playerId)}</b> の指名が重複（${c.leaders.map(lname).join(' / ')}）。抽選で交渉権を決めます`, main: { key: 'draw', arg: c.playerId, label: '抽選する' } };
@@ -136,10 +141,11 @@ function nextStep() {
   if (toReveal.length) {
     // 1人ずつ公開もできる(並び順で次の人)
     const one = { key: 'revealOne', arg: toReveal[0].id, label: `1人ずつ公開（次: ${lname(toReveal[0].id)}）` };
+    const spot = { key: 'spotNext', arg: toReveal[0].id, label: 'ピックアップで公開' };
     const partial = toReveal.length < pend.length;
     return partial
-      ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [one] }
-      : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [one] };
+      ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot, one] }
+      : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [spot, one] };
   }
   return { step: 0, text: '' };
 }
@@ -290,6 +296,8 @@ $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進�
 function doNext(key, arg) {
   if (key === 'reveal') act({ type: 'reveal' });
   else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });
+  else if (key === 'spotNext') act({ type: 'reveal', leaderId: arg, spot: true });
+  else if (key === 'spotEnd') act({ type: 'spotEnd' });
   else if (key === 'draw') act({ type: 'drawLottery', playerId: arg });
   else if (key === 'board' || key === 'teams') act({ type: 'setScene', scene: key });
   else if (key === 'nextRound') act({ type: 'nextRound' });
@@ -439,7 +447,7 @@ function renderAudio() {
     ? '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>BGMを止める'
     : '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>BGMを流す';
   setDisabled($('bgm-toggle'), !a.bgm);
-  for (const [id, v] of [['bgm-vol', a.bgmVol], ['se-vol', a.seVol]]) {
+  for (const [id, v] of [['bgm-vol', a.bgmVol], ['se-vol', a.seVol], ['rl-vol', a.rlVol]]) {
     if (document.activeElement !== $(id)) $(id).value = v;
     $(id + '-v').textContent = v;
   }
@@ -449,7 +457,7 @@ function renderAudio() {
 }
 $('bgm-track').addEventListener('change', (e) => setAudio({ bgm: e.target.value, bgmOn: true }));
 $('bgm-toggle').addEventListener('click', () => setAudio({ bgmOn: !audioOf().bgmOn }));
-for (const [id, key] of [['bgm-vol', 'bgmVol'], ['se-vol', 'seVol']]) {
+for (const [id, key] of [['bgm-vol', 'bgmVol'], ['se-vol', 'seVol'], ['rl-vol', 'rlVol']]) {
   $(id).addEventListener('input', (e) => { $(id + '-v').textContent = e.target.value; setAudio({ [key]: +e.target.value }); });
 }
 $('bgm-add').addEventListener('click', () => { $('bgm-file').value = ''; $('bgm-file').click(); });

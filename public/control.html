@@ -64,8 +64,12 @@
         <input id="bgm-vol" type="range" min="0" max="100" step="1" class="block w-40 h-11 accent-primary-500 cursor-pointer">
       </div>
       <div class="leading-normal">
-        <label for="se-vol" class="block mb-1 text-xs text-[var(--text-muted)]">効果音の音量 <span id="se-vol-v"></span></label>
+        <label for="se-vol" class="block mb-1 text-xs text-[var(--text-muted)]">効果音（ボード・チーム表） <span id="se-vol-v"></span></label>
         <input id="se-vol" type="range" min="0" max="100" step="1" class="block w-40 h-11 accent-primary-500 cursor-pointer">
+      </div>
+      <div class="leading-normal">
+        <label for="rl-vol" class="block mb-1 text-xs text-[var(--text-muted)]">ルーレットの音量 <span id="rl-vol-v"></span></label>
+        <input id="rl-vol" type="range" min="0" max="100" step="1" class="block w-40 h-11 accent-primary-500 cursor-pointer">
       </div>
       <button type="button" id="bgm-add" class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">曲を追加</button>
       <input id="bgm-file" type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a" multiple hidden aria-label="BGMの音声ファイル">
