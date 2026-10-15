@@ -57,6 +57,8 @@
   }
   // 順番指名でいま指名する人(この巡でまだ確定していない、順番の最初の人)
   const currentTurn = (s) => (roundMode(s) === 'order' ? turnOrder(s).find((l) => !pickOf(s, l.id, s.round)) || null : null);
+  // 公開前の確認に使う「いまの指名の組み合わせ」。指名が変わると変わる(=確認し直し)
+  const confirmKey = (s) => JSON.stringify([s.round, pendingLeaders(s).map((l) => [l.id, s.noms[l.id]?.playerId || null])]);
   // ドラフトが始まっているか(指名か確定が1つでもある)
   const draftStarted = (s) => s.picks.length > 0 || s.round > 1 || Object.values(s.noms).some((n) => n.playerId);
   const teamOf = (s, leaderId) => s.picks.filter((p) => p.leaderId === leaderId).sort((a, b) => a.round - b.round);
@@ -156,6 +158,7 @@
       // ピックアップ公開: spotShow でその人のカードを裏のまま大きく出す → reveal(spot: true) でめくる → spotEnd で一覧へ
       case 'spotShow': s.spot = action.leaderId; s.scene = 'board'; break;
       case 'spotEnd': s.spot = null; break;
+      case 'confirmNoms': s.confirmedKey = confirmKey(s); break; // 公開前の確認をした
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
         const c = conflicts(s).find((x) => x.playerId === action.playerId);
         if (!c) throw new Error('この選手の重複はありません');
@@ -234,5 +237,5 @@
     return { leaders, players };
   }
 
-  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted };
+  return { initialState, apply, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey };
 }));

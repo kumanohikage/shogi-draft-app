@@ -95,86 +95,9 @@ function render() {
   renderTimer();
 }
 
-// 公開前の確認: 確認したときの指名の組み合わせ。指名が変わったら、もう一度確認する
-let confirmedKey = '';
-const nomKey = () => JSON.stringify([S.round, C.pendingLeaders(S).map((l) => [l.id, S.noms[l.id]?.playerId])]);
-
-/* ---------- 次にやること ----------
- * 状態から「いま押すべき1つのボタン」を決める。押していけば
- * 指名入力 → 一斉公開 → (重複なら抽選 → ボードに戻して再指名 → 公開) → チーム表 → 次の巡 と進む */
-const STEPS = ['指名を入力', '一斉公開', '抽選・再指名', 'チーム表', '次の巡へ'];
-function nextStep() {
-  const pend = C.pendingLeaders(S), confs = C.conflicts(S);
-  const waiting = pend.filter((l) => !(S.noms[l.id] && S.noms[l.id].playerId));
-  const toReveal = pend.filter((l) => S.noms[l.id] && S.noms[l.id].playerId && !S.noms[l.id].revealed);
-  // この巡で一度でも公開したか(してあれば、いまの入力は再指名)
-  const renom = S.picks.some((p) => p.round === S.round) || S.lotteries.some((x) => x.round === S.round);
-  const L = S.lottery, name = (id) => esc(C.playerById(S, id)?.name), lname = (id) => esc(C.leaderById(S, id)?.name);
-  const sub = [];
-  if (demo && waiting.length) sub.push({ key: 'auto', label: 'おまかせ指名' });
-
-  if (!S.leaders.length) return { step: -1, text: 'まず「登録」でリーダーと選手を登録してください', main: { key: 'roster', label: '登録へ' } };
-  if (L && !L.done) return { step: 2, text: `<b>${name(L.playerId)}</b> の抽選を配信画面で演出中です`, main: { label: '演出中…', off: true } };
-  if (L && L.done && S.scene === 'roulette') {
-    const res = `<b>${name(L.playerId)}</b> は <b>${lname(L.winner)}</b> が交渉権確定`;
-    // 重複が残っていれば、ボードに戻らず続けて次の抽選へ(再指名は全部の抽選のあと)
-    if (confs.length) return { step: 2, text: `${res}。続けて <b>${name(confs[0].playerId)}</b> の重複を抽選します`, main: { key: 'draw', arg: confs[0].playerId, label: '次の抽選へ' }, sub: [{ key: 'board', label: '指名ボードに戻す' }] };
-    return { step: 2, text: `${res}${waiting.length ? '。外れたリーダーの再指名に進みます' : ''}`, main: { key: 'board', label: '指名ボードに戻す' } };
-  }
-  // ピックアップ公開中: 1人ずつ「次へ」→ 全員出たら「一覧を表示」で指名ボードに戻して判定を見せる
-  if (S.spot) {
-    const cur = S.noms[S.spot] || {};
-    const rest = [{ key: 'reveal', label: '残りを一斉公開' }];
-    // 裏のまま出している → 読み上げてから「めくる」
-    if (!cur.revealed) return { step: renom ? 2 : 1, text: `<b>${lname(S.spot)}</b> のカードを出しています。読み上げたら、めくってください`, main: { key: 'spotFlip', arg: S.spot, label: 'めくる' }, sub: rest };
-    if (toReveal.length) return { step: renom ? 2 : 1, text: `ピックアップで公開しています（あと${toReveal.length}人）`, main: { key: 'spotShow', arg: toReveal[0].id, label: `次へ（${lname(toReveal[0].id)}）` }, sub: rest };
-    return { step: renom ? 2 : 1, text: '全員の指名が出ました。一覧を出して、確定と競合を見せます', main: { key: 'spotEnd', label: '一覧を表示' } };
-  }
-  if (confs.length && C.allRevealed(S)) {
-    const c = confs[0];
-    return { step: 2, text: `<b>${name(c.playerId)}</b> の指名が重複（${c.leaders.map(lname).join(' / ')}）。抽選で交渉権を決めます`, main: { key: 'draw', arg: c.playerId, label: '抽選する' } };
-  }
-  if (C.draftComplete(S)) {
-    return S.scene === 'teams'
-      ? { step: 5, text: `全${S.rounds}巡の指名が確定しました。おつかれさまでした` }
-      : { step: 3, text: `全${S.rounds}巡の指名が確定しました。最終のチーム表を映しましょう`, main: { key: 'teams', label: 'チーム表を映す' } };
-  }
-  if (C.roundComplete(S)) {
-    return S.scene === 'teams'
-      ? { step: 4, text: `第${S.round}巡のチーム表を映しています。次は第${S.round + 1}巡です`, main: { key: 'nextRound', label: `第${S.round + 1}巡へ進む` } }
-      : { step: 3, text: `第${S.round}巡の指名がすべて確定しました`, main: { key: 'teams', label: 'チーム表を映す' } };
-  }
-  // 順番指名の巡: いまの番の人が指名 → 公開(公開した時点で確定)。ピックアップも使える
-  const turn = C.currentTurn(S);
-  if (turn) {
-    const n = S.noms[turn.id] || {};
-    const left = pend.length;
-    if (!n.playerId) {
-      if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
-      return { step: 0, text: `順番指名: <b>${lname(turn.id)}</b> の番です。指名を下で入力してください（残り${left}人）`, main: { label: '公開', off: true }, sub };
-    }
-    return { step: 1, text: `順番指名: <b>${lname(turn.id)}</b> の指名を公開します`, main: { key: 'revealOne', arg: turn.id, label: '公開' } };
-  }
-  const label = renom ? '再指名を公開' : '一斉公開';
-  if (waiting.length) {
-    if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
-    return { step: renom ? 2 : 0, text: `${renom ? '外れたリーダーの再指名' : '各リーダーの指名'}を下で入力してください（あと${waiting.length}人）`, main: { label, off: true }, sub };
-  }
-  if (toReveal.length) {
-    // 1人ずつ公開もできる(並び順で次の人)
-    const spot = { key: 'spotShow', arg: toReveal[0].id, label: 'ピックアップで公開' };
-    const partial = toReveal.length < pend.length;
-    // 公開の前に、誰が誰を指名したかを読み合わせる(配信には出ない)
-    if (!partial && confirmedKey !== nomKey()) {
-      const list = toReveal.map((l) => `<li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[var(--lc)]" style="--lc:${esc(l.color)}" aria-hidden="true"></span><span class="text-[var(--text-muted)]">${lname(l.id)}</span><span aria-hidden="true">→</span><b>${name(S.noms[l.id].playerId)}</b></li>`).join('');
-      return { step: renom ? 2 : 1, text: `公開する前に、指名に間違いがないか確認してください<ul class="mt-2 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-6 gap-y-1 text-base">${list}</ul>`, main: { key: 'confirm', label: '確認した' } };
-    }
-    return partial
-      ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot] }
-      : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [spot] };
-  }
-  return { step: 0, text: '' };
-}
+/* ---------- 次にやること(flow.js と共用) ---------- */
+const STEPS = DraftFlow.STEPS;
+const nextStep = () => DraftFlow.nextStep(S, { demo });
 
 function renderSteps(cur) {
   const check = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
@@ -363,7 +286,7 @@ $('demo-exit').addEventListener('click', () => { sendMode('real'); toast('本番
 $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進行をすべて消して、最初からにしますか？')) sendMode('demo', true); });
 // 「次にやること」のボタン
 function doNext(key, arg) {
-  if (key === 'confirm') { confirmedKey = nomKey(); renderRun(); }
+  if (key === 'confirm') act({ type: 'confirmNoms' });
   else if (key === 'reveal') act({ type: 'reveal' });
   else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });
   else if (key === 'spotShow') act({ type: 'spotShow', leaderId: arg });
