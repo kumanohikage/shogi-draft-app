@@ -30,6 +30,8 @@
   #spot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-top: 150px; box-sizing: border-box; opacity: 0; transition: opacity .4s; pointer-events: none; }
   #spot.on { opacity: 1; }
   #spot .spotcard { zoom: 1.75; }
+  #spot .spotcard.enter { animation: spotIn .45s cubic-bezier(.3,1.4,.5,1) both; }
+  @keyframes spotIn { from { transform: scale(.85); opacity: 0; } }
   /* 3D はめくっている間だけ(.anim)。止まっているときは平面で描いて文字をくっきりさせる */
   .card { width: 520px; height: 300px; }
   .card .in { position: relative; width: 100%; height: 100%; }

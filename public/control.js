@@ -116,7 +116,11 @@ function nextStep() {
   }
   // ピックアップ公開中: 1人ずつ「次へ」→ 全員出たら「一覧を表示」で指名ボードに戻して判定を見せる
   if (S.spot) {
-    if (toReveal.length) return { step: renom ? 2 : 1, text: `ピックアップで公開しています（あと${toReveal.length}人）`, main: { key: 'spotNext', arg: toReveal[0].id, label: `次へ（${lname(toReveal[0].id)}）` }, sub: [{ key: 'reveal', label: '残りを一斉公開' }] };
+    const cur = S.noms[S.spot] || {};
+    const rest = [{ key: 'reveal', label: '残りを一斉公開' }];
+    // 裏のまま出している → 読み上げてから「めくる」
+    if (!cur.revealed) return { step: renom ? 2 : 1, text: `<b>${lname(S.spot)}</b> のカードを出しています。読み上げたら、めくってください`, main: { key: 'spotFlip', arg: S.spot, label: 'めくる' }, sub: rest };
+    if (toReveal.length) return { step: renom ? 2 : 1, text: `ピックアップで公開しています（あと${toReveal.length}人）`, main: { key: 'spotShow', arg: toReveal[0].id, label: `次へ（${lname(toReveal[0].id)}）` }, sub: rest };
     return { step: renom ? 2 : 1, text: '全員の指名が出ました。一覧を出して、確定と競合を見せます', main: { key: 'spotEnd', label: '一覧を表示' } };
   }
   if (confs.length && C.allRevealed(S)) {
@@ -141,7 +145,7 @@ function nextStep() {
   if (toReveal.length) {
     // 1人ずつ公開もできる(並び順で次の人)
     const one = { key: 'revealOne', arg: toReveal[0].id, label: `1人ずつ公開（次: ${lname(toReveal[0].id)}）` };
-    const spot = { key: 'spotNext', arg: toReveal[0].id, label: 'ピックアップで公開' };
+    const spot = { key: 'spotShow', arg: toReveal[0].id, label: 'ピックアップで公開' };
     const partial = toReveal.length < pend.length;
     return partial
       ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot, one] }
@@ -296,7 +300,8 @@ $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進�
 function doNext(key, arg) {
   if (key === 'reveal') act({ type: 'reveal' });
   else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });
-  else if (key === 'spotNext') act({ type: 'reveal', leaderId: arg, spot: true });
+  else if (key === 'spotShow') act({ type: 'spotShow', leaderId: arg });
+  else if (key === 'spotFlip') act({ type: 'reveal', leaderId: arg, spot: true });
   else if (key === 'spotEnd') act({ type: 'spotEnd' });
   else if (key === 'draw') act({ type: 'drawLottery', playerId: arg });
   else if (key === 'board' || key === 'teams') act({ type: 'setScene', scene: key });

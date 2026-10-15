@@ -52,7 +52,7 @@ function render() {
   BGM.update(audio, S.scene === 'roulette');
   const f = $('roulette').contentWindow;
   if (f) {
-    f.postMessage({ type: 'volume', v: audio.rlVol / 100 }, '*');
+    f.postMessage({ type: 'volume', v: audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
   renderBoard(); renderTeams(); playLottery(false);
@@ -77,15 +77,15 @@ function flipIn(c, delay, sound) {
   setTimeout(() => { c.classList.add('open'); setTimeout(() => c.classList.remove('anim'), 900); if (sound) SE.flip(); }, delay);
 }
 
-let prevSpot = null;
+let prevSpot = null, prevSpotOpen = false;
 function renderBoard() {
   $('board-title').innerHTML = `${esc(S.title)}<small>第${S.round}巡 指名選手</small>`;
   const g = $('grid');
   g.style.gridTemplateColumns = `repeat(${cols(S.leaders.length)}, 520px)`;
   const dupIds = new Set(C.conflicts(S).flatMap((c) => c.leaders));
-  // ピックアップ公開中は、1人ずつ大きく見せる。確定・競合の判定は一覧に戻ってから順に出す
+  // ピックアップ公開中は、後ろの指名ボードは裏のまま(切り替えの途中でも中身が見えないように)
   const spotting = !!S.spot, endingSpot = !!prevSpot && !spotting && !first;
-  const open = new Set(), stamped = new Set(), dups = new Set(), lateDup = [];
+  const open = new Set(), stamped = new Set(), dups = new Set();
   const html = S.leaders.map((l) => {
     const pick = C.pickOf(S, l.id, S.round);
     const n = S.noms[l.id] || {};
@@ -99,20 +99,22 @@ function renderBoard() {
       // 1人ずつ公開の途中で、まだ重複していないものはハンコなし
       if (dupIds.has(l.id) || pick) { stamp = 'dup'; dup = true; }
     }
-    if (spotting) { stamp = ''; dup = false; }
+    if (spotting && !prevOpen.has(l.id)) { playerId = null; stamp = ''; dup = false; }
     if (stamp === 'ok') stamped.add(l.id);
     if (stamp === 'dup') dups.add(l.id);
     if (playerId) open.add(l.id);
-    const isNew = stamp && !first && !(stamp === 'ok' ? prevStamp : prevDup).has(l.id) && prevOpen.has(l.id);
-    // 一覧に戻ったときの競合の光は、判定の順番が来てから
-    if (endingSpot && dup && isNew) { lateDup.push(l.id); dup = false; }
+    const isNew = stamp && !first && !(stamp === 'ok' ? prevStamp : prevDup).has(l.id) && (prevOpen.has(l.id) || endingSpot);
+    // 一覧に戻ったときの競合の光は、判定が出そろってから
+    if (endingSpot && isNew) dup = false;
     return cardHtml(l, playerId, stamp, dup, isNew);
   }).join('');
   g.innerHTML = html;
+  // ピックアップに入るときは、ボードを一瞬で消す(フェードの途中で見えないように)
+  if (spotting && !prevSpot) { g.style.transition = 'none'; g.classList.add('hide'); void g.offsetWidth; g.style.transition = ''; }
   g.classList.toggle('hide', spotting);
   const onBoard = S.scene === 'board' && !first;
-  // めくれる瞬間を見せるため、いったん閉じた状態で描いてから順にめくる(開いた直後・ピックアップ中はめくらない)
-  const newly = first || spotting ? [] : [...open].filter((id) => !prevOpen.has(id));
+  // めくれる瞬間を見せるため、いったん閉じた状態で描いてから順にめくる(開いた直後・ピックアップの前後はめくらない)
+  const newly = first || spotting || endingSpot ? [] : [...open].filter((id) => !prevOpen.has(id));
   const cardOf = (id) => g.querySelector(`.card[data-id="${id}"]`);
   newly.forEach((id) => { const c = cardOf(id); c.classList.remove('open'); c.classList.add('anim'); });
   // 大きさの計算は、めくる前の状態にしてから(先に計算すると、開いた状態から一度裏返る動きが出る)
@@ -120,19 +122,19 @@ function renderBoard() {
   newly.forEach((id, i) => flipIn(cardOf(id), 120 + i * 260, onBoard));
   const after = 120 + newly.length * 260 + 450;
   if (endingSpot) {
-    // ピックアップのあと: 一覧を出してから、判定を1枚ずつ
+    // 結果発表: 一覧を出してから、確定・競合のハンコを1枚ずつ。競合の「ジャーン」は出そろってから1回だけ
     const order = S.leaders.map((l) => l.id).filter((id) => g.querySelector(`.card[data-id="${id}"] .stamp.pop`));
-    let firstDup = true;
     order.forEach((id, k) => {
-      const d = 600 + k * 380, el = g.querySelector(`.card[data-id="${id}"] .stamp.pop`);
-      el.style.animationDelay = d + 'ms';
-      setTimeout(() => {
-        if (lateDup.includes(id)) cardOf(id)?.classList.add('dup');
-        if (!onBoard) return;
-        if (el.classList.contains('dup')) { if (firstDup) SE.conflict(); firstDup = false; } else SE.stamp();
-      }, d);
+      const d = 700 + k * 450;
+      g.querySelector(`.card[data-id="${id}"] .stamp.pop`).style.animationDelay = d + 'ms';
+      if (onBoard) setTimeout(() => SE.stamp(), d);
     });
-  } else {
+    const end = 700 + order.length * 450 + 300;
+    setTimeout(() => {
+      dups.forEach((id) => cardOf(id)?.classList.add('dup'));
+      if (onBoard && dups.size) SE.conflict();
+    }, end);
+  } else if (!spotting) {
     // めくり終わったあとに、競合なら「ジャーン」、確定なら「ドン」
     const newDup = [...dups].some((id) => !prevDup.has(id));
     const newStamp = [...stamped].some((id) => !prevStamp.has(id));
@@ -141,18 +143,29 @@ function renderBoard() {
     else if (onBoard && newStamp) setTimeout(() => SE.stamp(), after);
   }
   renderSpot(onBoard);
-  prevOpen = open; prevStamp = stamped; prevDup = dups; prevSpot = S.spot;
+  // ピックアップ中は、ボードの「前回」を進めない(一覧に戻ったときに、まとめて新しいものとして扱う)
+  if (!spotting) { prevOpen = open; prevStamp = stamped; prevDup = dups; }
+  prevSpot = S.spot;
 }
 
-// ピックアップ: 公開した1人のカードを大きく出す(めくり方はボードと同じ)
+// ピックアップ: 1人のカードを裏のまま大きく出す → 管理画面で「めくる」を押したらめくれる
 function renderSpot(onBoard) {
   const sp = $('spot');
   sp.classList.toggle('on', !!S.spot);
-  if (!S.spot || S.spot === prevSpot) return;
+  if (!S.spot) { prevSpotOpen = false; return; }
   const l = C.leaderById(S, S.spot), n = S.noms[S.spot] || {};
   if (!l) return;
-  sp.innerHTML = `<div class="spotcard">${cardHtml(l, n.playerId, '', false, false)}</div>`;
-  if (!first) flipIn(sp.querySelector('.card'), 250, onBoard);
+  const isOpen = !!n.revealed;
+  if (S.spot !== prevSpot) {
+    // 次の人: 裏のカードを出す(もうめくってあれば表で)
+    sp.innerHTML = `<div class="spotcard">${cardHtml(l, isOpen ? n.playerId : null, '', false, false)}</div>`;
+    sp.querySelector('.spotcard').classList.add('enter');
+  } else if (isOpen && !prevSpotOpen) {
+    // めくる
+    sp.querySelector('.spotcard').innerHTML = cardHtml(l, n.playerId, '', false, false);
+    if (!first) flipIn(sp.querySelector('.card'), 0, onBoard);
+  }
+  prevSpotOpen = isOpen;
 }
 
 /* ---------- チーム表 ---------- */

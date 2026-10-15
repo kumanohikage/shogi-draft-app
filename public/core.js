@@ -123,7 +123,9 @@
         s.spot = action.spot && action.leaderId ? action.leaderId : null;
         break;
       }
-      case 'spotEnd': s.spot = null; break; // ピックアップ公開を終えて指名ボード(一覧)に戻す
+      // ピックアップ公開: spotShow でその人のカードを裏のまま大きく出す → reveal(spot: true) でめくる → spotEnd で一覧へ
+      case 'spotShow': s.spot = action.leaderId; s.scene = 'board'; break;
+      case 'spotEnd': s.spot = null; break;
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
         const c = conflicts(s).find((x) => x.playerId === action.playerId);
         if (!c) throw new Error('この選手の重複はありません');

@@ -99,6 +99,9 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
   t = C.apply(t, { type: 'addPlayers', players: ['a', 'b', 'c'].map((name) => ({ name })) });
   const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
   for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'nominate', leaderId: L[i], playerId: P[i] });
+  t = C.apply(t, { type: 'spotShow', leaderId: L[0] });
+  assert.strictEqual(t.spot, L[0]);
+  assert.strictEqual(t.noms[L[0]].revealed, false, '出しただけではめくらない');
   t = C.apply(t, { type: 'reveal', leaderId: L[0], spot: true });
   assert.strictEqual(t.spot, L[0]);
   assert.strictEqual(t.picks.length, 0);
