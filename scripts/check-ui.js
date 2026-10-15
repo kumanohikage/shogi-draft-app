@@ -101,6 +101,7 @@ app.whenReady().then(async () => {
   await check('10-run-renominate');
   // 5. 外れた全員でまとめて再指名 → 公開 → チーム表 → 次の巡
   for (const [i, id] of losers.entries()) await act({ type: 'nominate', leaderId: id, playerId: P[10 + i] });
+  await next('確認した'); await check('10b-run-confirm');
   await next('再指名を公開');
   await check('11-run-round-complete');
   await next('チーム表を映す');

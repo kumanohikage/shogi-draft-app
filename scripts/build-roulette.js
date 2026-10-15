@@ -38,8 +38,8 @@ rep('      this.master.gain.value = 0.75;', '      this.master.gain.value = wind
 rep('  if (track.children.length !== P.length) {\n    track.textContent = \'\';',
   '  const colorKey = P.map((_, i) => leaderColor(i)).join();\n  if (track.dataset.colors !== colorKey) {\n    track.dataset.colors = colorKey;\n    track.textContent = \'\';');
 
-// 紹介動画の録画用: 演出を指定できる(普段は使わない)
-rep('  const plan = PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);', "  const plan = EMBED.plan === 'zenkai' ? zenkaiPlan() : PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);");
+// 演出の指定: short = 短い抽選演出(一発決着)。zenkai は紹介動画の録画用
+rep('  const plan = PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);', "  const plan = EMBED.plan === 'zenkai' ? zenkaiPlan() : EMBED.plan === 'short' ? { ...zenkaiPlan(), zenkaiten: false, ippatsu: true, heat: 'normal', heatPath: ['normal'] } : PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);");
 
 // 結果が出たらアプリに知らせる
 rep('  showResult(winner);\n', '  showResult(winner);\n  parent.postMessage({ type: \'roulette-done\', id: EMBED.id }, \'*\');\n');

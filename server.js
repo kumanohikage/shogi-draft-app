@@ -69,6 +69,15 @@ function start(opts = {}) {
     if (req.method === 'POST' && p === '/api/upload') return upload(req, res, url, IMG, IMG_RE);
     if (req.method === 'POST' && p === '/api/bgm') return upload(req, res, url, BGM, AUDIO_RE);
     if (p === '/api/bgm') return json(res, listBgm());
+    // チーム表を画像で保存(画面を撮るのは Electron 側。opts.capture が無いとき=node だけで動かしたときは使えない)
+    if (p === '/api/export/teams.png') {
+      if (!opts.capture) { res.writeHead(501); return res.end('アプリ(exe)から使ってください'); }
+      return opts.capture('teams').then((png) => {
+        const name = encodeURIComponent(`${state.title || 'ドラフト'}_チーム表.png`);
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Disposition': `attachment; filename*=UTF-8''${name}`, 'Cache-Control': 'no-store' });
+        res.end(png);
+      }, (e) => { res.writeHead(500); res.end(e.message); });
+    }
     if (p === '/' || p === '/control') p = '/control.html';
     if (p === '/overlay') p = '/overlay.html';
     let file;

@@ -13,9 +13,10 @@ function fit() {
 addEventListener('resize', fit); fit();
 
 // 管理画面に「配信画面が開いている(OBS か ブラウザか、OBS で映っているか)」を知らせる
+const EXPORT = new URLSearchParams(location.search).get('export'); // 画像の書き出し用
 const obs = window.obsstudio;
 const presence = { obs: !!obs, visible: null, active: null };
-const sendPresence = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
+const sendPresence = () => { if (!EXPORT && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
 if (obs) {
   addEventListener('obsSourceVisibleChanged', (e) => { presence.visible = !!e.detail.visible; sendPresence(); });
   addEventListener('obsSourceActiveChanged', (e) => { presence.active = !!e.detail.active; sendPresence(); });
@@ -46,7 +47,9 @@ const { SE, BGM } = window.OverlayAudio;
 let first = true; // 開いた直後(OBS の読み込み時)は演出・効果音なしで今の状態を出す
 
 function render() {
-  for (const k of ['board', 'teams', 'roulette']) $('sc-' + k).classList.toggle('on', S.scene === k);
+  const scene = EXPORT || S.scene;
+  for (const k of ['board', 'teams', 'roulette', 'wait']) $('sc-' + k).classList.toggle('on', scene === k);
+  if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
   SE.setVolume(audio.seVol / 100);
   BGM.update(audio, S.scene === 'roulette');
@@ -55,7 +58,7 @@ function render() {
     f.postMessage({ type: 'volume', v: audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
-  renderBoard(); renderTeams(); playLottery(false);
+  renderBoard(); renderTeams(); renderWait(); renderTimer(); playLottery(false);
   first = false;
 }
 
@@ -170,6 +173,31 @@ function renderSpot(onBoard) {
   prevSpotOpen = isOpen;
 }
 
+/* ---------- 待ち時間・制限時間 ---------- */
+function renderWait() {
+  const o = C.optionsOf(S);
+  $('wait-title').innerHTML = `${esc(S.title)}<small>第${S.round}巡 指名中</small>`;
+  $('wait-img').setAttribute('src', o.waitImage ? img(o.waitImage) : '');
+}
+let timerEnded = false;
+function renderTimer() {
+  if (!S) return;
+  const o = C.optionsOf(S), t = S.timer || {};
+  const left = t.endsAt ? Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000)) : t.left ?? o.timerSec;
+  const active = !!t.endsAt || t.left != null; // 動いている or 止めてある
+  const text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  const end = !!t.endsAt && left === 0;
+  for (const el of [$('board-timer'), $('wait-timer')]) {
+    el.textContent = text;
+    el.classList.toggle('on', o.timerShow && active && !S.spot);
+    el.classList.toggle('end', end);
+  }
+  // 時間になったら「ピピッ」と合図(自動では何もしない)
+  if (end && !timerEnded && !first && (S.scene === 'board' || S.scene === 'wait')) { SE.pop(); setTimeout(() => SE.pop(), 180); }
+  timerEnded = end;
+}
+setInterval(renderTimer, 250);
+
 /* ---------- チーム表 ---------- */
 let prevPicks = new Set();
 function renderTeams() {
@@ -208,7 +236,7 @@ function playLottery(force) {
   const leaders = L.leaders.map((id) => C.leaderById(S, id));
   const f = $('roulette').contentWindow;
   f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: leaders.map((l) => l.name), colors: leaders.map((l) => l.color) }, '*');
-  setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.leaders.indexOf(L.winner), plan: window.__recPlan || '' }, '*') /* __recPlan: 紹介動画の録画用 */, 700);
+  setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.leaders.indexOf(L.winner), plan: window.__recPlan || (C.optionsOf(S).lotteryStyle === 'short' ? 'short' : '') }, '*') /* __recPlan: 紹介動画の録画用 */, 700);
 }
 addEventListener('message', (e) => {
   const m = e.data || {};

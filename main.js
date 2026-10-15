@@ -40,10 +40,22 @@ function buildMenu(dataDir) {
   ]));
 }
 
+// 配信画面の一場面を 1920×1080 の PNG にする(画面には出さない窓で開いて撮る)
+async function capture(scene) {
+  const w = new BrowserWindow({ width: 1920, height: 1080, useContentSize: true, frame: false, show: false, webPreferences: { offscreen: true } });
+  try {
+    w.setContentSize(1920, 1080);
+    w.webContents.setAudioMuted(true);
+    await w.loadURL(`http://localhost:${PORT}/overlay?export=${scene}`);
+    await w.webContents.executeJavaScript('document.fonts.ready.then(() => new Promise((r) => setTimeout(r, 800)))');
+    return (await w.webContents.capturePage()).toPNG();
+  } finally { w.destroy(); }
+}
+
 app.whenReady().then(async () => {
   const dataDir = resolveDataDir();
   try {
-    await start({ port: PORT, dataDir });
+    await start({ port: PORT, dataDir, capture });
   } catch (e) {
     dialog.showErrorBox('起動できません', `ポート ${PORT} が使用中です。すでにアプリが起動していないか確認してください。\n\n${e.message}`);
     app.quit(); return;

@@ -81,12 +81,23 @@
   .stamp.pop { animation: stampIn .35s cubic-bezier(.3,1.6,.5,1) both; }
   @keyframes stampIn { from { transform: rotate(-6deg) scale(2.4); opacity: 0; } }
 
+  /* 指名の制限時間 */
+  .timer { font: normal 64px 'Dela Gothic One', sans-serif; color: #fff; text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 6px 0 #3a1a00; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .3s; }
+  .timer.on { opacity: 1; }
+  .timer.end { color: #ffd2cc; animation: tEnd .6s ease-in-out infinite alternate; }
+  @keyframes tEnd { to { transform: scale(1.08); } }
+  .timer.corner { position: absolute; top: 46px; right: 70px; font-size: 56px; }
+  .timer.big { font-size: 120px; margin-top: 24px; text-align: center; }
+  .waitbox { display: flex; flex-direction: column; align-items: center; }
+  #wait-img { max-width: 1500px; max-height: 640px; border-radius: 18px; box-shadow: 0 14px 40px rgba(0,0,0,.45); background: #fffaf0; }
+  #wait-img[src=""] { display: none; }
   #roulette { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 </style>
 </head>
 <body>
 <div id="stage">
-  <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div></section>
+  <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="board-timer" class="timer corner"></div></section>
+  <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><div class="waitbox"><img id="wait-img" alt=""><div id="wait-timer" class="timer big"></div></div></div></section>
   <section id="sc-teams" class="scene bg"><h1 id="teams-title"></h1><div class="area"><div id="teams" class="teams"></div></div></section>
   <section id="sc-roulette" class="scene"><iframe id="roulette" src="roulette.html?layout=horizontal"></iframe></section>
 </div>

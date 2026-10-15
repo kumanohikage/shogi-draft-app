@@ -1992,7 +1992,7 @@ async function startSpin() {
   const winner = EMBED.winner;
 
   // ===== ここから下は演出だけ。winner は二度と書き換えない =====
-  const plan = EMBED.plan === 'zenkai' ? zenkaiPlan() : PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);
+  const plan = EMBED.plan === 'zenkai' ? zenkaiPlan() : EMBED.plan === 'short' ? { ...zenkaiPlan(), zenkaiten: false, ippatsu: true, heat: 'normal', heatPath: ['normal'] } : PREVIEW ? previewPlan(winner, n) : planDraft(winner, n);
   evalReset(n);
   // 止まるマス: 勝者のマスのどれか
   const landIdx = winner + n * Math.floor(Math.random() * (total / n));

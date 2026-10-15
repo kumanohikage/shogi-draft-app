@@ -91,7 +91,13 @@ function render() {
   renderRoster();
   renderAudio();
   renderLotteryLog();
+  renderOptions();
+  renderTimer();
 }
+
+// 公開前の確認: 確認したときの指名の組み合わせ。指名が変わったら、もう一度確認する
+let confirmedKey = '';
+const nomKey = () => JSON.stringify([S.round, C.pendingLeaders(S).map((l) => [l.id, S.noms[l.id]?.playerId])]);
 
 /* ---------- 次にやること ----------
  * 状態から「いま押すべき1つのボタン」を決める。押していけば
@@ -138,6 +144,17 @@ function nextStep() {
       ? { step: 4, text: `第${S.round}巡のチーム表を映しています。次は第${S.round + 1}巡です`, main: { key: 'nextRound', label: `第${S.round + 1}巡へ進む` } }
       : { step: 3, text: `第${S.round}巡の指名がすべて確定しました`, main: { key: 'teams', label: 'チーム表を映す' } };
   }
+  // 順番指名の巡: いまの番の人が指名 → 公開(公開した時点で確定)。ピックアップも使える
+  const turn = C.currentTurn(S);
+  if (turn) {
+    const n = S.noms[turn.id] || {};
+    const left = pend.length;
+    if (!n.playerId) {
+      if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
+      return { step: 0, text: `順番指名: <b>${lname(turn.id)}</b> の番です。指名を下で入力してください（残り${left}人）`, main: { label: '公開', off: true }, sub };
+    }
+    return { step: 1, text: `順番指名: <b>${lname(turn.id)}</b> の指名を公開します`, main: { key: 'revealOne', arg: turn.id, label: '公開' } };
+  }
   const label = renom ? '再指名を公開' : '一斉公開';
   if (waiting.length) {
     if (S.scene !== 'board') sub.push({ key: 'board', label: '指名ボードを映す' });
@@ -147,6 +164,11 @@ function nextStep() {
     // 1人ずつ公開もできる(並び順で次の人)
     const spot = { key: 'spotShow', arg: toReveal[0].id, label: 'ピックアップで公開' };
     const partial = toReveal.length < pend.length;
+    // 公開の前に、誰が誰を指名したかを読み合わせる(配信には出ない)
+    if (!partial && confirmedKey !== nomKey()) {
+      const list = toReveal.map((l) => `<li class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-[var(--lc)]" style="--lc:${esc(l.color)}" aria-hidden="true"></span><span class="text-[var(--text-muted)]">${lname(l.id)}</span><span aria-hidden="true">→</span><b>${name(S.noms[l.id].playerId)}</b></li>`).join('');
+      return { step: renom ? 2 : 1, text: `公開する前に、指名に間違いがないか確認してください<ul class="mt-2 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-x-6 gap-y-1 text-base">${list}</ul>`, main: { key: 'confirm', label: '確認した' } };
+    }
     return partial
       ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: { key: 'reveal', label: '残りを一斉公開' }, sub: [spot] }
       : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。配信画面で公開します`, main: { key: 'reveal', label }, sub: [spot] };
@@ -194,6 +216,7 @@ function renderRun() {
   const pendAll = C.pendingLeaders(S).every((l) => S.noms[l.id] && S.noms[l.id].playerId);
   // 重複が残っている間・抽選の演出中は再指名を入れられない(全部の抽選のあとでまとめて)
   const blocked = confs.length > 0 || !!(S.lottery && !S.lottery.done);
+  const turnNow = C.currentTurn(S);
   const inLot = (id) => !!(S.lottery && !S.lottery.done && S.lottery.leaders.includes(id));
   $('noms').innerHTML = S.leaders.map((l) => {
     const pick = C.pickOf(S, l.id, S.round), n = S.noms[l.id] || {};
@@ -202,9 +225,10 @@ function renderRun() {
     // 抽選の演出中は、当たり・外れどちらも同じ見た目にする(管理画面でも結果が先にわからないように)
     else if (pick || inLot(l.id)) { body = picked(S.lottery.playerId); st = badge('lot', '抽選中'); }
     else if (n.revealed) { body = picked(n.playerId); st = confs.some((c) => c.leaders.includes(l.id)) ? badge('dup', '重複') : badge('in', '公開済み'); }
+    else if (turnNow && turnNow.id !== l.id) { body = '<p class="flex items-center h-11 text-sm text-[var(--text-muted)]">順番を待っています</p>'; st = badge('wait', '順番待ち'); }
     else if (blocked) { body = '<p class="flex items-center h-11 text-sm text-[var(--text-muted)]">ほかの重複の抽選が終わったら再指名します</p>'; st = badge('wait', '再指名待ち'); }
     else {
-      const canReveal = n.playerId && pendAll;
+      const canReveal = n.playerId && pendAll && !turnNow;
       body = `<div class="flex gap-2"><div class="relative flex-1 min-w-0"><select data-nom="${l.id}" aria-label="${esc(l.name)} の指名" class="appearance-none w-full pl-3 pr-10 ${INPUT} cursor-pointer"><option value="">― 指名を選ぶ ―</option>${options.map((p) => `<option value="${p.id}" ${p.id === n.playerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>${ICON.chevron}</div>${canReveal ? `<button type="button" class="${BTN_SUB} flex-none" data-next="revealOne" data-arg="${l.id}" aria-label="${esc(l.name)} の指名を公開">公開</button>` : ''}</div>`;
       st = n.playerId ? badge('in', '入力済み') : badge('wait', '未入力');
     }
@@ -339,7 +363,8 @@ $('demo-exit').addEventListener('click', () => { sendMode('real'); toast('本番
 $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進行をすべて消して、最初からにしますか？')) sendMode('demo', true); });
 // 「次にやること」のボタン
 function doNext(key, arg) {
-  if (key === 'reveal') act({ type: 'reveal' });
+  if (key === 'confirm') { confirmedKey = nomKey(); renderRun(); }
+  else if (key === 'reveal') act({ type: 'reveal' });
   else if (key === 'revealOne') act({ type: 'reveal', leaderId: arg });
   else if (key === 'spotShow') act({ type: 'spotShow', leaderId: arg });
   else if (key === 'spotFlip') act({ type: 'reveal', leaderId: arg, spot: true });
@@ -479,6 +504,65 @@ $('csv-file').addEventListener('change', async (e) => {
   act({ type: 'replaceRoster', leaders: r.leaders.length ? r.leaders : undefined, players: r.players.length ? r.players : undefined });
   toast(`リーダー${r.leaders.length}人・選手${r.players.length}人を読み込みました`);
 });
+
+/* ---------- 進め方の設定 ---------- */
+const optionsOf = () => C.optionsOf(S);
+const setOption = (patch) => act({ type: 'setOption', patch });
+function renderOptions() {
+  const o = optionsOf();
+  // 巡ごとの指名のしかた
+  const modes = $('round-modes');
+  if (!modes.contains(document.activeElement)) {
+    modes.innerHTML = Array.from({ length: S.rounds }, (_, i) => {
+      const m = o.roundModes[i] || 'bid';
+      return `<div class="relative"><label class="sr-only" for="rm-${i}">第${i + 1}巡の指名のしかた</label><select id="rm-${i}" data-round-mode="${i}" class="appearance-none w-44 pl-3 pr-10 ${INPUT} cursor-pointer"><option value="bid" ${m === 'bid' ? 'selected' : ''}>第${i + 1}巡: 一斉入札</option><option value="order" ${m === 'order' ? 'selected' : ''}>第${i + 1}巡: 順番指名</option></select>${ICON.chevron}</div>`;
+    }).join('');
+  }
+  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
+  $('opt-timershow').checked = !!o.timerShow;
+  $('wait-img').classList.toggle('hidden', !o.waitImage);
+  if (o.waitImage) $('wait-img').src = img(o.waitImage);
+  setDisabled($('wait-clear'), !o.waitImage);
+}
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.roundMode !== undefined) {
+    const m = [...optionsOf().roundModes]; m[+t.dataset.roundMode] = t.value;
+    setOption({ roundModes: Array.from({ length: S.rounds }, (_, i) => m[i] || 'bid') });
+  } else if (t.id === 'opt-order') setOption({ orderStyle: t.value });
+  else if (t.id === 'opt-lottery') setOption({ lotteryStyle: t.value });
+  else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 120)) });
+  else if (t.id === 'opt-timershow') setOption({ timerShow: t.checked });
+});
+$('wait-pick').addEventListener('click', () => { $('wait-file').value = ''; $('wait-file').click(); });
+$('wait-clear').addEventListener('click', () => setOption({ waitImage: '' }));
+$('wait-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f || !IMG_EXT[f.type]) return toast('PNG / JPEG / GIF / WebP の画像を選んでください', true);
+  try { setOption({ waitImage: await upload(`wait_${Date.now()}${IMG_EXT[f.type]}`, f) }); } catch (err) { toast(err.message, true); }
+});
+
+// 制限時間: 残りは「終わる時刻」から計算して、0.25秒ごとに表示を更新
+const fmt = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+function timerLeft() {
+  const t = S.timer || {}, o = optionsOf();
+  if (t.endsAt) return Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000));
+  return t.left ?? o.timerSec;
+}
+function renderTimer() {
+  if (!S) return;
+  const t = S.timer || {}, left = timerLeft(), running = !!t.endsAt && left > 0;
+  $('timer-left').textContent = fmt(left);
+  $('timer-left').className = `min-w-[4.5rem] text-2xl font-bold tabular-nums ${t.endsAt && left === 0 ? 'text-red-300' : 'text-[var(--text-heading)]'}`;
+  setDisabled($('timer-start'), running);
+  setDisabled($('timer-stop'), !running);
+  $('timer-start').textContent = t.left != null && !t.endsAt ? '続きから' : 'スタート';
+  $('timer-note').textContent = t.endsAt && left === 0 ? '時間になりました' : optionsOf().timerShow ? '配信画面にも出ます' : '配信画面には出しません（登録タブで変えられます）';
+}
+setInterval(renderTimer, 250);
+$('timer-start').addEventListener('click', () => act({ type: 'timer', cmd: 'start' }));
+$('timer-stop').addEventListener('click', () => act({ type: 'timer', cmd: 'stop' }));
+$('timer-reset').addEventListener('click', () => act({ type: 'timer', cmd: 'reset' }));
 
 /* ---------- 音(BGM・効果音) ---------- */
 const audioOf = () => Object.assign({}, C.DEFAULT_AUDIO, S.audio);
