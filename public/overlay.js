@@ -62,13 +62,14 @@ function render() {
 /* ---------- 指名ボード ---------- */
 let prevOpen = new Set(), prevStamp = new Set(), prevDup = new Set();
 // 指名カード1枚(指名ボードとピックアップで共通)
-function cardHtml(l, playerId, stamp, dup, pop) {
+// wait: 裏面の下の文字(指名待ち / 選択希望選手 など)
+function cardHtml(l, playerId, stamp, dup, pop, wait = '指名待ち') {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(l.color)}"><div class="in">
       <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(l.name)}</div></div>
         <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<b>${esc(p ? p.name : '')}</b></div>
         ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
-      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(l.name)}</div><div class="koma">指</div><div class="wait">指名待ち</div></div>
+      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(l.name)}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
     </div></div>`;
 }
 // めくる: 裏の状態から少し待って表へ(3D はめくっている間だけ)
@@ -158,7 +159,8 @@ function renderSpot(onBoard) {
   const isOpen = !!n.revealed;
   if (S.spot !== prevSpot) {
     // 次の人: 裏のカードを出す(もうめくってあれば表で)
-    sp.innerHTML = `<div class="spotcard">${cardHtml(l, isOpen ? n.playerId : null, '', false, false)}</div>`;
+    // ピックアップは指名が済んでいるので、裏はプロ野球の読み上げと同じ「第◯巡 選択希望選手」
+    sp.innerHTML = `<div class="spotcard">${cardHtml(l, isOpen ? n.playerId : null, '', false, false, `第${S.round}巡 選択希望選手`)}</div>`;
     sp.querySelector('.spotcard').classList.add('enter');
   } else if (isOpen && !prevSpotOpen) {
     // めくる

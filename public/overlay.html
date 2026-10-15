@@ -27,7 +27,8 @@
   .grid { display: grid; gap: 34px 40px; transition: opacity .4s; }
   .grid.hide { opacity: 0; }
   /* ピックアップ公開: 1人のカードを大きく */
-  #spot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-top: 150px; box-sizing: border-box; opacity: 0; transition: opacity .4s; pointer-events: none; }
+  /* 指名ボードと同じ枠(見出しの下〜画面の下)の真ん中に置く */
+  #spot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px 40px 40px; box-sizing: border-box; opacity: 0; transition: opacity .4s; pointer-events: none; }
   #spot.on { opacity: 1; }
   #spot .spotcard { zoom: 1.75; }
   #spot .spotcard.enter { animation: spotIn .45s cubic-bezier(.3,1.4,.5,1) both; }
@@ -83,7 +84,7 @@
 </head>
 <body>
 <div id="stage">
-  <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div></div><div id="spot"></div></section>
+  <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div></section>
   <section id="sc-teams" class="scene bg"><h1 id="teams-title"></h1><div class="area"><div id="teams" class="teams"></div></div></section>
   <section id="sc-roulette" class="scene"><iframe id="roulette" src="roulette.html?layout=horizontal"></iframe></section>
 </div>
