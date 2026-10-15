@@ -90,7 +90,7 @@ function render() {
     b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on);
     b.classList.toggle('text-[var(--text-muted)]', !on); b.classList.toggle('hover:text-[var(--text-default)]', !on);
   });
-  show($('demo-banner'), demo, 'flex'); show($('demo-start'), !demo, 'flex');
+  show($('demo-banner'), demo, 'flex'); show($('demo-enter'), !demo, 'inline-flex');
   renderRun();
   renderRoster();
   renderAudio();
