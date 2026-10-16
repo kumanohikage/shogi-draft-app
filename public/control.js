@@ -233,7 +233,7 @@ function renderSceneEdit(g) {
   // その場面の BGM(同じ曲が続く場面では止めずにそのまま流れる)
   const names = g.bgm && g.bgm !== '-' && !bgmList.includes(g.bgm) ? [...bgmList, g.bgm] : bgmList;
   const bgmSel = `<div class="leading-normal"><label class="${LABEL}" for="pb-${g.id}">BGM</label><div class="relative w-80"><select id="pb-${g.id}" data-prog-bgm="${g.id}" class="appearance-none w-full pl-3 pr-10 ${INPUT} cursor-pointer">
-      <option value="" ${!g.bgm ? 'selected' : ''}>決めない（音のボタンの曲のまま）</option><option value="-" ${g.bgm === '-' ? 'selected' : ''}>BGM なし</option>
+      <option value="" ${!g.bgm ? 'selected' : ''}>設定なし</option><option value="-" ${g.bgm === '-' ? 'selected' : ''}>BGM なし</option>
       ${names.map((nm) => `<option value="${esc(nm)}" ${nm === g.bgm ? 'selected' : ''}>♪ ${esc(nm.replace(/\.[^.]+$/, ''))}${bgmList.includes(nm) ? '' : '（見つかりません）'}</option>`).join('')}</select>${ICON.chevron}</div></div>`;
   const memo = `<div class="leading-normal"><label class="${LABEL}" for="pm-${g.id}">メモ（自分用。配信には出ません）</label><textarea id="pm-${g.id}" rows="6" data-prog-memo="${g.id}" placeholder="話すこと・台本など" class="${TEXTAREA} resize-y">${esc(g.memo || '')}</textarea></div>`;
   // ドラフトの場面は「⚙ 進め方」のときだけメモを出す(本番の画面は指名に集中)
