@@ -192,12 +192,6 @@ function hash(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCod
 // 毎フレーム進める処理(fn(dt) が true を返したら終わり)
 let tickers = [];
 const ticker = (fn) => new Promise((res) => tickers.push({ fn, res }));
-// 外れのスタンプ: 3D の位置に重ねて「外れ」をドンと押す
-function stamp(text, at) {
-  const v = at.clone().project(camera), el = document.createElement('div');
-  el.className = 'stamp'; el.textContent = text; el.style.left = `${(v.x * 0.5 + 0.5) * W}px`; el.style.top = `${(-v.y * 0.5 + 0.5) * H}px`;
-  $('fx').appendChild(el); setTimeout(() => el.remove(), 950);
-}
 // 試作(チェック画面の「試作」で入る): 焦らしと手ごたえ。D.proto のときだけ使う
 const proto = () => !!(D && D.proto);
 // ヒットストップ: 決まった瞬間に 0.08 秒ほど動きを止め、光と揺れを重ねる(ゲームの「手ごたえ」の定番)
@@ -351,6 +345,8 @@ async function teamCutin(lot, team, last = false, win = false) {
 }
 // 最後に残った1チームか(それまで全部外れ)
 const isLast = (lot) => D.order.indexOf(lot) === D.lots.length - 1;
+// 最後から2番目か(ここの結果で、最後まで決まる)
+const penult = (lot) => D.order.indexOf(lot) === D.lots.length - 2;
 // 開幕: 指名された選手と競合数(ルーレットと同じ)
 function intro(d) { sound.reach(2); return cutin(d.player.name, 't-gold', { dur: 1500, sub: `${d.lots.length}チーム競合!!`, small: d.player.name.length > 8 }); }
 // 当たり: ルーレットの決着と同じ音・光・紙吹雪
@@ -485,18 +481,18 @@ function buildEnvelope(d) {
     applyStatic(dd) { for (let k = 0; k < dd.opened; k++) setOpenStatic(envs[dd.order[k]], dd.order[k] === dd.winLot); if (dd.done) envs.forEach((e, i) => { if (!e.open) setOpenStatic(e, i === dd.winLot); }); },
     async open(lot, win) {
       const e = envs[lot], team = D.owners[lot], c = new THREE.Color(e.lot.color);
-      const top = new THREE.Vector3(); e.g.localToWorld(top.set(0, 2.3 * 0.5, 0.2));
+      const top = new THREE.Vector3();
 
       // 1. この封筒が少し浮いて、カメラが寄る
       const zm = zoom(e), ov = overview();
       await Promise.all([camTo(zm.pos, zm.look, 0.6), tween(0.6, (k) => { e.g.position.y = e.base.y + k * 0.3; }, 'sine')]);
+      e.g.updateMatrixWorld(); e.g.localToWorld(top.set(0, 2.3 * 0.5, 0)); // 封筒の口(浮いたあとの位置)
       // 2. チーム名のカットイン(選んだくじの色)
       const sure = proto() && isLast(lot); // もう当たりと決まっている(ウイニングラン)
       await teamCutin(e.lot, team, isLast(lot), win);
       // 3. ためて、震える(試作: 心音2つぶん、止まってもう一度。決まっているときはためない)
       if (sure) await sleep(0.1);
       else if (proto()) {
-        heartbeats(2);
         await tween(0.55, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.018 * Math.sin(k * Math.PI); }, 'lin');
         await sleep(0.25);
         await tween(0.45, (k) => { e.g.rotation.z = Math.sin(now() * 46) * 0.026 * k; }, 'lin');
@@ -525,7 +521,7 @@ function buildEnvelope(d) {
         await tween(0.35, (k) => { e.card.material.opacity = Math.min(1, k * 3); e.card.position.set(0, k * 1.05, 0.01 + k * 0.11); }, 'out');
       } else if (proto()) {
         // 絞り: ゆっくり少しだけ出て(ふちの色がのぞく)、止まって、一気に出る
-        heartbeats(3, 0.5);
+        if (penult(lot)) heartbeats(3, 0.5); // 心音は、最後の結果が決まる「最後から2番目」の中袋だけ
         // 中袋は封筒の口から出す: 口より下は切り取って見せない(上のふちだけがのぞく)
         const mouth = new THREE.Vector3(); e.g.localToWorld(mouth.set(0, 2.3 / 2, 0));
         e.card.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -mouth.y)]; e.card.material.needsUpdate = true;
@@ -540,7 +536,7 @@ function buildEnvelope(d) {
       e.open = true;
       if (!win) {
         sound.lose();
-        if (proto()) { const at = new THREE.Vector3(); e.card.getWorldPosition(at); stamp('外れ', at); fx.heat += 1; }
+        if (proto()) fx.heat += 1;
         await sleep(0.7);
         await Promise.all([camTo(ov.pos, ov.look, 0.5), tween(0.5, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine')]);
         return;
@@ -693,7 +689,7 @@ function buildAmida(d) {
         const want = slowSeg(s) ? 0.28 : 1;
         if (want < 1 && !slowNow) { slowNow = true; fx.dimT = 0.85; beatAt = 0; }
         if (want === 1 && slowNow) { slowNow = false; fx.dimT = 0.6; }
-        if (slowNow && t >= beatAt) { sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
+        if (slowNow && t >= beatAt) { if (penult(lane)) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
         if (leaveSeg(s) && q === 0 && !paused.has(s)) { paused.add(s); pause = 0.5; sound.stopThud(); }
         if (pause > 0) { pause -= dt; met.glow.material.opacity = 0.45 + 0.35 * Math.abs(Math.sin(t * 14)); }
         else {
@@ -722,7 +718,7 @@ function buildAmida(d) {
       tween(0.6, (k) => { met.u.uFade.value = 1 - k; met.head.material.opacity = 1 - k; met.glow.material.opacity = 0.45 * (1 - k); }, 'out').then(() => { root.remove(met.points, met.head, met.glow); meteors.delete(met); });
       setGoal(p.end, win ? 'win' : 'lose');
       tween(0.4, (k) => goals[p.end].scale.setScalar(gs * (1 + Math.sin(k * Math.PI) * 0.3)), 'out');
-      if (!win) { sound.lose(); if (proto()) { stamp('外れ', goals[p.end].position.clone().applyMatrix4(root.matrixWorld)); fx.heat += 1; } await sleep(0.9); return; }
+      if (!win) { sound.lose(); if (proto()) fx.heat += 1; await sleep(0.9); return; }
       // 4. 当たり: ルーレットと同じ決着。そのあと、まだ通っていない道も全部見せる(公平に決まったことがわかるように)
       await finish(end, team, 0.8);
       await sleep(2.6);

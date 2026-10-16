@@ -35,10 +35,6 @@
   @keyframes resShake { 25% { transform: translate(-6px, 3px); } 50% { transform: translate(5px, -4px); } 75% { transform: translate(-3px, -2px); } }
   @keyframes shineMove { from { transform: translateX(-120%); } to { transform: translateX(650%); } }
   #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
-  /* 試作: 外れのスタンプ(その場所にドンと押す) */
-  .stamp { position: absolute; transform: translate(-50%, -50%) rotate(-8deg); font: normal 92px/1 'Dela Gothic One', sans-serif; color: #f4efe6; padding: 10px 26px; border: 8px solid #f4efe6; border-radius: 18px;
-    background: rgba(40,30,22,.55); text-shadow: 0 4px 0 rgba(0,0,0,.5); box-shadow: 0 0 0 4px rgba(0,0,0,.35); animation: stampIn .9s cubic-bezier(.2,1.6,.4,1) both; }
-  @keyframes stampIn { 0% { transform: translate(-50%, -50%) rotate(-8deg) scale(2.6); opacity: 0; } 22% { transform: translate(-50%, -50%) rotate(-8deg) scale(.92); opacity: 1; } 32% { transform: translate(-50%, -50%) rotate(-8deg) scale(1); } 80% { opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(-8deg) scale(1); opacity: 0; } }
   #flash.go { animation: flash var(--fd, .5s) ease-out; }
   @keyframes flash { 0% { opacity: var(--fo, .9); } 100% { opacity: 0; } }
   /* カットイン(ルーレットと同じ作り) */
