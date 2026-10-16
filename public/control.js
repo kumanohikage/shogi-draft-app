@@ -95,7 +95,7 @@ function render() {
   setDisabled($('undo'), !canUndo);
   $('undo').classList.toggle('hidden', ui.tab === 'prog'); // 進行表では、下のバーのオレンジの左にある
   document.querySelectorAll('[data-scene]').forEach((b) => {
-    const on = b.dataset.scene === S.scene;
+    const on = b.dataset.scene === S.scene || (b.dataset.scene === 'roulette' && S.scene === 'lots');
     b.setAttribute('aria-pressed', on);
     b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on);
     b.classList.toggle('text-[var(--text-muted)]', !on); b.classList.toggle('hover:text-[var(--text-default)]', !on);
@@ -932,7 +932,7 @@ function renderAudio() {
   const sb = C.progItem(S)?.bgm;
   if (bgmList.length && sb) { $('bgm-hint').textContent = sb === '-' ? 'いまの場面は「BGM なし」に決めています（進行表の場面の設定）。' : `いまの場面は「${sb.replace(/\.[^.]+$/, '')}」が流れます（進行表の場面の設定）。`; return; }
   $('bgm-hint').textContent = bgmList.length
-    ? '抽選ルーレットの間は BGM がゆっくり消え、ほかの画面に戻るとゆっくり戻ります。'
+    ? '抽選の演出の間は BGM がゆっくり消え、ほかの画面に戻るとゆっくり戻ります。'
     : '曲がまだありません。「曲を追加」で音声ファイルを選ぶか、メニューの「ファイル → BGMフォルダを開く」に入れてください。';
 }
 $('bgm-track').addEventListener('change', (e) => setAudio({ bgm: e.target.value, bgmOn: true }));

@@ -299,3 +299,12 @@ console.log('巡ごとの抽選の方式 ok');
   assert.deepStrictEqual([1, 2].map((r) => C.lotteryModeOf(old, r)), ['wheel', 'amida']);
 }
 console.log('出揃いました ok');
+// 「抽選」タブ: 封筒・あみだ・くじを選んでいる間は lots、回しているルーレットは roulette
+{
+  let s = C.apply(C.apply(init0(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p' }] }), { type: 'setOption', patch: { lotteryModes: ['envelope'] } });
+  for (const l of s.leaders) s = C.apply(s, { type: 'nominate', leaderId: l.id, playerId: s.players[0].id });
+  s = C.apply(C.apply(s, { type: 'reveal' }), { type: 'drawLottery', playerId: s.players[0].id }, () => 0.5);
+  s = C.apply(s, { type: 'setScene', scene: 'board' });
+  assert.strictEqual(C.apply(s, { type: 'setScene', scene: 'roulette' }).scene, 'lots');
+}
+console.log('抽選タブ ok');

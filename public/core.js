@@ -416,7 +416,12 @@
         if (optionsOf(s).flowRound) { s.scene = 'round'; s.timer = { endsAt: null, left: null }; } // 見出しから「始める」でタイマー開始
         else { s.scene = roundStartScene(s); startRoundTimer(s, action.now || Date.now()); }
         break;
-      case 'setScene': s.scene = action.scene; break;
+      // 「抽選」の画面は、いまの抽選の方式に合わせる(くじを選ぶ・封筒・あみだは lots、回しているルーレットは roulette)
+      case 'setScene': {
+        const L = s.lottery, onLots = L && L.mode && L.mode !== 'roulette' && (L.mode !== 'wheel' || L.phase === 'pick' || L.phase === 'ready');
+        s.scene = action.scene === 'roulette' && onLots ? 'lots' : action.scene;
+        break;
+      }
       // 巡の見出しから、指名を始める(待ち時間の画面か指名ボードへ。タイマー開始)
       case 'roundStart': s.scene = roundStartScene(s); startRoundTimer(s, action.now || Date.now()); break;
       // 番組の CSV 読み込み(大会・進め方・見た目・進行表)。ドラフトの途中でも名簿と結果はそのまま
