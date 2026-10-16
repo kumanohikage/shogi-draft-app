@@ -52,6 +52,39 @@
   @keyframes roundIn { from { opacity: 0; transform: scale(1.6); } }
   @keyframes bandIn2 { from { opacity: 0; transform: translateY(20px); } }
   @keyframes tFadeIn { from { opacity: 0; } }
+  /* ---------- くじ(選ぶ・封筒・あみだ) ---------- */
+  .lotshead { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 6px; }
+  .lotshead img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+  .lotshead .pn { font: normal 76px 'Dela Gothic One', sans-serif; color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00; }
+  .lotshead .pk { padding: 8px 26px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 34px 'Noto Sans JP'; }
+  .lotsbody { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 60px 16px; }
+  .lots { display: flex; gap: 36px; justify-content: center; flex-wrap: wrap; }
+  .lot { width: 220px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .lot .face { position: relative; width: 220px; height: 220px; border-radius: 28px; background: var(--lc); box-shadow: 0 14px 30px rgba(0,0,0,.4), inset 0 -10px 0 rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; color: #fff; font: normal 120px 'Dela Gothic One', sans-serif; text-shadow: 0 4px 0 rgba(0,0,0,.25); }
+  .lot .nm { font: 900 34px 'Noto Sans JP'; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); min-height: 50px; text-align: center; }
+  .lot .cl { font: 900 30px 'Noto Sans JP'; color: #fff3d6; padding: 2px 18px; border-radius: 999px; background: rgba(20,14,8,.7); }
+  .lot.taken .face { filter: saturate(.9); }
+  .lot.taken .nm { padding: 4px 20px; border-radius: 12px; background: #fffaf0; color: #2a1606; text-shadow: none; }
+  .lot.pop .face { animation: lotPop .45s cubic-bezier(.3,1.6,.5,1) both; }
+  @keyframes lotPop { from { transform: scale(1.25); } }
+  /* 封筒 */
+  .env .face { height: 160px; border-radius: 14px; font-size: 80px; overflow: hidden; }
+  .env .face::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 80px; background: linear-gradient(170deg, rgba(255,255,255,.28), rgba(255,255,255,.08)); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+  .env .res { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 900 40px 'Noto Sans JP'; border-radius: 14px; }
+  .env .res.win { background: linear-gradient(160deg, #fff7d6, #ffd54a); color: #a3150f; text-shadow: none; box-shadow: inset 0 0 0 6px #c0261e; }
+  .env .res.lose { background: #e9e4dc; color: #6a6258; text-shadow: none; }
+  .env .res.anim { animation: envOpen .7s cubic-bezier(.3,1.4,.5,1) both; }
+  @keyframes envOpen { from { transform: rotateX(90deg); } }
+  .lot.win .face { box-shadow: 0 0 0 8px #ffd54a, 0 0 60px 12px rgba(255,200,60,.9); }
+  .lotsnote { align-self: center; margin: 0 0 36px; padding: 12px 40px; border-radius: 999px; background: rgba(20,14,8,.85); color: #fff3d6; font: 900 40px 'Noto Sans JP'; white-space: nowrap; }
+  /* あみだ */
+  .amida { position: relative; }
+  .amida svg { display: block; overflow: visible; }
+  .amida .cover { position: absolute; left: -20px; right: -20px; top: 120px; bottom: 100px; border-radius: 22px; background: repeating-linear-gradient(45deg, #3a2410, #3a2410 22px, #2c1a0a 22px, #2c1a0a 44px); box-shadow: 0 14px 30px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; color: #f3d27a; font: normal 90px 'Dela Gothic One', sans-serif; transition: opacity .6s; }
+  .amida .cover.off { opacity: 0; }
+  .amida .trace { fill: none; stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
+  .amida .trace.anim { animation: amidaTrace 2.6s ease-in-out both; }
+  @keyframes amidaTrace { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
   @keyframes tFadeOut { to { opacity: 0; } }
   /* 立ち絵(リーダー紹介・ピックアップの前): 立ち絵＋名前の帯 */
   .standwrap { position: absolute; inset: 0; }
@@ -153,6 +186,7 @@
 <div id="stage">
   <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="stand"></div><div id="board-timer" class="timer corner"></div></section>
   <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><img id="wait-img" alt=""></div><div id="wait-timer" class="timer corner"></div></section>
+  <section id="sc-lots" class="scene bg"><h1 id="lots-title"></h1><div id="lots-head" class="lotshead"></div><div id="lots-body" class="lotsbody"></div><div id="lots-note" class="lotsnote"></div></section>
   <section id="sc-round" class="scene bg"><h1 id="round-head"></h1><div id="round-big" class="roundbig"><b id="round-no"></b><span id="round-mode"></span></div></section>
   <section id="sc-logo" class="scene bg"><div id="logo-big" class="logobig"></div></section>
   <section id="sc-slide" class="scene bg"><h1 id="slide-title"></h1><div id="slide-body"></div></section>

@@ -64,8 +64,24 @@
     if (S.scene === 'round' && !C.draftComplete(S) && !S.picks.some((p) => p.round === S.round)) {
       return { step: 0, text: `第${S.round}巡の見出しを映しています。始めると制限時間が動き出します`, main: { key: 'roundStart', label: `第${S.round}巡を始める` }, sub };
     }
+    // くじを選ぶ抽選: リーダーの並び順にくじを選ぶ → 回す / 開ける
+    if (L && L.phase === 'pick') {
+      const who = L.leaders.find((id) => L.picks[id] == null), k = L.leaders.indexOf(who) + 1;
+      const taken = new Set(Object.values(L.picks));
+      const choices = L.lots.map((x, i) => ({ key: 'lotPick', arg: String(i), label: x.label, color: x.color, off: taken.has(i) }));
+      return { step: 2, text: `<b>${name(L.playerId)}</b> の抽選: <b>${esc(C.teamLabel(S, C.leaderById(S, who)))}</b> がくじを選びます（${k} / ${L.leaders.length}人目）`, choices, main: { label: 'くじを選んでください', off: true } };
+    }
+    if (L && L.phase === 'ready') {
+      const first = esc(C.teamLabel(S, C.leaderById(S, L.leaders[0])));
+      if (L.mode === 'wheel') return { step: 2, text: `全員がくじを選びました。ルーレットを回します`, main: { key: 'lotSpin', label: 'ルーレットを回す' } };
+      return { step: 2, text: `全員が${L.mode === 'amida' ? 'あみだくじ' : '封筒'}を選びました。選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`, main: { key: 'lotOpen', label: `${L.mode === 'amida' ? 'たどる' : '開ける'}（${first}）` } };
+    }
+    if (L && L.phase === 'reveal' && (L.mode === 'envelope' || L.mode === 'amida') && !L.done) {
+      const nextWho = esc(C.teamLabel(S, C.leaderById(S, L.leaders[L.opened])));
+      return { step: 2, text: `外れ。次の${L.mode === 'amida' ? 'くじをたどります' : '封筒を開けます'}`, main: { key: 'lotOpen', label: `${L.mode === 'amida' ? 'たどる' : '開ける'}（${nextWho}）` } };
+    }
     if (L && !L.done) return { step: 2, text: `<b>${name(L.playerId)}</b> の抽選を配信画面で演出中です`, main: { label: '演出中…', off: true } };
-    if (L && L.done && S.scene === 'roulette') {
+    if (L && L.done && (S.scene === 'roulette' || S.scene === 'lots')) {
       const res = `<b>${name(L.playerId)}</b> は <b>${lname(L.winner)}</b> が交渉権確定`;
       // 重複が残っていれば、ボードに戻らず続けて次の抽選へ(再指名は全部の抽選のあと)
       if (confs.length) return { step: 2, text: `${res}。続けて <b>${name(confs[0].playerId)}</b> の重複を抽選します`, main: { key: 'draw', arg: confs[0].playerId, label: '次の抽選へ' }, sub: [{ key: 'board', label: '指名ボードに戻す' }] };
@@ -147,6 +163,9 @@
       case 'board': case 'teams': return { type: 'setScene', scene: key };
       case 'nextRound': return { type: 'nextRound' };
       case 'roundStart': return { type: 'roundStart' };
+      case 'lotPick': return { type: 'lotPick', lot: +arg };
+      case 'lotSpin': return { type: 'lotSpin' };
+      case 'lotOpen': return { type: 'lotOpen' };
       case 'progNext': return { type: 'progGo', idx: i + 1 };
       case 'progPrev': return { type: 'progGo', idx: i - 1 };
       case 'progShow': return { type: 'progGo', idx: i };

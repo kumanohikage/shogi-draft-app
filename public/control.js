@@ -301,7 +301,7 @@ function renderRun() {
   const warn = overlay.count ? '' : '<p class="mt-2 text-sm text-red-300">配信画面が開いていません。OBSのブラウザソース（またはブラウザ）で配信画面を開くと演出が流れます。開いていない間は、抽選の結果がすぐに出ます。</p>';
   $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal">${ui.view === 'live' ? warn : `<p class="text-xs text-[var(--text-muted)]">次にやること</p>
     <div class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</div>${warn}`}</div>
-    <div class="flex flex-wrap items-center gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}
+    <div class="flex flex-wrap items-center gap-2">${(n.choices || []).map((b) => `<button type="button" data-next="${b.key}" data-arg="${b.arg}" class="${BTN_SUB} gap-2 pl-3 min-w-[96px]" ${b.off ? 'disabled aria-disabled="true"' : ''} aria-label="${b.label}を選ぶ"><span class="w-5 h-5 rounded-md bg-[var(--lc)] ring-1 ring-white/30" style="--lc:${b.color}" aria-hidden="true"></span>${b.label}</button>`).join('')}${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}
       <button type="button" data-undo class="${BTN_SUB} gap-2 pl-3" ${canUndo ? '' : 'disabled aria-disabled="true"'} title="直前の操作を取り消す (Ctrl+Z)"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>1つ戻す</button>
       ${n.main ? btn({ ...n.main, label: n.main.busy ? '演出中…' : n.main.label, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 min-w-[184px] px-6')) : ''}</div>`;
 
@@ -363,7 +363,7 @@ function renderLotteryLog() {
   $('lottery-log').innerHTML = log.length ? log.slice().reverse().map((e) => e.reset
     ? `<li class="flex items-center gap-3 py-2"><span class="w-20 flex-none text-xs text-[var(--text-muted)]">${time(e.at)}</span>${badge('wait', 'リセット')}<span class="text-sm text-[var(--text-muted)]">ドラフトを最初からにしました</span></li>`
     : `<li class="flex flex-wrap items-center gap-3 py-2"><span class="w-20 flex-none text-xs text-[var(--text-muted)]">${time(e.at)}</span>${e.canceledAt ? badge('dup', '取り消し') : badge('ok', '有効')}
-      <span class="text-sm ${e.canceledAt ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-heading)]'}">第${e.round}巡 <b>${name(e.playerId)}</b>（${e.leaders.map(lname).join(' / ')}）→ <b>${lname(e.winner)}</b></span>
+      <span class="text-sm ${e.canceledAt ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-heading)]'}">第${e.round}巡 <b>${name(e.playerId)}</b>（${e.leaders.map(lname).join(' / ')}）→ <b>${lname(e.winner)}</b></span>${e.picks ? `<span class="text-xs text-[var(--text-muted)]">${e.leaders.map((id) => `${esc(e.lots[e.picks[id]])}→${lname(id)}`).join(' / ')}（当たり ${esc(e.lots[e.winLot])}）</span>` : ''}
       ${e.canceledAt ? `<span class="text-xs text-red-300">${time(e.canceledAt)} に取り消し</span>` : ''}</li>`).join('')
     : '<li class="py-2 text-sm text-[var(--text-muted)]">まだ抽選はありません</li>';
 }
@@ -737,6 +737,7 @@ function renderShow() {
   if (document.activeElement !== $('opt-transsec')) $('opt-transsec').value = o.transSec;
   if (document.activeElement !== $('opt-transcut')) $('opt-transcut').value = o.transCut || '';
   if (document.activeElement !== $('opt-fade')) $('opt-fade').value = o.fadeSec;
+  $('opt-leadercolors').checked = !!o.leaderColors;
   $('trans-video-name').textContent = o.transVideo || 'まだありません';
   if (document.activeElement !== $('in-rounds')) $('in-rounds').value = S.rounds;
   for (const k of ['flowRound', 'flowWait', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
@@ -834,7 +835,7 @@ function renderOptions() {
   const o = optionsOf();
   // 順番指名の巡が1つもなければ、順番の設定は使わない
   setDisabled($('opt-order'), !o.roundModes.slice(0, S.rounds).includes('order'));
-  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
+  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-lotmode', o.lotteryMode], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
   $('opt-timershow').checked = !!o.timerShow;
   $('opt-timerauto').checked = !!o.timerAuto;
   // 巡: 1行に1巡(指名のしかた＋待ち時間の画像)
@@ -859,6 +860,9 @@ document.addEventListener('change', (e) => {
     setOption({ roundModes: Array.from({ length: S.rounds }, (_, i) => m[i] || 'bid') });
   } else if (t.id === 'opt-order') setOption({ orderStyle: t.value });
   else if (t.id === 'opt-lottery') setOption({ lotteryStyle: t.value });
+  // くじを選ぶ方式では、くじの色と紛らわしいので、枠はリーダーの色をやめて落ち着いた色に(大会の見た目で戻せる)
+  else if (t.id === 'opt-lotmode') setOption({ lotteryMode: t.value, leaderColors: t.value === 'roulette' });
+  else if (t.id === 'opt-leadercolors') setOption({ leaderColors: t.checked });
   else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 300)) });
   else if (t.id === 'opt-timershow') setOption({ timerShow: t.checked });
   else if (t.id === 'opt-timerauto') setOption({ timerAuto: t.checked });

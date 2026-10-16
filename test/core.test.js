@@ -233,3 +233,29 @@ console.log('番組の CSV ok');
   assert.deepStrictEqual(C.programOf(t).slice(0, 2).map((g) => g.bgm), ['op.mp3', '-']);
 }
 console.log('場面の BGM ok');
+// くじを選ぶ抽選: 並び順に選ぶ → 当たりのくじを選んだ人が交渉権。選び終わるまで確定しない。最後の1人は残り物
+for (const mode of ['wheel', 'envelope', 'amida']) {
+  let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }, { name: 'C' }], players: [{ name: 'p' }, { name: 'q' }, { name: 'r' }] });
+  s = C.apply(s, { type: 'setOption', patch: { lotteryMode: mode } });
+  const [a, b, c] = s.leaders, p = s.players[0];
+  for (const l of [a, b, c]) s = C.apply(s, { type: 'nominate', leaderId: l.id, playerId: p.id });
+  s = C.apply(s, { type: 'reveal' });
+  s = C.apply(s, { type: 'drawLottery', playerId: p.id }, () => 0.5); // 当たりは 3本中の真ん中(1)
+  assert.strictEqual(s.lottery.phase, 'pick');
+  assert.strictEqual(s.lottery.winLot, 1);
+  assert.strictEqual(s.picks.length, 0); // まだ確定しない
+  s = C.apply(s, { type: 'lotPick', lot: 2 }); // A は ③
+  assert.throws(() => C.apply(s, { type: 'lotPick', lot: 2 })); // 同じくじは選べない
+  s = C.apply(s, { type: 'lotPick', lot: 1 }); // B は ②(当たり) → C は残りの ①
+  assert.deepStrictEqual(s.lottery.picks, { [a.id]: 2, [b.id]: 1, [c.id]: 0 });
+  assert.strictEqual(s.lottery.winner, b.id);
+  assert.strictEqual(s.lottery.phase, 'ready');
+  assert.deepStrictEqual(s.picks.map((x) => x.leaderId), [b.id]);
+  if (mode === 'wheel') { s = C.apply(s, { type: 'lotSpin' }); assert.strictEqual(s.scene, 'roulette'); }
+  else {
+    s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.done, false); // A: 外れ
+    s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.done, true); // B: 当たりで決着
+  }
+  if (mode === 'amida') assert.strictEqual(C.amidaEnd(s.lottery.amida.rungs, 1), s.lottery.amida.goal);
+}
+console.log('くじを選ぶ抽選 ok');

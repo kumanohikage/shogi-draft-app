@@ -214,7 +214,8 @@ function start(opts = {}) {
           // 抽選の演出完了の知らせと音の設定は「戻す」の対象にしない
           if (!NO_UNDO.has(msg.action.type)) { history.push(state); if (history.length > HISTORY_MAX) history.shift(); }
           state = next;
-          if (msg.action.type === 'drawLottery') {
+          if (msg.action.type === 'drawLottery' && state.lottery && state.lottery.mode && state.lottery.mode !== 'roulette') { /* くじを選ぶ方式: 選び終わるまで待つ */ }
+          else if (msg.action.type === 'drawLottery' || msg.action.type === 'lotSpin') {
             // 配信画面が開いていなければ演出は流れないので、その場で結果を出す
             if (!overlays.size) state = Core.apply(state, { type: 'lotteryDone', id: state.lottery.id });
             else lotterySafety(state.lottery.id);

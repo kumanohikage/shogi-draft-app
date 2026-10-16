@@ -76,13 +76,13 @@ function render() {
     f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
-  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); playLottery(false);
+  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); renderLots(); playLottery(false);
   first = false;
 }
 
 /* ---------- 場面の切り替え ----------
  * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
-const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round'];
+const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round', 'lots'];
 let shown = null, prevProg = null, transBusy = false;
 function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); }
 function sceneSwitch(scene) {
@@ -166,9 +166,11 @@ async function runTransition(o) {
 let prevOpen = new Set(), prevStamp = new Set(), prevDup = new Set();
 // 指名カード1枚(指名ボードとピックアップで共通)
 // wait: 裏面の下の文字(指名待ち / 選択希望選手 など)
+const NEUTRAL = '#5b4632';
+const lc = (l) => (C.optionsOf(S).leaderColors ? l.color : NEUTRAL);
 function cardHtml(l, playerId, stamp, dup, pop, wait = '指名待ち') {
   const p = playerId && C.playerById(S, playerId);
-  return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(l.color)}"><div class="in">
+  return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(lc(l))}"><div class="in">
       <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div>
         <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && p.note ? `<small>${esc(p.note)}</small>` : ''}</div></div>
         ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
@@ -331,7 +333,7 @@ function fitSlide() {
 // 立ち絵＋名前の帯(＋紹介文 / 「第◯巡 選択希望選手」)。立ち絵が無ければアイコンを大きく丸で
 // 帯の名前: リーダー紹介はフルネーム、ほかは「チーム＋略称」
 function standHtml(l, tag, full) {
-  return `<div class="standwrap" style="--c:${esc(l.color)}">
+  return `<div class="standwrap" style="--c:${esc(lc(l))}">
     ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="" style="--sk:${+l.standScale || 1};--sx:${+l.standX || 0}px;--sy:${+l.standY || 0}px">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
     ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
     <div class="band">${esc(full ? l.name : C.teamLabel(S, l))}</div></div>`;
@@ -405,11 +407,71 @@ function renderTeams() {
       const d = isNew(key) ? k++ : -1;
       return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}${esc(pl ? pl.name : '')}</li>`;
     }).join('');
-    return `<div class="team" style="--c:${esc(l.color)}"><div class="th">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
+    return `<div class="team" style="--c:${esc(lc(l))}"><div class="th">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
   }).join('');
   for (let i = 0; i < k; i++) setTimeout(() => SE.pop(), 300 + i * 150);
   fitArea(t);
   if (first || S.scene === 'teams') prevPicks = now;
+}
+
+/* ---------- くじ: 選ぶ → 封筒を開ける / あみだをたどる ----------
+ * くじは番号順に並べる。選んだリーダーの名前をくじの下に出す。開けるのは選んだ順(リーダーの並び順) */
+let lotsPrev = { id: null, picked: 0, opened: 0, phase: '' };
+function renderLots() {
+  const L = S.lottery;
+  if (!L || !L.lots) { if (lotsPrev.id) { $('lots-body').innerHTML = ''; lotsPrev = { id: null, picked: 0, opened: 0, phase: '' }; } return; }
+  const p = C.playerById(S, L.playerId);
+  const owner = (i) => L.leaders.find((id) => L.picks[id] === i);
+  const picked = Object.keys(L.picks).length, fresh = lotsPrev.id !== L.id;
+  const live = S.scene === 'lots' && !first;
+  $('lots-title').innerHTML = titleHtml('交渉権の抽選');
+  $('lots-head').innerHTML = `${p && p.icon ? `<img src="${img(p.icon)}" alt="">` : ''}<span class="pn">${esc(p ? p.name : '')}</span><span class="pk">${L.leaders.length}チームが競合</span>`;
+  // 下の帯: いま選ぶ人 / 開ける人 / 結果
+  const who = L.leaders.find((id) => L.picks[id] == null);
+  const team = (id) => esc(C.teamLabel(S, C.leaderById(S, id)));
+  const verb = L.mode === 'amida' ? 'あみだくじ' : L.mode === 'envelope' ? '封筒' : 'くじの色';
+  $('lots-note').innerHTML = L.phase === 'pick' ? `${team(who)} が${verb}を選んでいます`
+    : L.done && L.mode !== 'wheel' ? `${team(L.winner)} が交渉権を獲得`
+    : L.phase === 'ready' ? (L.mode === 'wheel' ? 'ルーレットを回します' : `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`)
+    : L.mode === 'amida' ? `${team(L.leaders[L.opened - 1])} のくじをたどっています` : `${team(L.leaders[L.opened - 1])} の封筒`;
+  if (L.mode === 'amida') renderAmida(L, owner, live, fresh);
+  else {
+    const isEnv = L.mode === 'envelope';
+    // 開けた封筒: 選んだ順で opened 人目まで
+    const openedSet = new Set(L.leaders.slice(0, L.opened));
+    $('lots-body').innerHTML = `<div class="lots">${L.lots.map((x, i) => {
+      const o = owner(i), isOpen = isEnv && o && openedSet.has(o), win = isOpen && o === L.winner;
+      const justPicked = live && o && !fresh && picked > lotsPrev.picked && L.picks[L.leaders[picked - 1]] === i && L.phase !== 'ready';
+      const justOpened = live && isOpen && o === L.leaders[L.opened - 1] && L.opened > lotsPrev.opened;
+      return `<div class="lot ${isEnv ? 'env' : ''} ${o ? 'taken' : ''} ${justPicked ? 'pop' : ''} ${win ? 'win' : ''}" style="--lc:${x.color}">
+        <div class="face">${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫'[i]}${isOpen ? `<div class="res ${win ? 'win' : 'lose'} ${justOpened ? 'anim' : ''}">${win ? '交渉権確定' : '外れ'}</div>` : ''}</div>
+        <div class="cl">${esc(x.label)}</div><div class="nm">${o ? team(o) : '？'}</div></div>`;
+    }).join('')}</div>`;
+    if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.stamp(), 500); }
+    else if (live && picked > lotsPrev.picked) SE.pop();
+  }
+  lotsPrev = { id: L.id, picked, opened: L.opened, phase: L.phase };
+}
+// あみだくじ: 上にくじ(色＋番号)と選んだ人。横線は開けるまで隠す。たどった線は選んだ人のくじの色
+function renderAmida(L, owner, live, fresh) {
+  const n = L.lots.length, W = Math.min(1500, n * 260), H = 380, top = 20, bot = H - 20;
+  const xs = Array.from({ length: n }, (_, i) => (n === 1 ? W / 2 : 60 + i * ((W - 120) / (n - 1))));
+  const rows = L.amida.rungs.length, ys = Array.from({ length: rows }, (_, r) => top + (r + 1) * ((bot - top) / (rows + 1)));
+  const path = (lane) => { let x = lane; const pts = [[xs[x], top - 10]]; L.amida.rungs.forEach((row, r) => { const y = ys[r]; if (row.includes(x)) { pts.push([xs[x], y], [xs[x + 1], y]); x++; } else if (row.includes(x - 1)) { pts.push([xs[x], y], [xs[x - 1], y]); x--; } }); pts.push([xs[x], bot + 10]); return { pts, end: x }; };
+  const len = (pts) => pts.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
+  const opened = L.leaders.slice(0, L.opened);
+  const traces = opened.map((id, k) => { const lane = L.picks[id], { pts, end } = path(lane); return { id, lane, pts, end, len: len(pts), last: k === opened.length - 1 }; });
+  const ends = new Map(traces.map((t) => [t.end, t]));
+  const svg = `<svg width="${W}" height="${H + 110}" viewBox="0 -10 ${W} ${H + 110}">
+    ${xs.map((x) => `<line x1="${x}" y1="${top - 10}" x2="${x}" y2="${bot + 10}" stroke="#fffaf0" stroke-width="10" stroke-linecap="round"/>`).join('')}
+    ${L.amida.rungs.map((row, r) => row.map((i) => `<line x1="${xs[i]}" y1="${ys[r]}" x2="${xs[i + 1]}" y2="${ys[r]}" stroke="#fffaf0" stroke-width="10" stroke-linecap="round"/>`).join('')).join('')}
+    ${traces.map((t) => `<polyline class="trace ${t.last && live && L.opened > lotsPrev.opened ? 'anim' : ''}" points="${t.pts.map((p) => p.join(',')).join(' ')}" stroke="${L.lots[t.lane].color}" style="--len:${t.len};stroke-dasharray:${t.len}"/>`).join('')}
+    ${xs.map((x, i) => { const t = ends.get(i), hit = t && t.id === L.winner; return `<g transform="translate(${x},${bot + 58})"><circle r="40" fill="${t ? (hit ? '#ffd54a' : '#e9e4dc') : '#3a2410'}" stroke="#fff" stroke-width="5"/><text y="16" text-anchor="middle" font-family="Noto Sans JP" font-weight="900" font-size="${hit ? 30 : 40}" fill="${t ? (hit ? '#a3150f' : '#6a6258') : '#f3d27a'}">${t ? (hit ? '当たり' : '×') : '？'}</text></g>`; }).join('')}
+  </svg>`;
+  const heads = L.lots.map((x, i) => { const o = owner(i); return `<div style="position:absolute;left:${xs[i] - 110}px;top:0;width:220px;display:flex;flex-direction:column;align-items:center;gap:8px"><div class="cl" style="background:${x.color};color:#fff;font:900 34px 'Noto Sans JP';padding:6px 22px;border-radius:999px">${esc(x.label)}</div><div class="nm" style="font:900 30px 'Noto Sans JP';padding:2px 16px;border-radius:10px;${o ? 'background:#fffaf0;color:#2a1606' : 'color:#fff'}">${o ? esc(C.teamLabel(S, C.leaderById(S, o))) : '？'}</div></div>`; }).join('');
+  $('lots-body').innerHTML = `<div class="amida" style="width:${W}px;padding-top:110px">${heads}${svg}<div class="cover ${L.phase === 'reveal' ? 'off' : ''}">？</div></div>`;
+  if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.stamp(), 2600); }
+  else if (live && Object.keys(L.picks).length > lotsPrev.picked) SE.pop();
 }
 
 /* ---------- 抽選ルーレット ---------- */
@@ -421,8 +483,12 @@ function playLottery(force) {
   const p = C.playerById(S, L.playerId);
   const leaders = L.leaders.map((id) => C.leaderById(S, id));
   const f = $('roulette').contentWindow;
-  f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: leaders.map((l) => C.teamLabel(S, l)), colors: leaders.map((l) => l.color) }, '*');
-  setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.leaders.indexOf(L.winner), plan: window.__recPlan || (C.optionsOf(S).lotteryStyle === 'short' ? 'short' : '') }, '*') /* __recPlan: 紹介動画の録画用 */, 700);
+  const wheel = L.mode === 'wheel';
+  const owner = (i) => C.leaderById(S, L.leaders.find((id) => L.picks[id] === i));
+  const names = wheel ? L.lots.map((x, i) => `${x.label} ${C.teamLabel(S, owner(i))}`) : leaders.map((l) => C.teamLabel(S, l));
+  const colors = wheel ? L.lots.map((x) => x.color) : leaders.map((l) => lc(l));
+  f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: names, colors }, '*');
+  setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: wheel ? L.winLot : L.leaders.indexOf(L.winner), plan: window.__recPlan || (C.optionsOf(S).lotteryStyle === 'short' ? 'short' : '') }, '*') /* __recPlan: 紹介動画の録画用 */, 700);
 }
 addEventListener('message', (e) => {
   const m = e.data || {};
