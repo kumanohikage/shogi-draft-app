@@ -12,30 +12,43 @@
 } }
 </script>
 <style>
-  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #0b0705; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #0d0703; }
   #c { display: block; width: 100%; height: 100%; }
-  /* 1920×1080 の文字(画面の上にかぶせる) */
+  /* 1920×1080 の文字(画面の上にかぶせる。ルーレットと同じ作り) */
   #hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none; font-family: 'Noto Sans JP', sans-serif; }
-  .head { position: absolute; left: 0; right: 0; top: 34px; display: flex; align-items: center; justify-content: center; gap: 24px; }
-  .head img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 0 30px rgba(255,210,120,.6); }
-  .head .pn { font: normal 64px 'Dela Gothic One', sans-serif; color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00, 0 0 30px rgba(255,200,80,.8); }
-  .head .pk { padding: 8px 26px; border-radius: 999px; background: rgba(20,14,8,.85); color: #fff3d6; font: 900 32px 'Noto Sans JP'; }
-  .note { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); padding: 12px 40px; border-radius: 999px; background: rgba(20,14,8,.88); color: #fff3d6; font: 900 40px 'Noto Sans JP'; white-space: nowrap; box-shadow: 0 0 30px rgba(0,0,0,.6); }
-  .legend { position: absolute; right: 44px; top: 44px; padding: 10px 20px; border-radius: 14px; background: rgba(20,14,8,.7); color: #fff3d6; font: 900 22px 'Noto Sans JP'; display: flex; align-items: center; gap: 10px; }
-  .legend i { display: inline-block; width: 22px; height: 22px; border-radius: 50%; }
-  .result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.6); opacity: 0; text-align: center; transition: opacity .4s, transform .5s cubic-bezier(.2,1.5,.4,1); }
-  .result.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  .result b { display: block; font: normal 120px 'Dela Gothic One', sans-serif; color: #ffe27a; text-shadow: 0 0 4px #5a2a00, 6px 6px 0 #7a1a00, -6px 6px 0 #7a1a00, 6px -6px 0 #7a1a00, -6px -6px 0 #7a1a00, 0 0 60px rgba(255,200,60,1); }
-  .result span { display: inline-block; margin-top: 16px; padding: 8px 32px; border-radius: 999px; background: rgba(20,14,8,.85); color: #fff; font: 900 48px 'Noto Sans JP'; }
+  .head { position: absolute; left: 0; right: 0; top: 30px; display: flex; align-items: center; justify-content: center; gap: 22px; }
+  .head img { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; border: 5px solid #ffe29a; box-shadow: 0 0 24px rgba(255,200,80,.7); }
+  .head .pn { font: normal 62px 'Dela Gothic One', sans-serif; letter-spacing: .04em; background: linear-gradient(180deg, #fffbe0, #ffe066 45%, #e09b00 60%, #7a4200); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px #3a1a00; filter: drop-shadow(0 0 14px rgba(255,170,40,.6)) drop-shadow(0 5px 0 rgba(0,0,0,.5)); }
+  .head .pk { padding: 8px 24px; border-radius: 999px; background: rgba(20,12,4,.8); border: 2px solid #a8741a; color: #ffe9b8; font: 900 30px 'Noto Sans JP'; }
+  .note { position: absolute; left: 50%; bottom: 38px; transform: translateX(-50%); padding: 12px 40px; border-radius: 999px; background: rgba(20,12,4,.85); border: 2px solid #a8741a; color: #fff3d6; font: 900 38px 'Noto Sans JP'; white-space: nowrap; }
+  /* 結果: ルーレットと同じ「◯◯ 交渉権確定!」 */
+  #result { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+  #result.show { display: flex; }
+  #result .rbg { position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,40,0,.15), rgba(40,0,0,.55)); animation: fadeIn .4s both; }
+  #result .who { position: relative; font: normal 120px/1.1 'Dela Gothic One', sans-serif; letter-spacing: .04em; white-space: nowrap;
+    background: linear-gradient(180deg, #fff, #f4f4fa 45%, #b9b9cc); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 3px rgba(0,0,0,.65); filter: drop-shadow(0 0 22px rgba(255,255,255,.5)) drop-shadow(0 8px 0 rgba(0,0,0,.5)); animation: resIn .7s cubic-bezier(.2,1.6,.4,1) both; }
+  #result .who i { font-style: normal; display: inline-block; margin-right: .3em; padding: 0 .25em; border-radius: .2em; background: var(--lc); -webkit-text-fill-color: #fff; -webkit-text-stroke: 0; filter: none; }
+  #result .ok { position: relative; font: normal 170px/1.1 'Dela Gothic One', sans-serif; letter-spacing: .04em; white-space: nowrap;
+    background: linear-gradient(180deg, #fffbe0 0%, #ffe066 30%, #ff9d00 48%, #ff2020 52%, #9a0000 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 4px #3a0000; filter: drop-shadow(0 0 30px #ff5a00) drop-shadow(0 10px 0 rgba(0,0,0,.6)); animation: resInEnd 1s .15s cubic-bezier(.2,1.6,.4,1) both, resShake .12s linear 1.05s 6; }
+  #result .shine { position: absolute; inset: 0; overflow: hidden; }
+  #result .shine i { position: absolute; top: 0; bottom: 0; width: 18%; background: linear-gradient(105deg, transparent, rgba(255,255,255,.35) 50%, transparent); animation: shineMove 1.3s linear infinite; }
+  @keyframes fadeIn { from { opacity: 0; } }
+  @keyframes resIn { 0% { transform: scale(2.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes resInEnd { 0% { transform: scale(2.6) rotate(-8deg); opacity: 0; } 60% { transform: scale(.92) rotate(0); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes resShake { 25% { transform: translate(-6px, 3px); } 50% { transform: translate(5px, -4px); } 75% { transform: translate(-3px, -2px); } }
+  @keyframes shineMove { from { transform: translateX(-120%); } to { transform: translateX(650%); } }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
 </style>
 </head>
 <body>
 <canvas id="c" width="1920" height="1080"></canvas>
 <div id="hud">
   <div class="head" id="head"></div>
-  <div class="legend" id="legend"></div>
-  <div class="result" id="result"><b>交渉権確定</b><span id="result-team"></span></div>
   <div class="note" id="note"></div>
+  <div id="flash"></div>
+  <div id="result"><div class="rbg"></div><div class="who" id="result-who"></div><div class="ok">交渉権確定!</div><div class="shine"><i></i></div></div>
 </div>
 <script type="module" src="lots3d.js"></script>
 </body>

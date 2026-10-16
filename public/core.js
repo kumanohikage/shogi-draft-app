@@ -376,7 +376,7 @@
         const who = L.leaders[L.opened];
         L.opened += 1;
         const fx3 = optionsOf(s).lotFx !== '2d', win = who === L.winner;
-        s.busyUntil = (action.now || Date.now()) + (L.mode === 'amida' ? (fx3 ? (win ? 9000 : 7300) : 3200) : (fx3 ? (win ? 6800 : 5600) : 1700));
+        s.busyUntil = (action.now || Date.now()) + (L.mode === 'amida' ? (fx3 ? (win ? 8000 : 6000) : 3200) : (fx3 ? (win ? 7000 : 5400) : 1700));
         if (win) L.done = true;
         break;
       }
