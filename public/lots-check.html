@@ -57,6 +57,9 @@ function reset() {
   for (const l of S.leaders) S = C.apply(S, { type: 'nominate', leaderId: l.id, playerId: S.players[0].id });
   S = C.apply(S, { type: 'reveal' });
   S = C.apply(S, { type: 'drawLottery', playerId: S.players[0].id }, Math.random);
+  // くじは適当に選んだ状態から始める(すぐ「抽選する」を押せるように)
+  const order = S.lottery.lots.map((_, i) => i).sort(() => Math.random() - 0.5);
+  for (const lot of order) S = C.apply(S, { type: 'lotPick', lot });
 
   $('f').style.visibility = mode === 'wheel' ? 'hidden' : ''; $('r').style.visibility = mode === 'wheel' ? '' : 'hidden';
   if (mode === 'wheel' && rReady) $('r').contentWindow.postMessage({ type: 'reset' }, '*');

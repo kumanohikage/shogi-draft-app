@@ -592,7 +592,7 @@ function buildAmida(d) {
     setOwner(i, team) { if (owners[i] === team) return; owners[i] = team; tags[i].material.map = tagTexture(d.lots[i], team); tags[i].material.needsUpdate = true; },
     update: updateBulbs,
     async afterIntro() {
-      const g = d.amida.goal; setGoal(g, 'win'); sound.kakutei(); flash('#fff', 0.3, 0.35);
+      const g = d.amida.goal; goals.forEach((_, i) => setGoal(i, i === g ? 'win' : 'lose')); sound.kakutei(); flash('#fff', 0.3, 0.35);
       burst(goals[g].position.clone(), 60, WIN_COLS, 0.4, 0.6);
       await tween(0.6, (k) => goals[g].scale.setScalar(gs * (1 + Math.sin(k * Math.PI) * 0.35)), 'out');
       await sleep(0.5);
