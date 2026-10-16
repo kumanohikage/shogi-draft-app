@@ -15,7 +15,7 @@
   const lotsFor = (n) => Array.from({ length: n }, (_, i) => ({ name: LOT_COLORS[i][0], color: LOT_COLORS[i][1], label: CIRCLED[i] + LOT_COLORS[i][0] }));
   // あみだくじ: 横線をランダムに引く(隣どうしの横線は同じ段に並べない)。lane の線が最後に着く場所を返す
   function amidaRungs(n, rng) {
-    const rows = Math.max(6, n * 2 + 2), rungs = [];
+    const rows = Math.max(4, n + 2), rungs = [];
     for (let r = 0; r < rows; r++) { const row = []; for (let i = 0; i < n - 1; i++) if (rng() < 0.45 && !row.includes(i - 1)) row.push(i); if (!row.length && n > 1) row.push(Math.floor(rng() * (n - 1))); rungs.push(row); }
     // となり合う縦線どうしは、横線が2本以上あるように足す(同じ高さで1本の縦線に横線が2本触れないように)
     const free = (row, i) => !row.includes(i) && !row.includes(i - 1) && !row.includes(i + 1);

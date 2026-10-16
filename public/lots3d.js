@@ -172,12 +172,13 @@ const FONT = (px, w = 900) => `${w} ${px}px 'Noto Sans JP', sans-serif`;
 function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 const goldGrad = (g, y0, y1) => { const gr = g.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, '#fff3b0'); gr.addColorStop(0.45, '#e8b84a'); gr.addColorStop(1, '#8a5a12'); return gr; };
 // くじの名札: 金の枠に「①赤」とチーム名
+const TAG_AR = 0.52; // 名札の縦横比(高さ / 幅)
 function tagTexture(lot, team) {
-  return tex(560, 250, (g, w) => {
-    roundRect(g, 6, 6, w - 12, 238, 26); g.fillStyle = 'rgba(20,12,4,.88)'; g.fill(); g.lineWidth = 8; g.strokeStyle = goldGrad(g, 0, 250); g.stroke();
-    roundRect(g, w / 2 - 120, 18, 240, 88, 44); g.fillStyle = lot.color; g.fill(); g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke();
-    g.fillStyle = '#fff'; g.font = FONT(60); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lot.label, w / 2, 63);
-    g.fillStyle = team ? '#ffe9b8' : 'rgba(255,233,184,.6)'; g.font = FONT(team && team.length > 7 ? 54 : 70); g.fillText(team || '？', w / 2, 176);
+  return tex(560, 292, (g, w) => {
+    roundRect(g, 6, 6, w - 12, 280, 28); g.fillStyle = 'rgba(20,12,4,.88)'; g.fill(); g.lineWidth = 8; g.strokeStyle = goldGrad(g, 0, 250); g.stroke();
+    roundRect(g, w / 2 - 120, 34, 240, 84, 42); g.fillStyle = lot.color; g.fill(); g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke();
+    g.fillStyle = '#fff'; g.font = FONT(60); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lot.label, w / 2, 77);
+    g.fillStyle = team ? '#ffe9b8' : 'rgba(255,233,184,.6)'; g.font = FONT(team && team.length > 7 ? 54 : 70); g.fillText(team || '？', w / 2, 204);
   });
 }
 function sprite(texture, w, h) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false })); s.scale.set(w, h, 1); return s; }
@@ -452,12 +453,12 @@ function buildEnvelope(d) {
     const card = new THREE.Mesh(new THREE.PlaneGeometry(BW * 0.86, BH * 0.62), new THREE.MeshStandardMaterial({ color: 0xd2cabb, transparent: true, opacity: 0, roughness: 0.5, metalness: 0.1, envMapIntensity: 0.5 }));
     card.position.set(0, 0, 0.01); g.add(card);
     const tw = Math.min(gap * 0.68, 1.55);
-    const tag = sprite(tagTexture(lot, d.owners[i]), tw, tw * 0.446); tag.position.set(x, 0.02, z + 1.25); tag.renderOrder = 5; tag.material.depthTest = false; root.add(tag);
+    const tag = sprite(tagTexture(lot, d.owners[i]), tw, tw * TAG_AR); tag.position.set(x, -0.05, z + 0.6); tag.renderOrder = 5; tag.material.depthTest = false; root.add(tag);
     return { g, pivot, mz, glow, light, card, tag, lot, x, z, team: d.owners[i], base: g.position.clone(), open: false };
   });
   // 全体: 名札から、上に出た中袋までが入る高さ。チームが多いときは横幅に合わせて引く
   const fit = n * gap + 1.2, tanH = Math.tan((17.5 * Math.PI) / 180);
-  const overview = () => { const dist = Math.max(5.1 / 2 / tanH, fit / 2 / tanH / (W / H)); return { pos: new THREE.Vector3(0, 2.0, dist), look: new THREE.Vector3(0, 1.7, 0) }; };
+  const overview = () => { const dist = Math.max(5.7 / 2 / tanH, fit / 2 / tanH / (W / H)); return { pos: new THREE.Vector3(0, 2.0, dist), look: new THREE.Vector3(0, 1.6, 0) }; };
   // 開けるとき: その封筒に寄る(横にずれるだけで回さない)
   const zoom = (e) => ({ pos: new THREE.Vector3(e.x * 0.85, 2.2, Math.min(6.6, overview().pos.z * 0.8)), look: new THREE.Vector3(e.x, 2.0, 0) });
   camSet(overview());
@@ -525,8 +526,6 @@ function buildEnvelope(d) {
         e.card.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -mouth.y)]; e.card.material.needsUpdate = true;
         e.card.material.opacity = 1; e.card.position.set(0, 0, 0.12);
         await tween(SQ, (k) => { e.card.position.y = k * 0.62; }, 'sine');
-        await tween(0.5, (k) => { e.card.position.x = Math.sin(now() * 50) * 0.012 * k; }, 'lin');
-        e.card.position.x = 0;
         impact(win ? 1.4 : 0.6);
         e.card.material.clippingPlanes = null; e.card.material.needsUpdate = true;
         await tween(0.25, (k) => { e.card.position.set(0, 0.62 + k * 0.43, 0.12); }, 'out');
@@ -584,7 +583,7 @@ class Meteor {
 }
 function buildAmida(d) {
   const root = new THREE.Group(); scene.add(root);
-  const n = d.lots.length, gap = Math.max(2.0, Math.min(10, 17 / Math.max(1, n - 1))), TOP = 4.5, BOT = -4.5, rungs = d.amida.rungs, R = rungs.length;
+  const n = d.lots.length, gap = Math.max(2.0, Math.min(6.5, 12 / Math.max(1, n - 1))), TOP = 4.5, BOT = -4.5, rungs = d.amida.rungs, R = rungs.length;
   const xs = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * gap);
   const ys = Array.from({ length: R }, (_, r) => TOP - (r + 1) * ((TOP - BOT) / (R + 1)));
   const RAD = 0.03, TR = 0.07;
@@ -614,7 +613,7 @@ function buildAmida(d) {
   const showRung = (r, i, flashIt) => { const o = rungMeshes[r].find((x) => x.i === i); if (!o || o.m.visible) return; o.m.visible = true; if (flashIt) tween(0.4, (k) => { o.m.material.opacity = 0.7 * k; o.m.material.color.setRGB(0.75 + 2.5 * (1 - k), 0.52 + 2 * (1 - k), 0.2 + 1 * (1 - k)); }, 'out'); else o.m.material.opacity = 0.7; };
   const tw = Math.min(gap * 0.9, 4.6);
   const owners = d.owners.slice();
-  const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i]), tw, tw * 0.446); s.position.set(xs[i], TOP + tw * 0.3, 0); root.add(s); return s; });
+  const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i]), tw, tw * TAG_AR); s.position.set(xs[i], TOP + tw * 0.4, 0); root.add(s); return s; });
   const goalTex = (state) => tex(256, 256, (c, w, h) => {
     roundRect(c, 8, 8, w - 16, h - 16, 40);
     if (state === 'win') { const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#fff3b0'); gr.addColorStop(0.5, '#ffc21a'); gr.addColorStop(1, '#b06a00'); c.fillStyle = gr; } else c.fillStyle = state === 'lose' ? '#4a4038' : 'rgba(20,12,4,.9)';
@@ -642,7 +641,7 @@ function buildAmida(d) {
   function setSeg(m, k) { const { a, b, len } = m.userData; m.visible = k > 0.002; m.scale.y = Math.max(0.0001, len * k); m.position.copy(a).lerp(b, k / 2); }
   function joint(p, mat) { const b = ball(mat, TR); b.position.copy(p); root.add(b); return b; }
   // 画角は全体が入る位置で固定(動かさない)
-  const spanTop = TOP + tw * 0.56, spanBot = BOT - gs * 1.2, fullW = n * gap + 2, tanH = Math.tan((17.5 * Math.PI) / 180);
+  const spanTop = TOP + tw * 0.72, spanBot = BOT - gs * 1.2, fullW = n * gap + 2, tanH = Math.tan((17.5 * Math.PI) / 180);
   const h0 = (spanTop - spanBot) / 0.87, cy = (spanTop + spanBot) / 2;
   const home = { pos: new THREE.Vector3(0, cy, Math.max(h0 / 2 / tanH, fullW / 2 / tanH / (W / H))), look: new THREE.Vector3(0, cy, 0) };
   camSet(home);
@@ -665,7 +664,7 @@ function buildAmida(d) {
     async open(lane, win) {
       const team = D.owners[lane], lot = d.lots[lane], lc = new THREE.Color(lot.color);
 
-      tween(0.4, (k) => { tags[lane].scale.set(tw * (1 + 0.15 * Math.sin(k * Math.PI)), tw * 0.446 * (1 + 0.15 * Math.sin(k * Math.PI)), 1); });
+      tween(0.4, (k) => { tags[lane].scale.set(tw * (1 + 0.15 * Math.sin(k * Math.PI)), tw * TAG_AR * (1 + 0.15 * Math.sin(k * Math.PI)), 1); });
       // 1. チーム名のカットイン(選んだくじの色)
       const sure = proto() && isLast(lane);
       await teamCutin(lot, team, isLast(lane), win);
@@ -700,7 +699,8 @@ function buildAmida(d) {
         if (pause > 0) { pause -= dt; met.glow.material.opacity = 0.45 + 0.35 * Math.abs(Math.sin(t * 14)); }
         else {
           speed += (want - speed) * (1 - Math.exp(-dt * (want < speed ? 5 : 3)));
-          let step = V * speed * dt;
+          const vert = (i) => Math.abs(segs[i].userData.a.x - segs[i].userData.b.x) < 1e-3;
+          let step = V * speed * dt * (vert(Math.min(s, segs.length - 1)) ? 0.8 : 1.8);
           while (step > 0 && s < segs.length) {
             const left = lens[s] * (1 - q);
             if (step < left) { q += step / lens[s]; step = 0; }
