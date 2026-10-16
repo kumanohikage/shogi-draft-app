@@ -257,8 +257,14 @@ for (const mode of ['wheel', 'envelope', 'amida']) {
   assert.deepStrictEqual(s.picks.map((x) => x.leaderId), [b.id]);
   if (mode === 'wheel') { s = C.apply(s, { type: 'lotSpin' }); assert.strictEqual(s.scene, 'roulette'); }
   else {
-    s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.done, false); // A: 外れ
-    s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.done, true); // B: 当たりで決着
+    // シンプル: 1人ずつ開ける
+    let t = C.apply(s, { type: 'setOption', patch: { lotFx: '2d' } });
+    t = C.apply(t, { type: 'lotOpen' }); assert.strictEqual(t.lottery.done, false); // A: 外れ
+    t = C.apply(t, { type: 'lotOpen' }); assert.strictEqual(t.lottery.done, true); // B: 当たりで決着
+    // 3D: 1回で当たりまで開け、演出が終わったら決着
+    s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.opened, 2); assert.strictEqual(s.lottery.done, false);
+    s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.opened, 2);
+    s = C.apply(s, { type: 'lotteryDone', id: s.lottery.id }); assert.strictEqual(s.lottery.done, true);
   }
   if (mode === 'amida') assert.strictEqual(C.amidaEnd(s.lottery.amida.rungs, 1), s.lottery.amida.goal);
 }

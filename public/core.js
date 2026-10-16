@@ -368,16 +368,22 @@
       }
       // 色を選んだルーレット: 回す(配信画面がルーレットに切り替わって回る)
       case 'lotSpin': if (s.lottery && s.lottery.phase === 'ready') { s.lottery.phase = 'reveal'; s.scene = 'roulette'; } break;
-      // 封筒・あみだ: 選んだ順に1人ずつ開ける(たどる)。当たりが出たら決着
+      // 封筒・あみだ: 選んだ順に開ける(たどる)。当たりが出たら決着
+      // 3D: 1回で当たりまで全部開ける(ルーレットと同じく、配信画面の演出が終わったら lotteryDone で決着)
+      // シンプル: 1人ずつ開ける
       case 'lotOpen': {
         const L = s.lottery;
         if (!L || (L.phase !== 'ready' && L.phase !== 'reveal') || L.done) break;
+        if (optionsOf(s).lotFx !== '2d') {
+          if (L.phase !== 'ready') break;
+          L.phase = 'reveal'; L.opened = L.leaders.indexOf(L.winner) + 1;
+          break;
+        }
         L.phase = 'reveal';
         const who = L.leaders[L.opened];
         L.opened += 1;
-        const fx3 = optionsOf(s).lotFx !== '2d', win = who === L.winner;
-        s.busyUntil = (action.now || Date.now()) + (L.mode === 'amida' ? (fx3 ? (win ? 8000 : 6000) : 3200) : (fx3 ? (win ? 7000 : 5400) : 1700));
-        if (win) L.done = true;
+        s.busyUntil = (action.now || Date.now()) + (L.mode === 'amida' ? 3200 : 1700);
+        if (who === L.winner) L.done = true;
         break;
       }
       case 'nextRound':

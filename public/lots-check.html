@@ -48,7 +48,7 @@
 const C = window.DraftCore, { SE } = window.OverlayAudio;
 const $ = (id) => document.getElementById(id);
 const NAMES = ['飛鳥', '角田', '金森', '銀河', '桂', '香月', '王寺', '歩坂', '香川', '桂木', '銀山', '金田'];
-let S = null, ready = false, busyUntil = 0, rReady = false, spinning = false;
+let S = null, ready = false, rReady = false;
 const wheel = () => S && S.lottery.mode === 'wheel';
 function reset() {
   const n = +$('n').value, mode = $('mode').value;
@@ -57,7 +57,7 @@ function reset() {
   for (const l of S.leaders) S = C.apply(S, { type: 'nominate', leaderId: l.id, playerId: S.players[0].id });
   S = C.apply(S, { type: 'reveal' });
   S = C.apply(S, { type: 'drawLottery', playerId: S.players[0].id }, Math.random);
-  busyUntil = 0; spinning = false;
+
   $('f').style.visibility = mode === 'wheel' ? 'hidden' : ''; $('r').style.visibility = mode === 'wheel' ? '' : 'hidden';
   if (mode === 'wheel' && rReady) $('r').contentWindow.postMessage({ type: 'reset' }, '*');
   send(); render();
@@ -65,8 +65,7 @@ function reset() {
 function team(id) { const l = C.leaderById(S, id); return l ? C.teamLabel(S, l) : ''; }
 function note(L) {
   const who = L.leaders.find((id) => L.picks[id] == null);
-  const verb = L.mode === 'amida' ? 'あみだくじ' : '封筒';
-  return L.phase === 'pick' ? `${team(who)} が${verb}を選んでいます` : L.phase === 'ready' ? `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}` : '';
+  return L.phase === 'pick' ? `${team(who)} がくじの色を選んでいます` : L.phase === 'ready' ? (L.mode === 'amida' ? 'あみだくじで抽選します' : '封筒で抽選します') : '';
 }
 // ルーレット: 配信画面と同じく、区切り=くじの色、当たり=winLot
 function spin() {
@@ -85,10 +84,11 @@ function render() {
   const L = S.lottery, taken = new Set(Object.values(L.picks)), who = L.leaders.find((id) => L.picks[id] == null);
   $('lots').innerHTML = L.phase === 'pick' ? L.lots.map((x, i) => `<button type="button" data-lot="${i}" ${taken.has(i) ? 'disabled' : ''}><i style="background:${x.color}"></i>${x.label}</button>`).join('') : '';
   $('auto').disabled = L.phase !== 'pick';
-  const busy = Date.now() < busyUntil;
-  $('open').disabled = L.phase === 'pick' || L.done || busy || spinning || (wheel() && L.phase !== 'ready');
-  $('open').textContent = busy || spinning ? '演出中…' : L.done ? '決着' : wheel() ? 'ルーレットを回す' : `${L.mode === 'amida' ? 'たどる' : '開ける'}（${team(L.leaders[L.opened]) || '―'}）`;
-  $('state').textContent = L.phase === 'pick' ? `${team(who)} の番（${L.leaders.indexOf(who) + 1} / ${L.leaders.length}）` : busy || spinning ? '演出中…（結果は演出のあとで）' : L.done ? `交渉権: ${team(L.winner)}` : `当たりのくじは決まっています（${L.opened} / ${L.leaders.length} 人開けた）`;
+  // 抽選が始まったら(回す・開ける)、演出が終わって決着するまでは演出中
+  const busy = L.phase === 'reveal' && !L.done;
+  $('open').disabled = L.phase !== 'ready';
+  $('open').textContent = busy ? '演出中…' : L.done ? '決着' : wheel() ? 'ルーレットを回す' : '抽選する';
+  $('state').textContent = L.phase === 'pick' ? `${team(who)} の番（${L.leaders.indexOf(who) + 1} / ${L.leaders.length}）` : busy ? '演出中…（結果は演出のあとで）' : L.done ? `交渉権: ${team(L.winner)}` : '全員選びました。当たりのくじは決まっています';
 }
 // 選ぶ: 最後の1人は少し間をあけて残り物(本番と同じ)
 function pick(lot) {
@@ -101,20 +101,21 @@ document.addEventListener('click', (e) => {
 });
 $('auto').addEventListener('click', () => { const L = S.lottery; const free = L.lots.map((_, i) => i).filter((i) => !Object.values(L.picks).includes(i)); if (free.length) pick(free[Math.floor(Math.random() * free.length)]); });
 $('open').addEventListener('click', () => {
-  if (wheel()) { act({ type: 'lotSpin' }); spinning = true; render(); spin(); return; }
-  act({ type: 'lotOpen' }); busyUntil = S.busyUntil || 0; render(); setTimeout(render, Math.max(0, busyUntil - Date.now()) + 50); });
+  if (wheel()) { act({ type: 'lotSpin' }); spin(); return; }
+  act({ type: 'lotOpen' });
+});
 $('reset').addEventListener('click', reset);
 $('mode').addEventListener('change', reset); $('n').addEventListener('change', reset);
 // 3D の画面の準備ができたら送る / 効果音
 addEventListener('message', (e) => {
   const m = e.data || {};
-  if (m.type === 'lots3d-ready') { ready = true; send(); }
+  if (m.type === 'lots3d-ready') { ready = true; vol(); send(); }
   else if (m.type === 'roulette-ready') { rReady = true; vol(); }
-  else if (m.type === 'roulette-done' && S && m.id === S.lottery.id) { spinning = false; act({ type: 'lotteryDone', id: m.id }); }
+  else if ((m.type === 'roulette-done' || m.type === 'lots3d-done') && S && m.id === S.lottery.id && !S.lottery.done) act({ type: 'lotteryDone', id: m.id });
   else if (m.type === 'lots-sfx' && $('sound').checked && SE[m.name]) SE[m.name]();
 });
 // ルーレットは自前の音。チェックを外している間は無音
-function vol() { const f = $('r').contentWindow; f.postMessage({ type: 'volume', v: $('sound').checked ? 1 : 0 }, '*'); f.postMessage({ type: 'silence', on: !$('sound').checked }, '*'); }
+function vol() { for (const f of [$('r').contentWindow, $('f').contentWindow]) { f.postMessage({ type: 'volume', v: $('sound').checked ? 1 : 0 }, '*'); f.postMessage({ type: 'silence', on: !$('sound').checked }, '*'); } }
 $('sound').addEventListener('change', () => { SE.setVolume($('sound').checked ? 0.7 : 0); vol(); });
 // 1920×1080 の画面を枠に合わせて縮める
 const fit = () => { for (const id of ['f', 'r']) $(id).style.transform = `scale(${$('stage').clientWidth / 1920})`; };

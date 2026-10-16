@@ -226,7 +226,7 @@ function start(opts = {}) {
             }
           }
           if (msg.action.type === 'drawLottery' && state.lottery && state.lottery.mode && state.lottery.mode !== 'roulette') { /* くじを選ぶ方式: 選び終わるまで待つ */ }
-          else if (msg.action.type === 'drawLottery' || msg.action.type === 'lotSpin') {
+          else if (msg.action.type === 'drawLottery' || msg.action.type === 'lotSpin' || (msg.action.type === 'lotOpen' && Core.optionsOf(state).lotFx !== '2d')) {
             // 配信画面が開いていなければ演出は流れないので、その場で結果を出す
             if (!overlays.size) state = Core.apply(state, { type: 'lotteryDone', id: state.lottery.id });
             else lotterySafety(state.lottery.id);

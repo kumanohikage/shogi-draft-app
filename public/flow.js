@@ -76,9 +76,10 @@
     if (L && L.phase === 'ready') {
       const first = esc(C.teamLabel(S, C.leaderById(S, L.leaders[0])));
       if (L.mode === 'wheel') return { step: 2, text: `全員がくじを選びました。ルーレットを回します`, main: { key: 'lotSpin', label: 'ルーレットを回す' } };
+      if (C.optionsOf(S).lotFx !== '2d') return { step: 2, text: `全員がくじを選びました。選んだ順に${L.mode === 'amida' ? 'あみだくじをたどります' : '封筒を開けます'}`, main: { key: 'lotOpen', label: '抽選する' } };
       return { step: 2, text: `全員が${L.mode === 'amida' ? 'あみだくじ' : '封筒'}を選びました。選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`, main: { key: 'lotOpen', label: `${L.mode === 'amida' ? 'たどる' : '開ける'}（${first}）` } };
     }
-    if (L && L.phase === 'reveal' && (L.mode === 'envelope' || L.mode === 'amida') && !L.done) {
+    if (L && L.phase === 'reveal' && (L.mode === 'envelope' || L.mode === 'amida') && !L.done && C.optionsOf(S).lotFx === '2d') {
       const nextWho = esc(C.teamLabel(S, C.leaderById(S, L.leaders[L.opened])));
       return { step: 2, text: `外れ。次の${L.mode === 'amida' ? 'くじをたどります' : '封筒を開けます'}`, main: { key: 'lotOpen', label: `${L.mode === 'amida' ? 'たどる' : '開ける'}（${nextWho}）` } };
     }

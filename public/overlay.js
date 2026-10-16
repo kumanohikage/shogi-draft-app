@@ -76,6 +76,7 @@ function render() {
     f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
+  lots3dVolume(audio);
   renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); renderLots(); playLottery(false);
   first = false;
 }
@@ -429,13 +430,15 @@ function renderLots() {
   // 下の帯: いま選ぶ人 / 開ける人 / 結果
   const who = L.leaders.find((id) => L.picks[id] == null);
   const team = (id) => esc(C.teamLabel(S, C.leaderById(S, id)));
-  const verb = L.mode === 'amida' ? 'あみだくじ' : L.mode === 'envelope' ? '封筒' : 'くじの色';
+  // 3D(封筒・あみだ): 選ぶまではルーレットと同じ「くじの色」を選ぶ画面。抽選が始まったら 3D の画面に任せる(プレビューでは軽い 2D のまま)
+  const fx3 = !PREVIEW && C.optionsOf(S).lotFx !== '2d' && (L.mode === 'envelope' || L.mode === 'amida');
+  const verb = L.mode === 'amida' && !fx3 ? 'あみだくじ' : L.mode === 'envelope' && !fx3 ? '封筒' : 'くじの色';
   $('lots-note').innerHTML = L.phase === 'pick' ? `${team(who)} が${verb}を選んでいます`
     : L.done && L.mode !== 'wheel' ? `${team(L.winner)} が交渉権を獲得`
-    : L.phase === 'ready' ? (L.mode === 'wheel' ? 'ルーレットを回します' : `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`)
+    : L.phase === 'ready' ? (L.mode === 'wheel' ? 'ルーレットを回します' : fx3 ? (L.mode === 'amida' ? 'あみだくじで抽選します' : '封筒で抽選します') : `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`)
     : L.mode === 'amida' ? `${team(L.leaders[L.opened - 1])} のくじをたどっています` : `${team(L.leaders[L.opened - 1])} の封筒`;
-  // 3D(封筒・あみだ): 3D の画面に任せる。プレビューでは軽い 2D のまま
-  const use3d = !PREVIEW && C.optionsOf(S).lotFx !== '2d' && (L.mode === 'envelope' || L.mode === 'amida');
+  const use3d = fx3 && L.phase === 'reveal';
+  if (!use3d && lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots-reset' }, '*');
   for (const id of ['lots-title', 'lots-head', 'lots-body', 'lots-note']) $(id).style.display = use3d ? 'none' : '';
   $('lots3d').style.display = use3d ? 'block' : 'none';
   if (use3d) {
@@ -446,9 +449,9 @@ function renderLots() {
     lotsPrev = { id: L.id, picked, opened: L.opened, phase: L.phase };
     return;
   }
-  if (L.mode === 'amida') renderAmida(L, owner, live, fresh);
+  if (L.mode === 'amida' && !fx3) renderAmida(L, owner, live, fresh);
   else {
-    const isEnv = L.mode === 'envelope';
+    const isEnv = L.mode === 'envelope' && !fx3;
     // 開けた封筒: 選んだ順で opened 人目まで
     const openedSet = new Set(L.leaders.slice(0, L.opened));
     $('lots-body').innerHTML = `<div class="lots">${L.lots.map((x, i) => {
@@ -490,9 +493,13 @@ function renderAmida(L, owner, live, fresh) {
 // 3D のくじの画面へ状態を送る(読み込みが終わるまでは取っておく)
 let lots3dReady = false, lots3dPending = null;
 function lots3dSend(data) { if (lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots', data }, '*'); else lots3dPending = data; }
+// 3D の画面の音量(ルーレットと同じ音量の設定)。抽選の画面以外では消す
+function lots3dVolume(audio) { if (!lots3dReady) return; const f = $('lots3d').contentWindow; f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); f.postMessage({ type: 'silence', on: S.scene !== 'lots' }, '*'); }
 addEventListener('message', (e) => {
   const m = e.data || {};
-  if (m.type === 'lots3d-ready') { lots3dReady = true; if (lots3dPending) { lots3dSend(lots3dPending); lots3dPending = null; } }
+  if (m.type === 'lots3d-ready') { lots3dReady = true; if (S) lots3dVolume(Object.assign({}, C.DEFAULT_AUDIO, S.audio)); if (lots3dPending) { lots3dSend(lots3dPending); lots3dPending = null; } }
+  // 3D の演出が終わった: 決着(ルーレットの roulette-done と同じ)
+  else if (m.type === 'lots3d-done' && !PREVIEW && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
   // 3D の画面からの効果音(音量・プレビューの無音はこちらで)
   else if (m.type === 'lots-sfx' && !PREVIEW && S && S.scene === 'lots' && SE[m.name]) SE[m.name]();
 });
