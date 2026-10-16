@@ -187,7 +187,7 @@ function halo(color, size) { const s = new THREE.Sprite(new THREE.SpriteMaterial
 const GOLD = () => new THREE.MeshStandardMaterial({ color: 0xd9a420, metalness: 1, roughness: 0.28 });
 
 /* ---------- 演出の値(ルーレットと同じく、目標へなめらかに寄せる) ---------- */
-const fx = { win: 0, winT: 0, dim: 0, dimT: 0, amb: 0.15, ambT: 0.15, bulb: 'idle', shake: 0, freezeUntil: 0, heat: 0, heatNow: 0 };
+const fx = { team: null, win: 0, winT: 0, dim: 0, dimT: 0, amb: 0.15, ambT: 0.15, bulb: 'idle', shake: 0, freezeUntil: 0, heat: 0, heatNow: 0 };
 // 抽選ごとに決まった乱数(配信画面を開き直しても同じ演出になる)
 function hash(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 100000) / 100000; }
 // 毎フレーム進める処理(fn(dt) が true を返したら終わり)
@@ -375,7 +375,7 @@ function camSet(v) { cam.pos.copy(v.pos); cam.look.copy(v.look); camNow.pos.copy
 let world = null;
 function clearWorld() {
   if (world) { world.cancel = true; scene.remove(world.root); }
-  world = null; tweens = []; tickers = []; meteors.clear(); fx.heat = 0; showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.ambT = 0.15; tierLight.intensity = 0;
+  world = null; tweens = []; tickers = []; meteors.clear(); fx.heat = 0; showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.team = null; fx.ambT = 0.15; tierLight.intensity = 0;
   $('fx').innerHTML = '';
 }
 function onData(d) {
@@ -638,14 +638,50 @@ function buildAmida(d) {
   function setSeg(m, k) { const { a, b, len } = m.userData; m.visible = k > 0.002; m.scale.y = Math.max(0.0001, len * k); m.position.copy(a).lerp(b, k / 2); }
   function joint(p, mat) { const b = ball(mat, TR); b.position.copy(p); root.add(b); return b; }
   // 画角は全体が入る位置で固定(動かさない)
-  const spanTop = TOP + tw * 0.72, spanBot = BOT - gs * 1.2, fullW = n * gap + 2, tanH = Math.tan((17.5 * Math.PI) / 180);
-  const h0 = (spanTop - spanBot) / 0.87, cy = (spanTop + spanBot) / 2;
+  // 板の大きさ: 名札からゴールまでと、左右の名札がおさまる角丸の四角
+  const boardTop = TOP + tw * 0.4 + (tw * TAG_AR) / 2 + 0.55, boardBot = BOT - gs * 1.12 - 0.55;
+  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw, gs) / 2 + 0.75, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
+  const roundRectShape = (hw, hh, r) => { const sh = new THREE.Shape(); sh.moveTo(-hw + r, -hh); sh.lineTo(hw - r, -hh); sh.absarc(hw - r, -hh + r, r, -Math.PI / 2, 0); sh.lineTo(hw, hh - r); sh.absarc(hw - r, hh - r, r, 0, Math.PI / 2); sh.lineTo(-hw + r, hh); sh.absarc(-hw + r, hh - r, r, Math.PI / 2, Math.PI); sh.lineTo(-hw, -hh + r); sh.absarc(-hw + r, -hh + r, r, Math.PI, Math.PI * 1.5); return sh; };
+  const ringCurve = (hw, hh, r, z) => new THREE.CatmullRomCurve3(roundRectShape(hw, hh, r).getSpacedPoints(240).slice(0, -1).map((p) => new THREE.Vector3(p.x, p.y + boardCY, z)), true);
+  const board = new THREE.Group(); root.add(board);
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0x1c120a, metalness: 0.85, roughness: 0.32, emissive: 0x000000 });
+  const panel = new THREE.Mesh(new THREE.ShapeGeometry(roundRectShape(boardHW, boardHH, 0.9), 12), panelMat); panel.position.set(0, boardCY, -0.35); board.add(panel);
+  const goldMat = new THREE.MeshStandardMaterial({ color: 0xffc94a, metalness: 1, roughness: 0.22 });
+  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW, boardHH, 0.9, -0.1), 400, 0.26, 18, true), goldMat));
+  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW + 0.6, boardHH + 0.6, 1.3, -0.25), 400, 0.09, 12, true), goldMat));
+  // 内側の光の線(いまのチームの色に光る)
+  const innerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.42, 0.15), toneMapped: false });
+  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW - 0.42, boardHH - 0.42, 0.55, -0.2), 400, 0.035, 8, true), innerMat));
+  // 縁の電飾
+  const rimCurve = ringCurve(boardHW, boardHH, 0.9, 0.18), NF = Math.round(rimCurve.getLength() / 0.55);
+  const frameBulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 14, 10), new THREE.MeshBasicMaterial({ toneMapped: false }), NF);
+  { const dm = new THREE.Object3D(); for (let i = 0; i < NF; i++) { dm.position.copy(rimCurve.getPointAt(i / NF)); dm.updateMatrix(); frameBulbs.setMatrixAt(i, dm.matrix); frameBulbs.setColorAt(i, new THREE.Color(1, 1, 1)); } }
+  board.add(frameBulbs);
+  const FRAME_GOLD = new THREE.Color(3.2, 2.2, 0.7), fc = new THREE.Color(), teamC = new THREE.Color(), panelEm = new THREE.Color();
+  // 電飾: ふだんは金でゆっくり流れる。チームの番はその色。流れ星のあいだは速く、焦らしは全体が脈打つ、当たりは虹。外れるほど明るく
+  function updateFrame(t) {
+    const hot = 1 + fx.heatNow * 0.3;
+    if (fx.team) teamC.set(fx.team).multiplyScalar(2.6); else teamC.copy(FRAME_GOLD);
+    for (let i = 0; i < NF; i++) {
+      if (fx.bulb === 'win') fc.setHSL((i / NF + t * 0.9) % 1, 1, 0.5).multiplyScalar(3.5 * (0.6 + 0.4 * ((i + Math.floor(t * 12)) % 2)));
+      else if (fx.bulb === 'hold') fc.copy(teamC).multiplyScalar(0.55 + 0.55 * Math.abs(Math.sin(t * 5.7)));
+      else if (fx.bulb === 'spin') fc.copy(teamC).multiplyScalar((i + Math.floor(t * 28)) % 4 === 0 ? 1.3 : 0.18);
+      else if (fx.team) fc.copy(teamC).multiplyScalar((i + Math.floor(t * 12)) % 3 === 0 ? 1.2 : 0.2);
+      else fc.copy(FRAME_GOLD).multiplyScalar((i + Math.floor(t * 7)) % 6 < 2 ? 1 : 0.12);
+      frameBulbs.setColorAt(i, fc.multiplyScalar(hot));
+    }
+    frameBulbs.instanceColor.needsUpdate = true;
+    innerMat.color.copy(fx.team ? teamC : new THREE.Color(0.6, 0.42, 0.15)).multiplyScalar(fx.team ? (fx.bulb === 'hold' ? 0.5 + 0.5 * Math.abs(Math.sin(t * 5.7)) : 0.7) : 1);
+    panelEm.set(fx.team || 0x000000).multiplyScalar(fx.team ? 0.07 : 0); panelMat.emissive.lerp(panelEm, 0.08);
+  }
+  const spanTop = boardTop + 0.75, spanBot = boardBot - 0.75, fullW = boardHW * 2 + 1.8, tanH = Math.tan((17.5 * Math.PI) / 180);
+  const h0 = (spanTop - spanBot) / 0.96, cy = (spanTop + spanBot) / 2;
   const home = { pos: new THREE.Vector3(0, cy, Math.max(h0 / 2 / tanH, fullW / 2 / tanH / (W / H))), look: new THREE.Vector3(0, cy, 0) };
   camSet(home);
   return {
     root,
     setOwner(i, team) { if (owners[i] === team) return; owners[i] = team; tags[i].material.map = tagTexture(d.lots[i], team); tags[i].material.needsUpdate = true; },
-    update: updateBulbs,
+    update: (t) => { updateBulbs(t); updateFrame(t); },
     async afterIntro() {
       const g = d.amida.goal; goals.forEach((_, i) => setGoal(i, i === g ? 'win' : 'lose')); sound.kakutei(); flash('#fff', 0.3, 0.35);
       burst(goals[g].position.clone(), 60, WIN_COLS, 0.4, 0.6);
@@ -660,6 +696,7 @@ function buildAmida(d) {
     },
     async open(lane, win) {
       const team = D.owners[lane], lot = d.lots[lane], lc = new THREE.Color(lot.color);
+      fx.team = lot.color;
 
       tween(0.4, (k) => { tags[lane].scale.set(tw * (1 + 0.15 * Math.sin(k * Math.PI)), tw * TAG_AR * (1 + 0.15 * Math.sin(k * Math.PI)), 1); });
       // 1. チーム名のカットイン(選んだくじの色)
@@ -693,11 +730,11 @@ function buildAmida(d) {
         if (slow && slowSegAt !== s) { slowSegAt = s; slowV = Math.max(0.05, (lens[s] * (1 - q)) / SLOW_T); vel = slowV; } // ぐっとブレーキ
         const target = slow ? slowV : V * (s < segs.length && leaveSeg(s) ? 2.2 : 1) * (vert(Math.min(s, segs.length - 1)) ? 0.8 : 1.8);
         if (slow && !slowNow) {
-          slowNow = true; fx.dimT = 0.85; beatAt = 0;
+          slowNow = true; fx.dimT = 0.85; beatAt = 0; fx.bulb = 'hold';
           // 当たりの列とゴールのあいだへ、ゆっくりまっすぐ寄る(回さない)
           if (big) { const midY = (segs[s].userData.a.y + goals[d.amida.goal].position.y) / 2; camTo(new THREE.Vector3(gx * 0.6, midY, home.pos.z * 0.72), new THREE.Vector3(gx * 0.6, midY, 0), SLOW_T); }
         }
-        if (!slow && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
+        if (!slow && slowNow) { slowNow = false; fx.dimT = 0.6; fx.bulb = 'spin'; if (big) camTo(home.pos, home.look, 0.8); }
         // 心音: ゆっくりのあいだ(着く直前には新しく鳴らさない)
         const leftT = s < segs.length ? (lens[s] * (1 - q)) / Math.max(vel, 1e-3) : 0;
         if (slowNow && t >= beatAt && leftT > 0.35) { if (big) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
@@ -729,12 +766,12 @@ function buildAmida(d) {
       tween(0.6, (k) => { met.u.uFade.value = 1 - k; met.head.material.opacity = 1 - k; met.glow.material.opacity = 0.45 * (1 - k); }, 'out').then(() => { root.remove(met.points, met.head, met.glow); meteors.delete(met); });
       setGoal(p.end, win ? 'win' : 'lose');
       tween(0.4, (k) => goals[p.end].scale.setScalar(gs * (1 + Math.sin(k * Math.PI) * 0.3)), 'out');
-      if (!win) { sound.lose(); if (proto()) fx.heat += 1; await sleep(0.9); return; }
+      if (!win) { sound.lose(); if (proto()) fx.heat += 1; await sleep(0.9); fx.team = null; return; }
       // 4. 当たり: ルーレットと同じ決着。そのあと、まだ通っていない道も全部見せる(公平に決まったことがわかるように)
       await finish(end, team, 0.8);
       await sleep(2.6);
       showResult('', false);
-      fx.winT = 0.4; fx.ambT = 1; fx.bulb = 'idle';
+      fx.winT = 0.4; fx.ambT = 1; fx.bulb = 'idle'; fx.team = null;
       const done = new Set(D.order.slice(0, D.opened));
       const rest = d.lots.map((_, i) => i).filter((i) => !done.has(i));
       for (const l of rest) {
