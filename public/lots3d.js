@@ -492,11 +492,7 @@ function buildEnvelope(d) {
       await teamCutin(e.lot, team, isLast(lot), win);
       // 3. ためて、震える(試作: 心音2つぶん、止まってもう一度。決まっているときはためない)
       if (sure) await sleep(0.1);
-      else if (proto()) {
-        await tween(0.55, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.018 * Math.sin(k * Math.PI); }, 'lin');
-        await sleep(0.25);
-        await tween(0.45, (k) => { e.g.rotation.z = Math.sin(now() * 46) * 0.026 * k; }, 'lin');
-      } else await tween(0.5, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.02 * k; }, 'lin');
+      else await tween(0.5, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.02 * k; }, 'lin');
       e.g.rotation.z = 0;
       // 4. 開ける: 一瞬だけくじの色で光り、火花があふれる(光は残さない)
       sound.gata(); flash('#fff', 0.3, 0.45);
@@ -521,17 +517,20 @@ function buildEnvelope(d) {
         await tween(0.35, (k) => { e.card.material.opacity = Math.min(1, k * 3); e.card.position.set(0, k * 1.05, 0.01 + k * 0.11); }, 'out');
       } else if (proto()) {
         // 絞り: ゆっくり少しだけ出て(ふちの色がのぞく)、止まって、一気に出る
-        if (penult(lot)) heartbeats(3, 0.5); // 心音は、最後の結果が決まる「最後から2番目」の中袋だけ
+        // 最後から2番目(ここの結果で最後まで決まる)は、心音に合わせてゆっくり。カメラも少しずつ口へ寄る
+        const big = penult(lot), SQ = big ? 2.8 : 1.1;
+        if (big) { heartbeats(5, 0.56); fx.dimT = 0.5; camTo(new THREE.Vector3(e.x, top.y + 0.1, zm.pos.z * 0.68), new THREE.Vector3(e.x, top.y - 0.15, 0), SQ); }
         // 中袋は封筒の口から出す: 口より下は切り取って見せない(上のふちだけがのぞく)
         const mouth = new THREE.Vector3(); e.g.localToWorld(mouth.set(0, 2.3 / 2, 0));
         e.card.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -mouth.y)]; e.card.material.needsUpdate = true;
         e.card.material.opacity = 1; e.card.position.set(0, 0, 0.12);
-        await tween(1.1, (k) => { e.card.position.y = k * 0.62; }, 'sine');
+        await tween(SQ, (k) => { e.card.position.y = k * 0.62; }, 'sine');
         await tween(0.5, (k) => { e.card.position.x = Math.sin(now() * 50) * 0.012 * k; }, 'lin');
         e.card.position.x = 0;
         impact(win ? 1.4 : 0.6);
         e.card.material.clippingPlanes = null; e.card.material.needsUpdate = true;
         await tween(0.25, (k) => { e.card.position.set(0, 0.62 + k * 0.43, 0.12); }, 'out');
+        if (big) { fx.dimT = 0; camTo(zm.pos, zm.look, 0.5); }
       } else await tween(0.6, (k) => { e.card.material.opacity = Math.min(1, k * 2); e.card.position.set(0, k * 1.05, 0.01 + k * 0.09); }, 'out');
       e.open = true;
       if (!win) {
@@ -645,7 +644,8 @@ function buildAmida(d) {
   // 画角は全体が入る位置で固定(動かさない)
   const spanTop = TOP + tw * 0.56, spanBot = BOT - gs * 1.2, fullW = n * gap + 2, tanH = Math.tan((17.5 * Math.PI) / 180);
   const h0 = (spanTop - spanBot) / 0.87, cy = (spanTop + spanBot) / 2;
-  camSet({ pos: new THREE.Vector3(0, cy, Math.max(h0 / 2 / tanH, fullW / 2 / tanH / (W / H))), look: new THREE.Vector3(0, cy, 0) });
+  const home = { pos: new THREE.Vector3(0, cy, Math.max(h0 / 2 / tanH, fullW / 2 / tanH / (W / H))), look: new THREE.Vector3(0, cy, 0) };
+  camSet(home);
   return {
     root,
     setOwner(i, team) { if (owners[i] === team) return; owners[i] = team; tags[i].material.map = tagTexture(d.lots[i], team); tags[i].material.needsUpdate = true; },
@@ -677,7 +677,9 @@ function buildAmida(d) {
       const lens = segs.map((m) => m.userData.len), total = lens.reduce((a, b) => a + b, 0), BASE = 2.6 + total * 0.02, V = total / BASE;
       const tease = proto() && !sure, gx = xs[d.amida.goal], onGoal = (m) => Math.abs(m.userData.a.x - gx) < 1e-3;
       // 当たりの列を下っている(縦の線)なら、ゆっくり。上の方では焦らさない(下 2/3 だけ)
-      const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3 && segs[s].userData.a.y < TOP - (TOP - BOT) / 3;
+      const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3;
+      // 最後から2番目は、もっとゆっくり・心音・少しずつ寄る
+      const big = proto() && penult(lane);
       // 当たりの列をゆっくり下りてきて、そこから離れていく横線(「このまま行くか…行かない!」で一瞬迷う)
       const leaveSeg = (s) => tease && s > 0 && slowSeg(s - 1) && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) > 1e-3;
       joint(p.pts[0], mat); const joined = new Set([0]); const crossed = new Set();
@@ -686,9 +688,13 @@ function buildAmida(d) {
       let s = 0, q = 0, speed = 0, t = 0, pause = 0, paused = new Set(), beatAt = 0, slowNow = false;
       await ticker((dt) => {
         t += dt;
-        const want = slowSeg(s) ? 0.28 : 1;
-        if (want < 1 && !slowNow) { slowNow = true; fx.dimT = 0.85; beatAt = 0; }
-        if (want === 1 && slowNow) { slowNow = false; fx.dimT = 0.6; }
+        const want = slowSeg(s) ? (big ? 0.14 : 0.3) : 1;
+        if (want < 1 && !slowNow) {
+          slowNow = true; fx.dimT = 0.85; beatAt = 0;
+          // 当たりの列とゴールのあいだへ、ゆっくりまっすぐ寄る(回さない)
+          if (big) { const midY = (segs[s].userData.a.y + goals[d.amida.goal].position.y) / 2; camTo(new THREE.Vector3(gx * 0.6, midY, home.pos.z * 0.72), new THREE.Vector3(gx * 0.6, midY, 0), 3.2); }
+        }
+        if (want === 1 && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
         if (slowNow && t >= beatAt) { if (penult(lane)) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
         if (leaveSeg(s) && q === 0 && !paused.has(s)) { paused.add(s); pause = 0.5; sound.stopThud(); }
         if (pause > 0) { pause -= dt; met.glow.material.opacity = 0.45 + 0.35 * Math.abs(Math.sin(t * 14)); }
@@ -711,6 +717,7 @@ function buildAmida(d) {
       });
       setSeg(segs[segs.length - 1], 1); joint(p.pts[p.pts.length - 1], mat);
       if (proto()) impact(win ? 1.4 : 0.6);
+      if (big) camTo(home.pos, home.look, win ? 1.2 : 0.8);
       fx.dimT = 0; fx.bulb = 'idle';
       // 3. ゴール: 流れ星がはじけて結果
       const end = head.clone();
