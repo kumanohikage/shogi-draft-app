@@ -28,6 +28,18 @@ function standSvg(color) {
 </svg>`;
 }
 const INTROS = ['前期王者', '初参加', '居飛車の鬼', '振り飛車一筋', '', 'リベンジに燃える'];
+// 紹介のメモ(自分用。本番モードで「メモ」に出る)
+const INTRO_MEMOS = ['連覇への意気込みを聞く', '初参加の感想と、狙っている選手', '居飛車党を集めたいか聞く', '振り飛車で固めるのか', '自己紹介をしてもらう', '前期の悔しかったところ'];
+// 場面ごとの台本(自分用のメモ)
+const SCRIPTS = {
+  G_open: 'こんばんは！お試しドラフト会議へようこそ。\n今日は6人のリーダーが、48人の中から3人ずつ指名します。\n最後まで楽しんでいってください！',
+  G_about: 'この大会は、チームで戦う将棋の団体戦です。\nコメント欄で「推しの選手」もぜひ教えてください。',
+  G_rule: 'ルールを読み上げる。\n重複したら抽選になることを強調する。',
+  G_intro: '1人30秒くらいで。紹介文を読み上げてから、意気込みを聞く。',
+  G_draft: '指名の前に、各リーダーに作戦を一言ずつ。\n抽選のときは、どちらが当たるかコメントで予想してもらう。',
+  G_final: '全チームが決まりました！\n各リーダーに、チームの一言を聞く。',
+  G_end: 'ご視聴ありがとうございました！\n本戦の日程を告知して終わる。',
+};
 
 // 画像を書き出して、お試し用の初期状態を返す
 function makeDemoState(imgDir) {
@@ -38,7 +50,7 @@ function makeDemoState(imgDir) {
     fs.writeFileSync(path.join(imgDir, icon), silhouette(color));
     const stand = `demo_stand_${i + 1}.svg`;
     fs.writeFileSync(path.join(imgDir, stand), standSvg(color));
-    return { name, short: name.split(' ')[0], color, icon, stand, intro: INTROS[i] };
+    return { name, short: name.split(' ')[0], color, icon, stand, intro: INTROS[i], introMemo: INTRO_MEMOS[i] };
   });
   const players = [];
   FAMILY.forEach((f, i) => GIVEN.forEach((g, j) => {
@@ -50,6 +62,7 @@ function makeDemoState(imgDir) {
   let s = Core.initialState();
   s = Core.apply(s, { type: 'setTitle', title: 'お試しドラフト会議' });
   s = Core.apply(s, { type: 'replaceRoster', leaders, players });
+  for (const [id, memo] of Object.entries(SCRIPTS)) s = Core.apply(s, { type: 'updateProgram', id, patch: { memo } });
   return s;
 }
 
