@@ -59,7 +59,7 @@
   .standwrap .standicon { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); width: 560px; height: 560px; border-radius: 50%; object-fit: cover; border: 12px solid var(--c); box-shadow: 0 20px 50px rgba(0,0,0,.35); background: #fff; }
   .standwrap .band { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); min-width: 1000px; padding: 22px 80px; box-sizing: border-box; text-align: center;
     background: linear-gradient(90deg, #f0b400, #ffe27a 50%, #f0b400); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -8px 0 var(--c); font: 900 70px 'Noto Sans JP', sans-serif; color: #1a1205; }
-  .standwrap .tag { position: absolute; left: 50%; bottom: 210px; transform: translateX(-50%); padding: 10px 34px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 36px 'Noto Sans JP', sans-serif; white-space: nowrap; }
+  .standwrap .tag { position: absolute; left: 50%; bottom: 236px; transform: translateX(-50%); padding: 10px 34px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 36px 'Noto Sans JP', sans-serif; white-space: nowrap; }
   .standwrap.enter .stand, .standwrap.enter .standicon { animation: standIn .6s cubic-bezier(.2,.9,.3,1) both; }
   .standwrap.enter .band { animation: bandIn .5s .15s cubic-bezier(.2,.9,.3,1) both; }
   @keyframes standIn { from { opacity: 0; transform: translateX(calc(-50% + var(--sx, 0px))) translateY(calc(var(--sy, 0px) + 40px)) scale(var(--sk, 1)); } }
@@ -163,6 +163,7 @@
   <video id="trans-video" playsinline preload="auto"></video>
 </div>
 <script src="core.js"></script>
+<script src="flow.js"></script>
 <script src="overlay-audio.js"></script>
 <script src="overlay.js"></script>
 </body>

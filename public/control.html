@@ -146,23 +146,23 @@
     </div>
 
     <!-- 本番: 左に映している場面、右に「次にやること」と「メモ」、その下に次の場面 -->
-    <div id="prog-live" class="hidden grid grid-cols-[minmax(0,1fr)_12px_var(--side,420px)]">
+    <div id="prog-live" class="hidden grid grid-cols-[minmax(0,1fr)_32px_var(--side,420px)]">
       <div id="live-main" class="min-w-0 flex flex-col gap-4">
         <div class="flex items-center gap-3"><span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-primary-500/[.12] text-primary-300">映している</span><h2 id="live-title" class="text-xl font-bold text-[var(--text-heading)]"></h2></div>
         <div id="live-preview" class="relative w-full aspect-video overflow-hidden rounded-xl border border-[var(--border-default)] bg-black"><iframe id="preview-frame" title="配信画面のプレビュー" class="absolute left-0 top-0 w-[1920px] h-[1080px] origin-top-left border-0 pointer-events-none" tabindex="-1"></iframe></div>
       </div>
       <!-- 左右の境目: ドラッグで右の幅を変える -->
       <div id="live-split" role="separator" aria-orientation="vertical" aria-label="右の列の幅" aria-valuemin="300" aria-valuemax="760" aria-valuenow="420" tabindex="0" class="group flex justify-center cursor-col-resize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><span class="w-1 h-full rounded-full bg-[var(--border-default)] group-hover:bg-primary-500/60"></span></div>
-      <aside id="live-side" class="sticky top-20 self-start h-[calc(100vh-210px)] min-h-[520px] flex flex-col gap-3">
-        <div class="flex-none p-4 rounded-xl border-2 border-primary-500/60 bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-primary-300">次にやること</p><div id="live-next" class="text-base text-[var(--text-heading)] [&_b]:text-primary-300" aria-live="polite"></div></div>
-        <div class="flex-1 min-h-0 flex flex-col rounded-xl border-2 border-[var(--border-strong)] bg-[var(--bg-surface)]">
+      <aside id="live-side" class="self-start flex flex-col gap-5 pb-2">
+        <div class="flex-none p-5 rounded-xl border-2 border-primary-500/60 bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-primary-300">次にやること</p><div id="live-next" class="text-base text-[var(--text-heading)] [&_b]:text-primary-300" aria-live="polite"></div></div>
+        <div class="flex flex-col rounded-xl border-2 border-[var(--border-strong)] bg-[var(--bg-surface)]">
           <div class="flex-none flex items-center gap-1 pl-4 pr-1 pt-1"><p class="flex-1 text-xs font-bold text-[var(--text-muted)]">メモ</p>
             <button type="button" data-memo-size="-1" class="w-11 h-11 inline-flex items-center justify-center rounded-lg text-sm text-[var(--text-muted)] hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" aria-label="メモの文字を小さく">A−</button>
             <button type="button" data-memo-size="1" class="w-11 h-11 inline-flex items-center justify-center rounded-lg text-base font-bold text-[var(--text-muted)] hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" aria-label="メモの文字を大きく">A＋</button></div>
-          <div id="live-memo" tabindex="0" class="flex-1 min-h-0 overflow-auto px-4 pb-4 text-[length:var(--memo,18px)] leading-relaxed text-[var(--text-heading)] whitespace-pre-wrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"></div>
+          <div id="live-memo" tabindex="0" title="右下の角をドラッグで高さを変えられます" class="min-h-24 max-h-[70vh] resize-y overflow-auto px-5 pb-5 text-[length:var(--memo,18px)] leading-relaxed text-[var(--text-heading)] whitespace-pre-wrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"></div>
         </div>
         <div id="live-timer" class="flex-none"></div>
-        <div class="flex-none leading-normal"><p class="mb-1 text-xs text-[var(--text-muted)]">次 <span id="live-upnext" class="text-[var(--text-heading)]"></span></p>
+        <div class="flex-none leading-normal"><p class="mb-2 text-xs text-[var(--text-muted)]">次 <span id="live-upnext" class="text-[var(--text-heading)]"></span></p>
           <div id="next-preview" class="relative w-full aspect-video overflow-hidden rounded-lg border border-[var(--border-default)] bg-black"><iframe id="next-frame" title="次の場面のプレビュー" class="absolute left-0 top-0 w-[1920px] h-[1080px] origin-top-left border-0 pointer-events-none" tabindex="-1"></iframe></div></div>
       </aside>
     </div>

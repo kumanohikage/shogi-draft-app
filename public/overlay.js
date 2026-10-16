@@ -17,7 +17,12 @@ const EXPORT = new URLSearchParams(location.search).get('export'); // 画像の�
 // 管理画面の本番ビューに小さく出すプレビュー: 音を出さない・配信画面として数えない・抽選の完了を送らない
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 const PREVIEW_NEXT = new URLSearchParams(location.search).get('preview') === 'next';
+// 次のプレビュー: オレンジのボタンを押したあとの画面(押せないときは進行表の次の場面)
 function nextView(s) {
+  try {
+    const n = window.DraftFlow.nextStep(s), a = n.main && !n.main.off && window.DraftFlow.actionFor(n.main.key, n.main.arg, s);
+    if (a) { const v = C.apply(s, a, () => 0); v.lottery = v.lottery && { ...v.lottery, done: false }; return v; }
+  } catch (e) { /* 進めない操作は、進行表の次の場面で */ }
   const prog = C.programOf(s), i = C.progIdxOf(s), g = prog[i], k = s.introIdx || 0;
   if (g && g.type === 'intro' && k < s.leaders.length - 1) return { ...s, introIdx: k + 1, scene: 'intro' };
   const n = prog[i + 1];
@@ -342,11 +347,13 @@ function renderRound() {
   if (key && key !== prevRoundKey && !first) { const b = $('round-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); }
   prevRoundKey = key;
 }
-let prevIntro = '';
+let prevIntro = '', prevIntroOn = false;
 function renderIntro() {
   const l = S.leaders[Math.min(S.introIdx || 0, S.leaders.length - 1)];
   const key = l ? JSON.stringify([l, C.optionsOf(S).teamPrefix]) : '';
-  if (key === prevIntro) return;
+  const entering = S.scene === 'intro' && !prevIntroOn; // リーダー紹介に入った瞬間(最初の人)も演出する
+  prevIntroOn = S.scene === 'intro';
+  if (key === prevIntro && !entering) return;
   prevIntro = key;
   $('intro-body').innerHTML = l ? standHtml(l, l.intro || '', true) : '';
   const w = $('intro-body').querySelector('.standwrap');
@@ -406,7 +413,7 @@ function renderTeams() {
 /* ---------- 抽選ルーレット ---------- */
 function playLottery(force) {
   const L = S.lottery;
-  if (!L || !rouletteReady || S.scene !== 'roulette') return;
+  if (!L || !rouletteReady || S.scene !== 'roulette' || PREVIEW_NEXT) return; // 次のプレビューでは抽選を回さない(結果が先に見えないように)
   if (!force && (lastSpin === L.id || L.done)) return;
   lastSpin = L.id;
   const p = C.playerById(S, L.playerId);

@@ -236,6 +236,8 @@
           for (const id of ids) { const n = s.noms[id]; if (n && n.revealed && !pickOf(s, id, s.round)) s.picks.push({ round: s.round, leaderId: id, playerId: n.playerId, by: 'order' }); }
         } else confirmSingles(s);
         s.scene = 'board'; s.spotStand = false; // 公開はボードで見せる
+        // めくる演出が終わるまで次に進めない(続けて押して抽選に飛ばないように)。1枚ずつ0.26秒
+        s.busyUntil = (action.now || Date.now()) + (action.spot ? 900 : 120 + ids.length * 260 + 950);
         // spot: true なら、その人を配信画面に大きく出す(ピックアップ公開)
         s.spot = action.spot && action.leaderId ? action.leaderId : null;
         break;
@@ -243,7 +245,13 @@
       // ピックアップ公開: spotShow でその人のカードを裏のまま大きく出す → reveal(spot: true) でめくる → spotEnd で一覧へ
       case 'spotShow': s.spot = action.leaderId; s.spotStand = false; s.scene = 'board'; break;
       case 'spotStand': s.spot = action.leaderId; s.spotStand = true; s.scene = 'board'; break; // カードの前に立ち絵
-      case 'spotEnd': s.spot = null; s.spotStand = false; break;
+      case 'spotEnd': {
+        s.spot = null; s.spotStand = false;
+        // 一覧に戻ると、確定・競合のハンコが1枚ずつ(0.45秒ごと)出る。出そろうまで次に進めない
+        const n = s.leaders.filter((l) => (s.noms[l.id] || {}).revealed || pickOf(s, l.id, s.round)).length;
+        s.busyUntil = (action.now || Date.now()) + 700 + n * 450 + 700;
+        break;
+      }
       // ---------- 資料 ----------
       case 'addSlide': {
         const id = uid('S');

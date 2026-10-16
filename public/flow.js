@@ -13,10 +13,11 @@
     const prog = C.programOf(S), i = C.progIdxOf(S), item = prog[i];
     const next = prog[i + 1], prev = prog[i - 1];
     const goNext = next ? { key: 'progNext', label: `次へ（${esc(next.label)}）` } : null;
-    const goPrev = prev ? { key: 'progPrev', label: `前の場面へ（${esc(prev.label)}）` } : null;
     const info = { idx: i, total: prog.length, label: item ? item.label : '' };
     if (!item || item.type === 'draft') {
       const d = draftStep(S, opts);
+      // 演出(めくる・ハンコ)の途中は、オレンジを押せない
+      if (S.busyUntil && S.busyUntil > Date.now() && d.main && !d.main.off) d.main = { ...d.main, off: true, busy: true };
       // ドラフトが終わって最後のチーム表まで見せたら、進行表の次の場面へ
       if (C.draftComplete(S) && (!S.lottery || S.lottery.done) && S.scene !== 'roulette' && goNext && (S.scene === 'teams' || !C.optionsOf(S).flowTeams || next.type === 'final')) {
         return { ...d, step: 5, text: `全${S.rounds}巡の指名が確定しました`, main: goNext, sub: [], info };
@@ -29,8 +30,6 @@
     if (item.type === 'intro') {
       const n = S.leaders.length, k = Math.min(S.introIdx || 0, n - 1), l = S.leaders[k];
       const nl = S.leaders[k + 1];
-      if (k > 0) sub.push({ key: 'introPrev', label: '前の人へ' });
-      else if (goPrev) sub.push(goPrev);
       return {
         step: -2, info,
         text: `リーダー紹介: <b>${esc(l.name)}</b>（${k + 1} / ${n}）`,
@@ -38,7 +37,6 @@
         sub,
       };
     }
-    if (goPrev) sub.push(goPrev);
     return {
       step: -2, info,
       text: `「<b>${esc(item.label)}</b>」を映しています`,
@@ -103,8 +101,6 @@
     // 待ち時間の画面: 指名を待つ間、オレンジのボタンで画像を順に進める
     const wn = C.waitImagesOf(S).length, wi = Math.min(S.waitIdx || 0, Math.max(0, wn - 1));
     const waitMore = S.scene === 'wait' && wi < wn - 1 ? { key: 'waitNext', label: `次の画像へ（${wi + 2} / ${wn}）` } : null;
-    // 戻すのはオレンジの左の白いボタン(下のバーで送る・戻すをそろえる)
-    if (S.scene === 'wait' && wi > 0) sub.unshift({ key: 'waitPrev', label: '前の画像' });
     // 順番指名の巡: いまの番の人が指名 → 公開(公開した時点で確定)
     const turn = C.currentTurn(S);
     if (turn) {

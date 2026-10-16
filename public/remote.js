@@ -43,16 +43,13 @@ function render() {
   $('step-label').textContent = n.step >= 0 && n.step < F.STEPS.length ? F.STEPS[n.step] : '';
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''}>${b.label}</button>`;
   $('next').innerHTML = n.text || '';
-  // 下のバー: 戻す系(前の画像・前へ・前の人へ)は白でオレンジの左。ほかのサブはその上に
-  const BACK = ['waitPrev', 'progPrev', 'introPrev'];
-  const subs = (n.sub || []).filter((b) => b.key !== 'auto');
-  const back = subs.find((b) => BACK.includes(b.key));
-  $('subs').innerHTML = subs.filter((b) => b !== back).map((b) => btn(b, BTN_SUB)).join('');
-  const main = n.main ? btn(n.main, BTN_PRIMARY) : `<p class="h-14 flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
-  $('bar').innerHTML = `<div class="flex gap-2">${back ? btn(back, BTN_SUB.replace('w-full h-11', 'flex-none h-14')) : ''}<div class="flex-1 min-w-0">${main}</div></div>`;
+  // 下のバー: オレンジの左に「1つ戻す」(前へ系のボタンは無し)。ほかのサブ(おまかせ指名はお試しのときだけ)はその上に
+  const subs = (n.sub || []).filter((b) => b.key !== 'auto' || demo);
+  $('subs').innerHTML = subs.map((b) => btn(b, BTN_SUB)).join('');
+  const main = n.main ? btn({ ...n.main, label: n.main.busy ? '演出中…' : n.main.label }, BTN_PRIMARY) : `<p class="h-14 flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
+  $('bar').innerHTML = `<div class="flex gap-2"><button type="button" id="undo" class="${BTN_SUB.replace('w-full h-11', 'flex-none h-14')} gap-1 px-3" ${canUndo ? '' : 'disabled aria-disabled="true"'} aria-label="1つ戻す"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>戻す</button><div class="flex-1 min-w-0">${main}</div></div>`;
   $('scenes').innerHTML = SCENES.map(([k, t]) => `<button type="button" data-scene="${k}" aria-pressed="${S.scene === k}" class="h-11 px-2 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${S.scene === k ? 'bg-[var(--bg-page-alt)] border-primary-400 text-[var(--text-heading)]' : 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]'}">${t}</button>`).join('');
   renderNoms();
-  setDisabled($('undo'), !canUndo);
   renderTimer();
 }
 
@@ -93,6 +90,19 @@ function renderTimer() {
   setDisabled($('timer-stop'), !(t.endsAt && left > 0));
 }
 setInterval(renderTimer, 250);
+// 演出が終わったら、オレンジを押せるように描き直す
+let wasBusy = false;
+setInterval(() => { if (!S) return; const busy = !!S.busyUntil && S.busyUntil > Date.now(); if (wasBusy && !busy) render(); wasBusy = busy; }, 200);
+// おまかせ指名(お試し専用): 空いている指名をランダムに。上位の選手に寄せて、ときどき重複が起きるように(管理画面と同じ)
+function autoNominate() {
+  const taken = C.pickedIds(S), free = S.players.filter((p) => !taken.has(p.id) && !p.absent), hot = free.slice(0, 3);
+  for (const l of C.pendingLeaders(S)) {
+    if (S.noms[l.id] && S.noms[l.id].playerId) continue;
+    const pool = Math.random() < 0.4 && hot.length ? hot : free;
+    const p = pool[Math.floor(Math.random() * pool.length)];
+    if (p) act({ type: 'nominate', leaderId: l.id, playerId: p.id });
+  }
+}
 
 document.addEventListener('click', (e) => {
   const b = e.target.closest('button');
@@ -101,6 +111,7 @@ document.addEventListener('click', (e) => {
   if (b.dataset.scene) act({ type: 'setScene', scene: b.dataset.scene });
   else if (key && DraftFlow.actionFor(key, arg, S)) act(DraftFlow.actionFor(key, arg, S));
   else if (key === 'roster') toast('名簿の登録はパソコンのアプリで行ってください');
+  else if (key === 'auto') autoNominate();
   else if (b.id === 'timer-start') act({ type: 'timer', cmd: 'start' });
   else if (b.id === 'timer-stop') act({ type: 'timer', cmd: 'stop' });
   else if (b.id === 'timer-reset') act({ type: 'timer', cmd: 'reset' });

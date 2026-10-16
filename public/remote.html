@@ -22,7 +22,7 @@
   </div>
 
   <!-- 次にやることとメモ(同じ並び) -->
-  <section class="grid grid-cols-2 gap-2">
+  <section class="flex flex-col gap-2">
     <div class="p-3 rounded-xl border-2 border-primary-500/60 bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-primary-300">次にやること</p><div id="next" class="text-sm text-[var(--text-heading)] [&_b]:text-primary-300 [&_ul]:hidden" aria-live="polite"></div></div>
     <div class="p-3 rounded-xl border-2 border-[var(--border-strong)] bg-[var(--bg-surface)] leading-normal"><p class="mb-1 text-xs font-bold text-[var(--text-muted)]">メモ</p><div id="memo" class="text-sm text-[var(--text-heading)] whitespace-pre-wrap"></div></div>
   </section>
@@ -51,10 +51,6 @@
     <div id="noms" class="grid grid-cols-2 gap-2"></div>
   </section>
 
-  <button type="button" id="undo" class="self-start inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">
-    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
-    1つ戻す
-  </button>
 </main>
 
 <!-- 進めるボタン: 画面の下に固定。Android のナビゲーションバー・iPhone のホームバーにかぶらないよう、

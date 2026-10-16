@@ -47,7 +47,7 @@ app.whenReady().then(async () => {
     fs.writeFileSync(path.join(OUT, name + '.jpg'), (await ov.webContents.capturePage()).toJPEG(86));
     console.log('撮影', name);
   };
-  const clickNext = async () => { await cjs("document.querySelector('#next button.h-12').click(); 0"); await wait(400); };
+  const clickNext = async () => { for (let i = 0; i < 40 && await cjs("(document.querySelector('#next button.h-12') || {}).disabled === true"); i++) await wait(150); await cjs("document.querySelector('#next button.h-12').click(); 0"); await wait(400); };
   const L = S.leaders.map((l) => l.id), P = S.players.map((p) => p.id);
 
   // 1. リーダー(一覧と1人のパネル)

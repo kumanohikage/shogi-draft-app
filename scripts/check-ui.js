@@ -72,6 +72,7 @@ app.whenReady().then(async () => {
   const L = S.leaders.map((l) => l.id), P = S.players.map((p) => p.id);
   // 以降は「次にやること」の大きなボタンを押して進める(主催者の操作と同じ)
   const next = async (expect) => {
+    for (let i = 0; i < 40 && await js("(document.querySelector('#next button.h-12') || {}).disabled === true"); i++) await wait(150); // 演出中(押せない)の間は待つ
     const label = await js("(document.querySelector('#next button.h-12') || {}).textContent || ''");
     if (expect && !label.includes(expect)) { console.log(`✗ 次のボタンが「${label}」（期待: ${expect}）`); errors++; }
     await js("document.querySelector('#next button.h-12').click()"); await wait(400);

@@ -93,6 +93,7 @@ function render() {
   $('title').textContent = S.title || 'ドラフト会議';
   document.title = `${S.title || 'ドラフト会議'} - ドラフト会議アプリ`;
   setDisabled($('undo'), !canUndo);
+  $('undo').classList.toggle('hidden', ui.tab === 'prog'); // 進行表では、下のバーのオレンジの左にある
   document.querySelectorAll('[data-scene]').forEach((b) => {
     const on = b.dataset.scene === S.scene;
     b.setAttribute('aria-pressed', on);
@@ -246,10 +247,12 @@ function renderLive(cur) {
   $('round-edit').classList.add('hidden'); // 本番では設定に行かない
   $('live-next').innerHTML = n.text || '';
   const memo = [l && l.introMemo ? `${l.name}: ${l.introMemo}` : '', cur && cur.memo ? cur.memo : ''].filter(Boolean).join('\n');
+  if ($('live-memo').dataset.text !== memo) { $('live-memo').style.height = ''; $('live-memo').dataset.text = memo; }
   $('live-memo').textContent = memo || '（メモはありません）';
   $('live-memo').classList.toggle('text-[var(--text-muted)]', !memo);
   const nl = isIntro ? S.leaders[k + 1] : null, ng = prog[i + 1];
-  $('live-upnext').textContent = nl ? nl.name : ng ? ng.label : '（最後の場面です）';
+  const m = n.main && !n.main.off ? n.main.label.replace(/<[^>]+>/g, '') : '';
+  $('live-upnext').textContent = m ? `（${m} を押したあと）` : nl ? nl.name : ng ? ng.label : '（最後の場面です）';
   $('next-preview').classList.toggle('hidden', !nl && !ng);
 }
 function fitPreview() {
@@ -293,7 +296,9 @@ function renderRun() {
   const warn = overlay.count ? '' : '<p class="mt-2 text-sm text-red-300">配信画面が開いていません。OBSのブラウザソース（またはブラウザ）で配信画面を開くと演出が流れます。開いていない間は、抽選の結果がすぐに出ます。</p>';
   $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal">${ui.view === 'live' ? warn : `<p class="text-xs text-[var(--text-muted)]">次にやること</p>
     <div class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</div>${warn}`}</div>
-    <div class="flex flex-wrap items-center gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}${n.main ? btn({ ...n.main, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 min-w-[184px] px-6')) : ''}</div>`;
+    <div class="flex flex-wrap items-center gap-2">${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}
+      <button type="button" data-undo class="${BTN_SUB} gap-2 pl-3" ${canUndo ? '' : 'disabled aria-disabled="true"'} title="直前の操作を取り消す (Ctrl+Z)"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>1つ戻す</button>
+      ${n.main ? btn({ ...n.main, label: n.main.busy ? '演出中…' : n.main.label, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 min-w-[184px] px-6')) : ''}</div>`;
 
   // 重複の一覧(抽選は「次にやること」から順番に)
   $('conflicts').innerHTML = confs.map((c) => `<div class="flex flex-wrap items-center gap-4 p-4 bg-red-500/[.12] border border-red-500/40 rounded-lg">
@@ -466,6 +471,7 @@ function selectTab(name) {
 document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
 selectTab('prog');
 
+document.addEventListener('click', (e) => { if (e.target.closest('[data-undo]')) $('undo').click(); });
 $('undo').addEventListener('click', () => {
   if (undoCancelsLottery && !confirm('直前の抽選を取り消します。\n取り消したことは「抽選の記録」に残ります。よろしいですか？')) return;
   ws.send(JSON.stringify({ type: 'undo' }));
@@ -886,6 +892,8 @@ function renderTimer() {
   $('timer-note').textContent = t.endsAt && left === 0 ? '時間になりました' : optionsOf().timerShow ? '配信画面にも出ます' : '配信画面には出しません';
 }
 setInterval(renderTimer, 250);
+let wasBusy = false;
+setInterval(() => { if (!S) return; const busy = !!S.busyUntil && S.busyUntil > Date.now(); if (wasBusy && !busy) renderRun(); wasBusy = busy; }, 200);
 $('timer-start').addEventListener('click', () => act({ type: 'timer', cmd: 'start' }));
 $('timer-stop').addEventListener('click', () => act({ type: 'timer', cmd: 'stop' }));
 $('timer-reset').addEventListener('click', () => act({ type: 'timer', cmd: 'reset' }));
