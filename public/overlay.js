@@ -515,7 +515,7 @@ function playLottery(force) {
   const f = $('roulette').contentWindow;
   const wheel = L.mode === 'wheel';
   const owner = (i) => C.leaderById(S, L.leaders.find((id) => L.picks[id] === i));
-  const names = wheel ? L.lots.map((x, i) => `${x.label} ${C.teamLabel(S, owner(i))}`) : leaders.map((l) => C.teamLabel(S, l));
+  const names = wheel ? L.lots.map((x, i) => C.teamLabel(S, owner(i))) : leaders.map((l) => C.teamLabel(S, l));
   const colors = wheel ? L.lots.map((x) => x.color) : leaders.map((l) => lc(l));
   f.postMessage({ type: 'setup', pick: p ? p.name : '', image: p && p.icon ? img(p.icon) : '', leaders: names, colors }, '*');
   setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: wheel ? L.winLot : L.leaders.indexOf(L.winner), plan: window.__recPlan || (C.optionsOf(S).lotteryStyle === 'short' ? 'short' : '') }, '*') /* __recPlan: 紹介動画の録画用 */, 700);

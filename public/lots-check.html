@@ -70,7 +70,7 @@ function note(L) {
 // ルーレット: 配信画面と同じく、区切り=くじの色、当たり=winLot
 function spin() {
   const L = S.lottery, owner = (i) => L.leaders.find((id) => L.picks[id] === i), f = $('r').contentWindow;
-  f.postMessage({ type: 'setup', pick: '香川 あおい', image: '', leaders: L.lots.map((x, i) => `${x.label} ${team(owner(i))}`), colors: L.lots.map((x) => x.color) }, '*');
+  f.postMessage({ type: 'setup', pick: '香川 あおい', image: '', leaders: L.lots.map((x, i) => team(owner(i))), colors: L.lots.map((x) => x.color) }, '*');
   setTimeout(() => f.postMessage({ type: 'spin', id: L.id, winner: L.winLot, plan: '' }, '*'), 700);
 }
 function send() {
