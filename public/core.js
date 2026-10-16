@@ -284,9 +284,9 @@
       case 'spotStand': s.spot = action.leaderId; s.spotStand = true; s.scene = 'board'; break; // カードの前に立ち絵
       case 'spotEnd': {
         s.spot = null; s.spotStand = false;
-        // 一覧に戻ると、確定・競合のハンコが1枚ずつ(0.45秒ごと)出る。出そろうまで次に進めない
+        // 一覧に戻ると、確定・競合のハンコが1枚ずつ(0.22秒ごと)出る。出そろうまで次に進めない
         const n = s.leaders.filter((l) => (s.noms[l.id] || {}).revealed || pickOf(s, l.id, s.round)).length;
-        s.busyUntil = (action.now || Date.now()) + 700 + n * 450 + 700;
+        s.busyUntil = (action.now || Date.now()) + 400 + n * 220 + 500;
         break;
       }
       // ---------- 資料 ----------

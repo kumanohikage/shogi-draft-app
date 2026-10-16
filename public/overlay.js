@@ -233,11 +233,11 @@ function renderBoard() {
     // 結果発表: 一覧を出してから、確定・競合のハンコを1枚ずつ。競合の「ジャーン」は出そろってから1回だけ
     const order = S.leaders.map((l) => l.id).filter((id) => g.querySelector(`.card[data-id="${id}"] .stamp.pop`));
     order.forEach((id, k) => {
-      const d = 700 + k * 450;
+      const d = 400 + k * 220;
       g.querySelector(`.card[data-id="${id}"] .stamp.pop`).style.animationDelay = d + 'ms';
       if (onBoard) setTimeout(() => SE.stamp(), d);
     });
-    const end = 700 + order.length * 450 + 300;
+    const end = 400 + order.length * 220 + 300;
     setTimeout(() => {
       dups.forEach((id) => cardOf(id)?.classList.add('dup'));
       if (onBoard && dups.size) SE.conflict();
