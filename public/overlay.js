@@ -376,7 +376,9 @@ function renderTimer() {
   const end = !!t.endsAt && left === 0;
   for (const el of [$('board-timer'), $('wait-timer')]) {
     el.textContent = text;
-    el.classList.toggle('on', o.timerShow && active && !S.spot);
+    // 指名を待っている間だけ出す(公開の結果・抽選・チーム表では消す)
+    const nominating = C.pendingLeaders(S).some((l) => !(S.noms[l.id] || {}).revealed);
+    el.classList.toggle('on', o.timerShow && active && !S.spot && nominating);
     el.classList.toggle('end', end);
   }
 }

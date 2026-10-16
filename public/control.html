@@ -9,7 +9,7 @@
 <body class="min-h-screen bg-[var(--bg-page)] text-[var(--text-default)] font-sans">
 <!-- ヘッダー: 大会名・メインオブジェクトのタブ(進行表 / リーダー / 選手 / 大会)・どこからでも使う道具 -->
 <header class="sticky top-0 z-30 flex items-center gap-4 px-6 h-16 bg-[var(--bg-page)] border-b border-[var(--border-default)]">
-  <h1 id="title" class="max-w-60 text-lg font-bold text-primary-400 truncate">ドラフト会議</h1>
+  <h1 id="title" class="sr-only">ドラフト会議</h1><!-- 大会名はウィンドウのタイトルに出す(ヘッダーには出さない) -->
   <nav id="tabs" aria-label="画面の切り替え" class="flex items-end h-16 gap-2" role="tablist">
     <button type="button" role="tab" data-tab="prog" aria-selected="true" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">進行表</button>
     <button type="button" role="tab" data-tab="leaders" aria-selected="false" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リーダー</button>
