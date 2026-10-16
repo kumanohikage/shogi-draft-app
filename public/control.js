@@ -740,7 +740,7 @@ function renderShow() {
   $('opt-leadercolors').checked = !!o.leaderColors;
   $('trans-video-name').textContent = o.transVideo || 'まだありません';
   if (document.activeElement !== $('in-rounds')) $('in-rounds').value = S.rounds;
-  for (const k of ['flowRound', 'flowWait', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
+  for (const k of ['flowRound', 'flowWait', 'flowAllIn', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
 }
 // 画像を選ぶ: 背景・ロゴ / 立ち絵 / 画像の資料 で共通の入力
 let pickTarget = null;
@@ -860,9 +860,9 @@ document.addEventListener('change', (e) => {
     const m = [...optionsOf().roundModes]; m[+t.dataset.roundMode] = t.value;
     setOption({ roundModes: Array.from({ length: S.rounds }, (_, i) => m[i] || 'bid') });
   } else if (t.dataset.lotMode !== undefined) {
-    // 抽選の方式(巡ごと)。くじを選ぶ方式が1つでもあれば、くじの色と紛らわしいので枠はリーダーの色をやめる(大会の見た目で戻せる)
+    // 抽選の方式(巡ごと)
     const lm = Array.from({ length: S.rounds }, (_, i) => C.lotteryModeOf(S, i + 1)); lm[+t.dataset.lotMode] = t.value;
-    setOption({ lotteryModes: lm, leaderColors: lm.every((x) => x === 'roulette') });
+    setOption({ lotteryModes: lm });
   } else if (t.id === 'opt-order') setOption({ orderStyle: t.value });
   else if (t.id === 'opt-lottery') setOption({ lotteryStyle: t.value });
   else if (t.id === 'opt-leadercolors') setOption({ leaderColors: t.checked });

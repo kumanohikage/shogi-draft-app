@@ -288,3 +288,14 @@ console.log('くじを選ぶ抽選 ok');
   assert.strictEqual(s.lottery.mode, 'envelope'); // 第1巡は封筒
 }
 console.log('巡ごとの抽選の方式 ok');
+// 出揃いました: 一斉入札で公開前の確認をしたら映す(設定で外せる)。古い「選ばないルーレット」は色を選ぶルーレットに
+{
+  let s = C.apply(C.apply(init0(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p' }, { name: 'q' }] }), { type: 'setOption', patch: { flowRound: false } });
+  s = C.apply(s, { type: 'nominate', leaderId: s.leaders[0].id, playerId: s.players[0].id });
+  s = C.apply(s, { type: 'nominate', leaderId: s.leaders[1].id, playerId: s.players[1].id });
+  assert.strictEqual(C.apply(s, { type: 'confirmNoms' }).scene, 'allin');
+  assert.notStrictEqual(C.apply(C.apply(s, { type: 'setOption', patch: { flowAllIn: false } }), { type: 'confirmNoms' }).scene, 'allin');
+  const old = C.normalize({ ...C.initialState(), options: { lotteryMode: 'roulette', lotteryModes: ['roulette', 'amida'] } });
+  assert.deepStrictEqual([1, 2].map((r) => C.lotteryModeOf(old, r)), ['wheel', 'amida']);
+}
+console.log('出揃いました ok');

@@ -49,6 +49,10 @@
   .roundbig span { padding: 12px 48px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 52px 'Noto Sans JP', sans-serif; letter-spacing: .1em; }
   .roundbig.enter b { animation: roundIn .7s cubic-bezier(.2,1.4,.4,1) both; }
   .roundbig.enter span { animation: bandIn2 .5s .25s cubic-bezier(.2,.9,.3,1) both; }
+  /* 出揃いました: 上に「第1巡 選択希望選手」の帯、下に大きく */
+  .roundbig.allin b { font-size: 190px; }
+  .roundbig.allin.enter span { animation: bandIn2 .5s cubic-bezier(.2,.9,.3,1) both; }
+  .roundbig.allin.enter b { animation: roundIn .7s .3s cubic-bezier(.2,1.4,.4,1) both; }
   @keyframes roundIn { from { opacity: 0; transform: scale(1.6); } }
   @keyframes bandIn2 { from { opacity: 0; transform: translateY(20px); } }
   @keyframes tFadeIn { from { opacity: 0; } }
@@ -191,6 +195,7 @@
   <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="stand"></div><div id="board-timer" class="timer corner"></div></section>
   <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><img id="wait-img" alt=""></div><div id="wait-timer" class="timer corner"></div></section>
   <section id="sc-lots" class="scene bg"><h1 id="lots-title"></h1><div id="lots-head" class="lotshead"></div><div id="lots-body" class="lotsbody"></div><div id="lots-note" class="lotsnote"></div><iframe id="lots3d" title="くじ 3D" style="position:absolute;inset:0;width:100%;height:100%;border:0;display:none"></iframe></section>
+  <section id="sc-allin" class="scene bg"><h1 id="allin-head"></h1><div id="allin-big" class="roundbig allin"><span id="allin-sub"></span><b>出揃いました</b></div></section>
   <section id="sc-round" class="scene bg"><h1 id="round-head"></h1><div id="round-big" class="roundbig"><b id="round-no"></b><span id="round-mode"></span></div></section>
   <section id="sc-logo" class="scene bg"><div id="logo-big" class="logobig"></div></section>
   <section id="sc-slide" class="scene bg"><h1 id="slide-title"></h1><div id="slide-body"></div></section>

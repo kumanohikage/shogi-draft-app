@@ -160,15 +160,16 @@
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d' };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d' };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
   const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options, { lotFx: '3d' });
   // その巡の抽選の方式
   const lotteryModeOf = (s, r = s.round) => { const o = optionsOf(s); return (o.lotteryModes || [])[r - 1] || o.lotteryMode || 'wheel'; };
-  const LOTTERY_LABEL = { roulette: 'ルーレット', wheel: '色を選んでルーレット', envelope: '封筒', amida: 'あみだくじ' };
-  const lotteryModeFrom = (v) => (/色/.test(v) ? 'wheel' : /封筒/.test(v) ? 'envelope' : /あみだ/.test(v) ? 'amida' : 'roulette');
+  // 選べる方式。くじを選ばないルーレット(roulette)は廃止(古いデータは normalize で wheel に。中のしくみはテスト用に残す)
+  const LOTTERY_LABEL = { wheel: 'ルーレット', envelope: '封筒', amida: 'あみだくじ' };
+  const lotteryModeFrom = (v) => (/封筒/.test(v) ? 'envelope' : /あみだ/.test(v) ? 'amida' : 'wheel');
   const roundMode = (s, r = s.round) => optionsOf(s).roundModes[r - 1] || 'bid';
   // 順番指名の巡の順番: 登録順。スネークなら、順番指名の巡を数えて奇数回目は逆順
   function turnOrder(s, r = s.round) {
@@ -340,7 +341,10 @@
       }
       case 'introGo': s.introIdx = Math.max(0, Math.min(s.leaders.length - 1, action.idx | 0)); s.scene = 'intro'; break;
       case 'waitShow': s.waitIdx = Math.max(0, action.idx | 0); break; // 待ち時間画面の何枚目を出すか
-      case 'confirmNoms': s.confirmedKey = confirmKey(s); break; // 公開前の確認をした
+      case 'confirmNoms': // 公開前の確認をした。一斉入札なら「出揃いました」を映す
+        s.confirmedKey = confirmKey(s);
+        if (optionsOf(s).flowAllIn && roundMode(s) === 'bid') s.scene = 'allin';
+        break;
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
         const c = conflicts(s).find((x) => x.playerId === action.playerId);
         if (!c) throw new Error('この選手の重複はありません');
@@ -499,10 +503,10 @@
     rows.push(['進め方', '指名のしかた', ...Array.from({ length: s.rounds }, (_, i) => (roundMode(s, i + 1) === 'order' ? '順番指名' : '一斉入札'))]);
     rows.push(['進め方', '順番指名の順番', o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク']);
     rows.push(['進め方', '抽選の演出', o.lotteryStyle === 'short' ? '短い' : '通常']);
-    rows.push(['進め方', '抽選の方式', ...Array.from({ length: s.rounds }, (_, i) => LOTTERY_LABEL[lotteryModeOf(s, i + 1)])]);
+    rows.push(['進め方', '抽選の方式', ...Array.from({ length: s.rounds }, (_, i) => LOTTERY_LABEL[lotteryModeOf(s, i + 1)] || 'ルーレット')]);
     rows.push(['進め方', '制限時間（秒）', o.timerSec]);
     rows.push(['進め方', 'タイマーを自動でスタート', o.timerAuto ? 'する' : 'しない'], ['進め方', 'タイマーを配信画面に出す', o.timerShow ? 'する' : 'しない']);
-    rows.push(['進め方', '巡のはじめの見出し', o.flowRound ? '出す' : '出さない'], ['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
+    rows.push(['進め方', '巡のはじめの見出し', o.flowRound ? '出す' : '出さない'], ['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '指名が出揃った画面', o.flowAllIn ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
     for (let r = 1; r <= s.rounds; r++) rows.push(['進め方', `待ち時間の画像（第${r}巡）`, ...((o.waitImages || {})[r] || [])]);
     rows.push(['見た目', '背景', o.bgImage], ['見た目', '名前の前につける文字', o.teamPrefix], ['見た目', 'リーダーの色を枠に使う', o.leaderColors ? 'する' : 'しない']);
     rows.push(['見た目', '場面の切り替え', TRANSITIONS[o.transition] || 'なし'], ['見た目', '切り替えの長さ（秒）', o.transSec], ['見た目', '切り替えの動画', o.transVideo], ['見た目', '動画で入れ替える秒数', o.transCut || '自動'], ['見た目', 'フェード（秒）', o.fadeSec]);
@@ -540,6 +544,7 @@
         else if (key === 'タイマーを配信画面に出す') O.timerShow = yes(v0);
         else if (key === '待ち時間の画面') O.flowWait = yes(v0);
         else if (key === '巡のはじめの見出し') O.flowRound = yes(v0);
+        else if (key === '指名が出揃った画面') O.flowAllIn = yes(v0);
         else if (key === 'ピックアップ前の立ち絵') O.flowStand = yes(v0);
         else if (key === '巡の終わりのチーム表') O.flowTeams = yes(v0);
         else { const m = /待ち時間の画像.*?(\d+)/.exec(key); if (m) (O.waitImages = O.waitImages || {})[+m[1]] = v.filter(Boolean); }
@@ -572,6 +577,10 @@
   // 保存データの読み込み時: 範囲外の値を直す(前の版のデータなど)
   function normalize(s) {
     if (!(s.rounds >= 1 && s.rounds <= MAX_ROUNDS)) s.rounds = 3;
+    // 廃止した「くじを選ばないルーレット」は、色を選ぶルーレットに
+    const o = s.options || {};
+    if (o.lotteryMode === 'roulette') o.lotteryMode = 'wheel';
+    if (Array.isArray(o.lotteryModes)) o.lotteryModes = o.lotteryModes.map((m) => (m === 'roulette' ? 'wheel' : m));
     if (s.round > s.rounds) s.round = s.rounds;
     return s;
   }

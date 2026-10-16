@@ -145,7 +145,7 @@
       }
       return partial
         ? { step: renom ? 2 : 1, text: `1人ずつ公開しています（あと${toReveal.length}人）`, main: spot, sub: [{ key: 'reveal', label: '残りを一斉公開' }] }
-        : { step: renom ? 2 : 1, text: `${renom ? '再指名' : '全員の指名'}がそろいました。1人ずつ配信画面で公開します`, main: spot, sub: [{ key: 'reveal', label }] };
+        : { step: renom ? 2 : 1, text: `${S.scene === 'allin' ? '「出揃いました」を映しています。' : ''}${renom ? '再指名' : '全員の指名'}がそろいました。1人ずつ配信画面で公開します`, main: spot, sub: [{ key: 'reveal', label }] };
     }
     return { step: 0, text: '' };
   }

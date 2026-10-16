@@ -70,20 +70,21 @@ function render() {
   if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
   SE.setVolume(PREVIEW ? 0 : audio.seVol / 100);
-  BGM.update(PREVIEW ? { ...audio, bgmOn: false } : { ...audio, bgm: C.sceneBgm(S) }, S.scene === 'roulette');
+  const drawing = S.scene === 'roulette' || (S.scene === 'lots' && S.lottery && S.lottery.phase === 'reveal');
+  BGM.update(PREVIEW ? { ...audio, bgmOn: false } : { ...audio, bgm: C.sceneBgm(S) }, drawing);
   const f = $('roulette').contentWindow;
   if (f) {
     f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
   lots3dVolume(audio);
-  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); renderLots(); playLottery(false);
+  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); renderAllIn(); renderLots(); playLottery(false);
   first = false;
 }
 
 /* ---------- 場面の切り替え ----------
  * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
-const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round', 'lots'];
+const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round', 'allin', 'lots'];
 let shown = null, prevProg = null, transBusy = false;
 function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); }
 function sceneSwitch(scene) {
@@ -338,6 +339,16 @@ function standHtml(l, tag, full) {
     ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="" style="--sk:${+l.standScale || 1};--sx:${+l.standX || 0}px;--sy:${+l.standY || 0}px">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
     ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
     <div class="band">${esc(full ? l.name : C.teamLabel(S, l))}</div></div>`;
+}
+// 出揃いました: 一斉入札で全員の指名がそろった(再指名のときは「再指名」)
+let prevAllInKey = '';
+function renderAllIn() {
+  const renom = S.picks.some((p) => p.round === S.round) || S.lotteries.some((x) => x.round === S.round);
+  $('allin-head').innerHTML = titleHtml('');
+  $('allin-sub').textContent = `第${S.round}巡 ${renom ? '再指名' : '選択希望選手'}`;
+  const key = S.scene === 'allin' ? `${S.round}:${S.confirmedKey}` : '';
+  if (key && key !== prevAllInKey && !first) { const b = $('allin-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); if (!PREVIEW) SE.glow(); }
+  prevAllInKey = key;
 }
 // 巡の見出し: 「第◯巡」と指名のしかた
 let prevRoundKey = '';
