@@ -135,7 +135,8 @@ app.whenReady().then(async () => {
   if (!(await js("document.getElementById('crop').open"))) { console.log('✗ 調整画面が開かない'); errors++; }
   await js("crop.zoom = 2; crop.x = 40; drawCrop(); 0");
   await check('14-roster-crop');
-  await js("document.getElementById('crop-save').click(); 0"); await wait(1200);
+  await js("document.getElementById('crop-save').click(); 0");
+  for (let i = 0; i < 30 && S.players[0].icon === before; i++) await wait(200); // 保存が終わるまで待つ
   const p0 = S.players[0];
   if (!p0.icon || p0.icon === before || !fs.existsSync(path.join(dataDir, 'images', p0.icon)) || !p0.iconSrc || !p0.iconCrop || p0.iconCrop.zoom !== 2) { console.log(`✗ 画像の保存に失敗 ${JSON.stringify(p0)}`); errors++; }
   else console.log(`✓ 画像を調整して保存: ${p0.icon}（元画像 ${p0.iconSrc}、調整 ${JSON.stringify(p0.iconCrop)}）`);
