@@ -371,7 +371,8 @@ function finish(at, team, size = 1) {
   setTimeout(() => { if (fx.winT) { burst(at, 250, WIN_COLS, size, size); launchConfetti(150); } }, 900);
   setTimeout(() => { if (fx.winT) launchConfetti(150); }, 1900);
 
-  return sleep(0.35).then(() => showResult(team, true));
+  // 「交渉権確定!」を出した時点で決着を知らせる(ルーレットと同じ。残りの封筒・道を見せている間も次へ進める)
+  return sleep(0.35).then(() => { showResult(team, true); parent.postMessage({ type: 'lots3d-done', id: D.id }, '*'); });
 }
 
 /* ---------- カメラ: なめらかに(フレームの速さに左右されない減衰で)目標へ。回さない ---------- */
@@ -550,7 +551,7 @@ function buildEnvelope(d) {
       }
       // 6. 当たり: ルーレットと同じ決着
       await finish(top, team, 0.6);
-      await sleep(2.6);
+      await sleep(2.0);
       showResult('', false);
       await Promise.all([camTo(ov.pos, ov.look, 0.8), tween(0.8, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine')]);
       openRest(); fx.winT = 0.4; fx.ambT = 1;
@@ -765,7 +766,7 @@ function buildAmida(d) {
       if (!win) { sound.lose(); fx.heat += 1; await sleep(0.9); fx.team = null; return; }
       // 4. 当たり: ルーレットと同じ決着。そのあと、まだ通っていない道も全部見せる(公平に決まったことがわかるように)
       await finish(end, team, 0.8);
-      await sleep(2.6);
+      await sleep(2.0);
       showResult('', false);
       fx.winT = 0.4; fx.ambT = 1; fx.bulb = 'idle'; fx.team = null;
       const done = new Set(D.order.slice(0, D.opened));
