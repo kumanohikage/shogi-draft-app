@@ -74,11 +74,11 @@ function toast(t, err) {
 /* ---------- 配信画面(OBS / ブラウザ)が開いているか ---------- */
 function renderOverlayStatus() {
   const o = overlay, el = $('overlay-st');
-  const [text, cls] = !o.count ? ['× 配信画面が開いていません', 'text-red-300']
-    : o.obs && o.hidden ? ['● OBS: 今のシーンには映っていません', 'text-amber-300']
-    : o.obs ? ['● OBSで配信画面を表示中', 'text-emerald-300']
-    : ['● ブラウザで配信画面を表示中', 'text-emerald-300'];
-  el.textContent = text; el.className = `max-w-44 truncate whitespace-nowrap text-xs ${cls}`; el.title = text;
+  const [text, cls, tip] = !o.count ? ['× 配信画面が開いていません', 'text-red-300', 'OBS のブラウザソース（またはブラウザ）で配信画面を開いてください']
+    : o.obs && o.hidden ? ['● 映っていません', 'text-amber-300', 'OBS の今のシーンには、配信画面が映っていません']
+    : o.obs ? ['● 表示中', 'text-emerald-300', 'OBS で配信画面を表示しています']
+    : ['● 表示中', 'text-emerald-300', 'ブラウザで配信画面を表示しています'];
+  el.textContent = text; el.className = `whitespace-nowrap text-xs ${cls}`; el.title = tip; // 詳しくはマウスを乗せると出る
 }
 
 /* ---------- 抽選演出中は結果を伏せる ---------- */
