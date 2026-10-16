@@ -347,7 +347,7 @@ function renderAllIn() {
   $('allin-head').innerHTML = titleHtml('');
   $('allin-sub').textContent = `第${S.round}巡 ${renom ? '再指名' : '選択希望選手'}`;
   const key = S.scene === 'allin' ? `${S.round}:${S.confirmedKey}` : '';
-  if (key && key !== prevAllInKey && !first) { const b = $('allin-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); if (!PREVIEW) SE.glow(); }
+  if (key && key !== prevAllInKey && !first) { const b = $('allin-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); }
   prevAllInKey = key;
 }
 // 巡の見出し: 「第◯巡」と指名のしかた
