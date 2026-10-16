@@ -16,6 +16,16 @@ addEventListener('resize', fit); fit();
 const EXPORT = new URLSearchParams(location.search).get('export'); // 画像の書き出し用
 // 管理画面の本番ビューに小さく出すプレビュー: 音を出さない・配信画面として数えない・抽選の完了を送らない
 const PREVIEW = new URLSearchParams(location.search).has('preview');
+const PREVIEW_NEXT = new URLSearchParams(location.search).get('preview') === 'next';
+function nextView(s) {
+  const prog = C.programOf(s), i = C.progIdxOf(s), g = prog[i], k = s.introIdx || 0;
+  if (g && g.type === 'intro' && k < s.leaders.length - 1) return { ...s, introIdx: k + 1, scene: 'intro' };
+  const n = prog[i + 1];
+  if (!n) return { ...s, scene: 'blank' };
+  const v = { ...s, progIdx: i + 1, introIdx: 0, spot: null, spotStand: false, lottery: null };
+  v.scene = C.sceneForItem(v, n);
+  return v;
+}
 const obs = window.obsstudio;
 const presence = { obs: !!obs, visible: null, active: null };
 const sendPresence = () => { if (!EXPORT && !PREVIEW && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
@@ -29,7 +39,7 @@ function connect() {
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
-    if (m.type === 'state') { S = m.state; render(); }
+    if (m.type === 'state') { S = PREVIEW_NEXT ? nextView(m.state) : m.state; render(); }
   };
 }
 
@@ -61,13 +71,13 @@ function render() {
     f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
-  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); playLottery(false);
+  renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); playLottery(false);
   first = false;
 }
 
 /* ---------- 場面の切り替え ----------
  * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
-const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro'];
+const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round'];
 let shown = null, prevProg = null, transBusy = false;
 function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); }
 function sceneSwitch(scene) {
@@ -78,8 +88,11 @@ function sceneSwitch(scene) {
   // 動画は先に読み込んでおく(押してから待たないように)
   const v = $('trans-video');
   if (o.transition === 'video' && o.transVideo && !v.src.endsWith(encodeURIComponent(o.transVideo))) v.src = img(o.transVideo);
-  if (EXPORT || first || !progChanged || scene === shown || o.transition === 'none') return showScene(scene);
-  runTransition(o);
+  if (EXPORT || PREVIEW || first || scene === shown) return showScene(scene);
+  // 進行表の場面が変わったら設定のトランジション、それ以外(ボード ⇔ チーム表 など)は短いフェード
+  if (progChanged && o.transition !== 'none') return runTransition(o);
+  if (o.fadeSec > 0) return runTransition({ ...o, transition: 'fade', transSec: o.fadeSec });
+  showScene(scene);
 }
 const cur = () => EXPORT || S.scene;
 const later = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -106,6 +119,12 @@ async function runTransition(o) {
       swap();
       t.style.transition = `opacity ${ms / 2}ms ease-out`; t.style.opacity = 0;
       await later(ms / 2);
+    } else if (o.transition === 'fade') {
+      // 次の場面を上に重ねて浮かび上がらせる(下の場面は最後まで出したままなので透けない)
+      const to = $('sc-' + cur());
+      if (to) { to.classList.add('on', 't-top'); to.style.animation = `tFadeIn ${ms}ms ease both`; await later(ms); to.style.animation = ''; to.classList.remove('t-top'); }
+      else if (ghost) { ghost.style.animation = `tFadeOut ${ms}ms ease both`; await later(ms); } // 何も出さない: 消えていく
+      swap();
     } else if (o.transition === 'slide' || o.transition === 'wipe') {
       const next = cur(), to = $('sc-' + next);
       if (!to) return swap(); // 何も出さない場面へ
@@ -286,8 +305,9 @@ function renderSlide() {
   prevSlideKey = key;
   if (!sl) { $('slide-title').innerHTML = ''; $('slide-body').innerHTML = ''; return; }
   if (sl.kind === 'image') {
-    $('slide-title').innerHTML = '';
-    $('slide-body').innerHTML = sl.image ? `<div class="slideimg"><img src="${img(sl.image)}" alt=""></div>` : '';
+    const full = sl.fit === 'full';
+    $('slide-title').innerHTML = full ? '' : titleHtml('');
+    $('slide-body').innerHTML = !sl.image ? '' : full ? `<div class="slideimg"><img src="${img(sl.image)}" alt=""></div>` : `<div class="slidecard"><img src="${img(sl.image)}" alt=""></div>`;
   } else {
     $('slide-title').innerHTML = titleHtml('');
     $('slide-body').innerHTML = `<div class="slidebox"><h2>${esc(sl.title)}</h2><ul>${(sl.lines || []).filter((x) => x.trim()).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`;
@@ -307,9 +327,20 @@ function fitSlide() {
 // 帯の名前: リーダー紹介はフルネーム、ほかは「チーム＋略称」
 function standHtml(l, tag, full) {
   return `<div class="standwrap" style="--c:${esc(l.color)}">
-    ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
+    ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="" style="--sk:${+l.standScale || 1};--sx:${+l.standX || 0}px;--sy:${+l.standY || 0}px">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
     ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
     <div class="band">${esc(full ? l.name : C.teamLabel(S, l))}</div></div>`;
+}
+// 巡の見出し: 「第◯巡」と指名のしかた
+let prevRoundKey = '';
+function renderRound() {
+  const o = C.optionsOf(S), order = C.roundMode(S) === 'order';
+  $('round-head').innerHTML = titleHtml('');
+  $('round-no').textContent = `第${S.round}巡`;
+  $('round-mode').textContent = order ? `順番指名（${o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク'}）` : '一斉入札';
+  const key = S.scene === 'round' ? `${S.round}` : '';
+  if (key && key !== prevRoundKey && !first) { const b = $('round-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); }
+  prevRoundKey = key;
 }
 let prevIntro = '';
 function renderIntro() {

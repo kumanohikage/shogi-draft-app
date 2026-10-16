@@ -15,7 +15,7 @@
       version: 1,
       title: 'ドラフト会議',
       rounds: 3,
-      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), intro(紹介文), introMemo(紹介のメモ。自分用) }  ※チーム名はドラフト後に決まるので持たない
+      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), standScale/standX/standY(立ち絵の大きさと位置), intro(紹介文), introMemo(紹介のメモ。自分用) }  ※チーム名はドラフト後に決まるので持たない
       players: [],          // { id, name, icon, note(ひとこと), absent(欠場) }
       round: 1,             // 今の巡
       // 今の巡の指名: leaderId -> { playerId, revealed }
@@ -26,7 +26,7 @@
       lotteries: [],
       // 抽選中: { id, playerId, leaders, winner, done }
       lottery: null,
-      scene: 'logo',        // 配信画面: 'logo' | 'slide' | 'intro' | 'wait' | 'board' | 'roulette' | 'teams' | 'blank'(新しく始めるときは進行表の最初=オープニング)
+      scene: 'logo',        // 配信画面: 'logo' | 'slide' | 'intro' | 'round'(巡の見出し) | 'wait' | 'board' | 'roulette' | 'teams' | 'blank'(新しく始めるときは進行表の最初=オープニング)
       spot: null,           // ピックアップ公開中のリーダー(配信画面に1人だけ大きく出す)。null なら指名ボード
       audio: { ...DEFAULT_AUDIO },
       options: { ...DEFAULT_OPTIONS },
@@ -106,7 +106,7 @@
   function sceneForItem(s, g) {
     if (!g) return s.scene;
     if (g.type === 'draft') {
-      return draftFresh(s) ? roundStartScene(s) : 'board';
+      return draftFresh(s) ? (optionsOf(s).flowRound ? 'round' : roundStartScene(s)) : 'board';
     }
     return { logo: 'logo', slide: 'slide', intro: 'intro', final: 'teams', blank: 'blank' }[g.type] || s.scene;
   }
@@ -125,9 +125,10 @@
   // 場面の切り替え(進行表の場面が変わるときだけ): transition = none | fadeBlack | fadeWhite | slide | wipe | video
   //   transSec: 切り替えの長さ(秒) / transVideo: 動画のファイル名 / transCut: 動画の何秒目で場面を入れ替えるか(0 = 動画の長さの半分)
   // 見た目: bgImage(全画面の背景) / logoImage(大会ロゴ) / titleMode(大会名を 'text' 文字 | 'logo' ロゴ画像で出す。'' は前の版の扱い = ロゴがあればロゴ) / teamPrefix(名前の帯の「チーム」)
+  // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3 };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
@@ -290,7 +291,7 @@
         s.scene = sceneForItem(s, p[i]);
         // ドラフトのはじめに入ったら、タイマーを動かす(もう動かしていれば何もしない)
         const t = s.timer || {};
-        if (p[i].type === 'draft' && draftFresh(s) && !t.endsAt && t.left == null) startRoundTimer(s, action.now || Date.now());
+        if (p[i].type === 'draft' && draftFresh(s) && !t.endsAt && t.left == null && s.scene !== 'round') startRoundTimer(s, action.now || Date.now());
         break;
       }
       case 'introGo': s.introIdx = Math.max(0, Math.min(s.leaders.length - 1, action.idx | 0)); s.scene = 'intro'; break;
@@ -314,10 +315,12 @@
         if (!roundComplete(s)) throw new Error('この巡はまだ全員の指名が確定していません');
         if (s.round >= s.rounds) throw new Error('最後の巡です');
         s.round += 1; s.noms = {}; s.lottery = null; s.spot = null; s.spotStand = false; s.waitIdx = 0;
-        s.scene = roundStartScene(s);
-        startRoundTimer(s, action.now || Date.now());
+        if (optionsOf(s).flowRound) { s.scene = 'round'; s.timer = { endsAt: null, left: null }; } // 見出しから「始める」でタイマー開始
+        else { s.scene = roundStartScene(s); startRoundTimer(s, action.now || Date.now()); }
         break;
       case 'setScene': s.scene = action.scene; break;
+      // 巡の見出しから、指名を始める(待ち時間の画面か指名ボードへ。タイマー開始)
+      case 'roundStart': s.scene = roundStartScene(s); startRoundTimer(s, action.now || Date.now()); break;
       // 番組の CSV 読み込み(大会・進め方・見た目・進行表)。ドラフトの途中でも名簿と結果はそのまま
       case 'replaceShow': {
         if (action.title != null) s.title = String(action.title).slice(0, 40);
@@ -404,15 +407,15 @@
     rows.push(['進め方', '抽選の演出', o.lotteryStyle === 'short' ? '短い' : '通常']);
     rows.push(['進め方', '制限時間（秒）', o.timerSec]);
     rows.push(['進め方', 'タイマーを自動でスタート', o.timerAuto ? 'する' : 'しない'], ['進め方', 'タイマーを配信画面に出す', o.timerShow ? 'する' : 'しない']);
-    rows.push(['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
+    rows.push(['進め方', '巡のはじめの見出し', o.flowRound ? '出す' : '出さない'], ['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
     for (let r = 1; r <= s.rounds; r++) rows.push(['進め方', `待ち時間の画像（第${r}巡）`, ...((o.waitImages || {})[r] || [])]);
     rows.push(['見た目', '背景', o.bgImage], ['見た目', '名前の前につける文字', o.teamPrefix]);
-    rows.push(['見た目', '場面の切り替え', TRANSITIONS[o.transition] || 'なし'], ['見た目', '切り替えの長さ（秒）', o.transSec], ['見た目', '切り替えの動画', o.transVideo], ['見た目', '動画で入れ替える秒数', o.transCut || '自動']);
+    rows.push(['見た目', '場面の切り替え', TRANSITIONS[o.transition] || 'なし'], ['見た目', '切り替えの長さ（秒）', o.transSec], ['見た目', '切り替えの動画', o.transVideo], ['見た目', '動画で入れ替える秒数', o.transCut || '自動'], ['見た目', 'フェード（秒）', o.fadeSec]);
     for (const g of programOf(s)) {
       if (g.type !== 'slide') rows.push(['進行表', SCENE_CSV[g.type], g.label]);
       else {
         const sl = slideById(s, g.slideId) || { kind: 'text', title: '', lines: [] };
-        if (sl.kind === 'image') rows.push(['進行表', '画像の資料', g.label, sl.image || '']);
+        if (sl.kind === 'image') rows.push(['進行表', '画像の資料', g.label, sl.image || '', sl.fit === 'full' ? '画面いっぱい' : '枠つき']);
         else rows.push(['進行表', sl.rules || sl.id === 'S_draft' ? 'ドラフト説明' : '文字の資料', g.label, sl.title, ...(sl.lines || [])]);
       }
       if (g.memo) rows.push(['進行表', 'メモ', g.memo]); // 自分用のメモ(すぐ上の場面のもの)
@@ -439,6 +442,7 @@
         else if (key === 'タイマーを自動でスタート') O.timerAuto = yes(v0);
         else if (key === 'タイマーを配信画面に出す') O.timerShow = yes(v0);
         else if (key === '待ち時間の画面') O.flowWait = yes(v0);
+        else if (key === '巡のはじめの見出し') O.flowRound = yes(v0);
         else if (key === 'ピックアップ前の立ち絵') O.flowStand = yes(v0);
         else if (key === '巡の終わりのチーム表') O.flowTeams = yes(v0);
         else { const m = /待ち時間の画像.*?(\d+)/.exec(key); if (m) (O.waitImages = O.waitImages || {})[+m[1]] = v.filter(Boolean); }
@@ -448,13 +452,14 @@
         else if (/^切り替えの長さ/.test(key)) out.options.transSec = Math.max(0.2, Math.min(3, +v0 || 0.6));
         else if (key === '切り替えの動画') out.options.transVideo = v0;
         else if (key === '動画で入れ替える秒数') out.options.transCut = Math.max(0, +v0 || 0);
+        else if (/^フェード/.test(key)) out.options.fadeSec = Math.max(0, Math.min(2, +v0 || 0));
       } else if (kind === '進行表') {
         if (key === 'メモ') { if (prog.length) prog[prog.length - 1].memo = v.join(','); continue; }
         const type = Object.keys(SCENE_CSV).find((t) => SCENE_CSV[t] === key);
         if (type) { if (type !== 'draft' || !prog.some((g) => g.type === 'draft')) prog.push({ id: uid('G'), type, label: v0 || key }); }
         else if (key === '文字の資料' || key === 'ドラフト説明' || key === '画像の資料') {
           const id = uid('S'), image = key === '画像の資料';
-          out.slides.push(image ? { id, kind: 'image', title: v0, lines: [], image: v[1] || '' } : { id, kind: 'text', title: v[1] || v0, lines: v.slice(2).filter((x) => x !== ''), image: '', rules: key === 'ドラフト説明' });
+          out.slides.push(image ? { id, kind: 'image', title: v0, lines: [], image: v[1] || '', fit: /いっぱい/.test(v[2] || '') ? 'full' : 'card' } : { id, kind: 'text', title: v[1] || v0, lines: v.slice(2).filter((x) => x !== ''), image: '', rules: key === 'ドラフト説明' });
           prog.push({ id: uid('G'), type: 'slide', slideId: id, label: v0 || key });
         }
       }

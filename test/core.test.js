@@ -185,6 +185,9 @@ console.log('core OK');
 {
   let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p1' }, { name: 'p2' }, { name: 'p3' }, { name: 'p4' }] });
   s = C.apply(s, { type: 'progGo', idx: 4, now: 1000 });
+  assert.strictEqual(s.scene, 'round'); // 巡の見出し
+  assert.strictEqual(s.timer.endsAt, null);
+  s = C.apply(s, { type: 'roundStart', now: 1000 });
   assert.strictEqual(s.scene, 'board');
   assert.strictEqual(s.timer.endsAt, 1000 + 300 * 1000);
   const [a, b] = s.leaders, [p1, p2] = s.players;
@@ -193,6 +196,8 @@ console.log('core OK');
   s = C.apply(s, { type: 'reveal' });
   s = C.apply(s, { type: 'setOption', patch: { timerAuto: false, waitImages: { 2: ['q.png'] } } });
   s = C.apply(s, { type: 'nextRound' });
+  assert.strictEqual(s.scene, 'round');
+  s = C.apply(s, { type: 'roundStart' });
   assert.strictEqual(s.scene, 'wait');
   assert.strictEqual(s.timer.endsAt, null);
 }

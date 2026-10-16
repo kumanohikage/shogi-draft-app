@@ -5,7 +5,7 @@
   const C = root.DraftCore;
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
-  const STEPS = ['指名を入力', '一斉公開', '抽選・再指名', 'チーム表', '次の巡へ'];
+  const STEPS = ['指名を入力', '公開', '抽選・再指名', 'チーム表', '次の巡へ'];
 
   /* ---------- 番組(進行表)の1つの場面 ---------- */
   function nextStep(S, opts = {}) {
@@ -62,6 +62,10 @@
     // ピックアップで1人を出す最初のボタン(設定で、カードの前に立ち絵)
     const spotIn = (id, label) => ({ key: o.flowStand ? 'spotStand' : 'spotShow', arg: id, label });
 
+    // 巡の見出しを映している: 次へで指名を始める(タイマー開始)
+    if (S.scene === 'round' && !C.draftComplete(S) && !S.picks.some((p) => p.round === S.round)) {
+      return { step: 0, text: `第${S.round}巡の見出しを映しています。始めると制限時間が動き出します`, main: { key: 'roundStart', label: `第${S.round}巡を始める` }, sub };
+    }
     if (L && !L.done) return { step: 2, text: `<b>${name(L.playerId)}</b> の抽選を配信画面で演出中です`, main: { label: '演出中…', off: true } };
     if (L && L.done && S.scene === 'roulette') {
       const res = `<b>${name(L.playerId)}</b> は <b>${lname(L.winner)}</b> が交渉権確定`;
@@ -146,6 +150,7 @@
       case 'draw': return { type: 'drawLottery', playerId: arg };
       case 'board': case 'teams': return { type: 'setScene', scene: key };
       case 'nextRound': return { type: 'nextRound' };
+      case 'roundStart': return { type: 'roundStart' };
       case 'progNext': return { type: 'progGo', idx: i + 1 };
       case 'progPrev': return { type: 'progGo', idx: i - 1 };
       case 'progShow': return { type: 'progGo', idx: i };

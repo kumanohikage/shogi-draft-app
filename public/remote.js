@@ -10,7 +10,7 @@ const BTN_SUB = `inline-flex items-center justify-center w-full h-11 px-4 text-[
 const INPUT = 'h-11 px-3 text-base bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50';
 const BADGE = { ok: 'bg-emerald-500/[.12] text-emerald-300', lot: 'bg-amber-500/[.12] text-amber-300', dup: 'bg-red-500/[.12] text-red-300', in: 'bg-primary-500/[.12] text-primary-300', wait: 'bg-[var(--bg-page-alt)] text-[var(--text-muted)]' };
 const badge = (k, t) => `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${BADGE[k]}">${t}</span>`;
-const SCENES = [['board', '指名ボード'], ['roulette', '抽選'], ['teams', 'チーム表'], ['wait', '待ち時間'], ['blank', '出さない']];
+const SCENES = [['round', '巡の見出し'], ['board', '指名ボード'], ['roulette', '抽選'], ['teams', 'チーム表'], ['wait', '待ち時間'], ['blank', '出さない']];
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
@@ -68,17 +68,17 @@ function renderNoms() {
   $('noms').innerHTML = S.leaders.map((l) => {
     const pick = C.pickOf(S, l.id, S.round), n = S.noms[l.id] || {};
     let body, st;
-    if (pick && !hidden(pick)) { body = `<p class="text-base font-bold text-[var(--text-heading)]">${pname(pick.playerId)}</p>`; st = badge(pick.by === 'lottery' ? 'lot' : 'ok', pick.by === 'lottery' ? '抽選で確定' : '確定'); }
-    else if (pick || inLot(l.id)) { body = `<p class="text-base font-bold text-[var(--text-heading)]">${pname(S.lottery.playerId)}</p>`; st = badge('lot', '抽選中'); }
-    else if (n.revealed) { body = `<p class="text-base font-bold text-[var(--text-heading)]">${pname(n.playerId)}</p>`; st = confs.some((c) => c.leaders.includes(l.id)) ? badge('dup', '重複') : badge('in', '公開済み'); }
+    if (pick && !hidden(pick)) { body = `<p class="truncate text-sm font-bold text-[var(--text-heading)]">${pname(pick.playerId)}</p>`; st = badge(pick.by === 'lottery' ? 'lot' : 'ok', pick.by === 'lottery' ? '抽選で確定' : '確定'); }
+    else if (pick || inLot(l.id)) { body = `<p class="truncate text-sm font-bold text-[var(--text-heading)]">${pname(S.lottery.playerId)}</p>`; st = badge('lot', '抽選中'); }
+    else if (n.revealed) { body = `<p class="truncate text-sm font-bold text-[var(--text-heading)]">${pname(n.playerId)}</p>`; st = confs.some((c) => c.leaders.includes(l.id)) ? badge('dup', '重複') : badge('in', '公開済み'); }
     else if (turn && turn.id !== l.id) { body = ''; st = badge('wait', '順番待ち'); }
     else if (blocked) { body = '<p class="text-sm text-[var(--text-muted)]">ほかの重複の抽選のあとで再指名</p>'; st = badge('wait', '再指名待ち'); }
     else {
-      body = `<select data-nom="${l.id}" aria-label="${esc(l.name)} の指名" class="w-full ${INPUT}"><option value="">― 指名を選ぶ ―</option>${options.map((p) => `<option value="${p.id}" ${p.id === n.playerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`;
+      body = `<select data-nom="${l.id}" aria-label="${esc(l.name)} の指名" class="w-full ${INPUT}"><option value="">― 選ぶ ―</option>${options.map((p) => `<option value="${p.id}" ${p.id === n.playerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`;
       st = n.playerId ? badge('in', '入力済み') : badge('wait', '未入力');
     }
-    return `<div class="flex flex-col gap-2 p-3 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-      <div class="flex items-center gap-2"><span class="w-3 h-3 flex-none rounded-full bg-[var(--lc)]" style="--lc:${esc(l.color)}" aria-hidden="true"></span><p class="min-w-0 flex-1 text-sm font-bold text-[var(--text-heading)] truncate">${esc(l.name)}</p>${st}</div>${body}</div>`;
+    return `<div class="min-w-0 flex flex-col gap-1.5 p-2.5 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+      <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 flex-none rounded-full bg-[var(--lc)]" style="--lc:${esc(l.color)}" aria-hidden="true"></span><p class="min-w-0 flex-1 text-sm font-bold text-[var(--text-heading)] truncate">${esc(C.shortName(l))}</p></div><div>${st}</div>${body}</div>`;
   }).join('');
 }
 
