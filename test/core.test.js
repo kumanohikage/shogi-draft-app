@@ -257,10 +257,6 @@ for (const mode of ['wheel', 'envelope', 'amida']) {
   assert.deepStrictEqual(s.picks.map((x) => x.leaderId), [b.id]);
   if (mode === 'wheel') { s = C.apply(s, { type: 'lotSpin' }); assert.strictEqual(s.scene, 'roulette'); }
   else {
-    // シンプル: 1人ずつ開ける
-    let t = C.apply(s, { type: 'setOption', patch: { lotFx: '2d' } });
-    t = C.apply(t, { type: 'lotOpen' }); assert.strictEqual(t.lottery.done, false); // A: 外れ
-    t = C.apply(t, { type: 'lotOpen' }); assert.strictEqual(t.lottery.done, true); // B: 当たりで決着
     // 3D: 1回で当たりまで開け、演出が終わったら決着
     s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.opened, 2); assert.strictEqual(s.lottery.done, false);
     s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.opened, 2);
@@ -278,3 +274,17 @@ for (const mode of ['wheel', 'envelope', 'amida']) {
   }
 }
 console.log('くじを選ぶ抽選 ok');
+// 抽選の方式は巡ごと(なければ全体の設定)。番組の CSV でも巡ごとに出し入れできる。見せ方は 3D だけ
+{
+  let s = C.apply(init0(), { type: 'setOption', patch: { lotteryMode: 'wheel', lotteryModes: ['envelope', 'amida'], lotFx: '2d' } });
+  assert.deepStrictEqual([1, 2, 3].map((r) => C.lotteryModeOf(s, r)), ['envelope', 'amida', 'wheel']);
+  assert.strictEqual(C.optionsOf(s).lotFx, '3d');
+  const t = C.apply(init0(), { type: 'replaceShow', ...C.showFromCSV(C.showToCSV(s)) });
+  assert.deepStrictEqual([1, 2, 3].map((r) => C.lotteryModeOf(t, r)), ['envelope', 'amida', 'wheel']);
+  s = C.apply(s, { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p' }] });
+  for (const l of s.leaders) s = C.apply(s, { type: 'nominate', leaderId: l.id, playerId: s.players[0].id });
+  s = C.apply(s, { type: 'reveal' });
+  s = C.apply(s, { type: 'drawLottery', playerId: s.players[0].id }, () => 0.5);
+  assert.strictEqual(s.lottery.mode, 'envelope'); // 第1巡は封筒
+}
+console.log('巡ごとの抽選の方式 ok');

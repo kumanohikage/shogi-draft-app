@@ -112,7 +112,12 @@
     const lines = [`各チーム${n}人を、${n}巡に分けて指名します`];
     if (bid.length) {
       lines.push(`${ord.length ? rs(bid) + 'は' : '毎巡、'}全チームが同時に指名します`);
-      lines.push({ wheel: '指名が重複したら、リーダーの並び順にくじの色を選び、ルーレットで交渉権を決めます', envelope: '指名が重複したら、リーダーの並び順に封筒を選び、当たりを引いたリーダーが交渉権を獲得します', amida: '指名が重複したら、リーダーの並び順にあみだくじを選び、当たりにたどり着いたリーダーが交渉権を獲得します' }[o.lotteryMode] || '指名が重複したら、抽選で交渉権を決めます');
+      // 抽選の方式(巡ごとに違えば、巡をつけて方式ごとに)
+      const LOT_LINE = { wheel: 'リーダーの並び順にくじの色を選び、ルーレットで交渉権を決めます', envelope: 'リーダーの並び順に封筒を選び、当たりを引いたリーダーが交渉権を獲得します', amida: 'リーダーの並び順にあみだくじを選び、当たりにたどり着いたリーダーが交渉権を獲得します', roulette: 'ルーレットで交渉権を決めます' };
+      const byMode = {}; for (const r of bid) (byMode[lotteryModeOf(s, r)] ||= []).push(r);
+      const modes = Object.keys(byMode);
+      if (modes.length === 1) lines.push(`指名が重複したら、${LOT_LINE[modes[0]]}`);
+      else for (const m of modes) lines.push(`${rs(byMode[m])}で指名が重複したら、${LOT_LINE[m]}`);
       lines.push('交渉権を得られなかったチームは、もう一度指名します');
     }
     if (ord.length) {
@@ -149,16 +154,21 @@
   // 見た目: bgImage(全画面の背景) / logoImage(大会ロゴ) / titleMode(大会名を 'text' 文字 | 'logo' ロゴ画像で出す。'' は前の版の扱い = ロゴがあればロゴ) / teamPrefix(名前の帯の「チーム」)
   // lotteryMode: 重複の抽選のしかた = roulette(選ばずにルーレット) | wheel(くじの色を選んでからルーレット) | envelope(封筒を選んで開ける) | amida(あみだくじ)
   //   くじを選ぶ方式では、抽選を始めた瞬間に当たりのくじを決めて隠し、リーダーの並び順にくじを選ぶ。当たりのくじを選んだリーダーが交渉権を得る
-  // lotFx: 封筒・あみだくじの見せ方 = 3d(光と立体でゆっくり) | 2d(シンプル)
+  // lotteryModes[巡-1]: 巡ごとの抽選の方式(なければ lotteryMode)
+  // lotFx: 封筒・あみだくじの見せ方 = 3d のみ(2d のシンプル版はコードに残しているが選べない)
   // leaderColors: 配信画面の枠にリーダーの色を使う(くじの色と紛らわしいときは外して落ち着いた色に統一)
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'wheel', leaderColors: false, lotFx: '3d' };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d' };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
-  const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options);
+  const optionsOf = (s) => Object.assign({}, DEFAULT_OPTIONS, s.options, { lotFx: '3d' });
+  // その巡の抽選の方式
+  const lotteryModeOf = (s, r = s.round) => { const o = optionsOf(s); return (o.lotteryModes || [])[r - 1] || o.lotteryMode || 'wheel'; };
+  const LOTTERY_LABEL = { roulette: 'ルーレット', wheel: '色を選んでルーレット', envelope: '封筒', amida: 'あみだくじ' };
+  const lotteryModeFrom = (v) => (/色/.test(v) ? 'wheel' : /封筒/.test(v) ? 'envelope' : /あみだ/.test(v) ? 'amida' : 'roulette');
   const roundMode = (s, r = s.round) => optionsOf(s).roundModes[r - 1] || 'bid';
   // 順番指名の巡の順番: 登録順。スネークなら、順番指名の巡を数えて奇数回目は逆順
   function turnOrder(s, r = s.round) {
@@ -334,7 +344,7 @@
       case 'drawLottery': { // 重複の抽選(結果はここで決める。演出は画面側)
         const c = conflicts(s).find((x) => x.playerId === action.playerId);
         if (!c) throw new Error('この選手の重複はありません');
-        const mode = optionsOf(s).lotteryMode;
+        const mode = lotteryModeOf(s);
         if (mode && mode !== 'roulette') {
           // 選ぶ順番はリーダーの並び順。くじは人数分(色＋番号)。当たりのくじはここで決めて隠す
           const order = s.leaders.map((l) => l.id).filter((id) => c.leaders.includes(id)), n = order.length;
@@ -489,8 +499,7 @@
     rows.push(['進め方', '指名のしかた', ...Array.from({ length: s.rounds }, (_, i) => (roundMode(s, i + 1) === 'order' ? '順番指名' : '一斉入札'))]);
     rows.push(['進め方', '順番指名の順番', o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク']);
     rows.push(['進め方', '抽選の演出', o.lotteryStyle === 'short' ? '短い' : '通常']);
-    rows.push(['進め方', '封筒・あみだの見せ方', o.lotFx === '2d' ? 'シンプル' : '3D']);
-    rows.push(['進め方', '抽選の方式', { roulette: 'ルーレット', wheel: '色を選んでルーレット', envelope: '封筒', amida: 'あみだくじ' }[o.lotteryMode] || 'ルーレット']);
+    rows.push(['進め方', '抽選の方式', ...Array.from({ length: s.rounds }, (_, i) => LOTTERY_LABEL[lotteryModeOf(s, i + 1)])]);
     rows.push(['進め方', '制限時間（秒）', o.timerSec]);
     rows.push(['進め方', 'タイマーを自動でスタート', o.timerAuto ? 'する' : 'しない'], ['進め方', 'タイマーを配信画面に出す', o.timerShow ? 'する' : 'しない']);
     rows.push(['進め方', '巡のはじめの見出し', o.flowRound ? '出す' : '出さない'], ['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
@@ -525,8 +534,7 @@
         if (key === '指名のしかた') O.roundModes = v.filter((x) => x !== '').map((x) => (/順番/.test(x) ? 'order' : 'bid'));
         else if (key === '順番指名の順番') O.orderStyle = /ウェーバー/.test(v0) ? 'waiver' : 'snake';
         else if (key === '抽選の演出') O.lotteryStyle = /短/.test(v0) ? 'short' : 'full';
-        else if (key === '封筒・あみだの見せ方') O.lotFx = /シンプル|2D/i.test(v0) ? '2d' : '3d';
-        else if (key === '抽選の方式') O.lotteryMode = /色/.test(v0) ? 'wheel' : /封筒/.test(v0) ? 'envelope' : /あみだ/.test(v0) ? 'amida' : 'roulette';
+        else if (key === '抽選の方式') { O.lotteryModes = v.filter((x) => x !== '').map(lotteryModeFrom); O.lotteryMode = O.lotteryModes[0] || 'wheel'; }
         else if (/^制限時間/.test(key)) O.timerSec = Math.max(10, Math.min(3600, +v0 || 300));
         else if (key === 'タイマーを自動でスタート') O.timerAuto = yes(v0);
         else if (key === 'タイマーを配信画面に出す') O.timerShow = yes(v0);
@@ -568,5 +576,5 @@
     return s;
   }
 
-  return { LOT_COLORS, amidaEnd, amidaRungs, TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  return { LOT_COLORS, LOTTERY_LABEL, lotteryModeOf, amidaEnd, amidaRungs, TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));

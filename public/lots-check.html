@@ -28,11 +28,10 @@
 <body>
 <header>
   <h1>くじの演出チェック</h1>
-  <label>方式 <select id="mode"><option value="envelope">封筒（3D）</option><option value="amida">あみだくじ（3D）</option><option value="wheel">色を選んでルーレット</option></select></label>
+  <label>方式 <select id="mode"><option value="envelope">封筒</option><option value="amida">あみだくじ</option><option value="wheel">色を選んでルーレット</option></select></label>
   <label>競合チーム数 <select id="n"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>12</option></select></label>
   <button type="button" id="reset">最初から</button>
   <label><input type="checkbox" id="sound"> 音を出す</label>
-  <label><input type="checkbox" id="proto"> 試作（焦らし）</label>
   <span id="state"></span>
 </header>
 <header>
@@ -81,7 +80,7 @@ function send() {
   if (!ready || wheel()) return;
   const L = S.lottery, owner = (i) => L.leaders.find((id) => L.picks[id] === i);
   $('f').contentWindow.postMessage({ type: 'lots', data: { id: L.id, mode: L.mode, lots: L.lots, owners: L.lots.map((_, i) => (owner(i) ? team(owner(i)) : null)),
-    order: L.leaders.map((id) => L.picks[id]), opened: L.opened, done: L.done, winLot: L.winLot, amida: L.amida, player: { name: '香川 あおい', icon: '' }, note: note(L), proto: $('proto').checked } }, '*');
+    order: L.leaders.map((id) => L.picks[id]), opened: L.opened, done: L.done, winLot: L.winLot, amida: L.amida, player: { name: '香川 あおい', icon: '' }, note: note(L) } }, '*');
 }
 function act(a) { try { S = C.apply(S, a); } catch (e) { $('state').textContent = e.message; return; } send(); render(); }
 function render() {
@@ -109,7 +108,6 @@ $('open').addEventListener('click', () => {
   act({ type: 'lotOpen' });
 });
 $('reset').addEventListener('click', reset);
-$('proto').addEventListener('change', reset);
 $('mode').addEventListener('change', reset); $('n').addEventListener('change', reset);
 // 3D の画面の準備ができたら送る / 効果音
 addEventListener('message', (e) => {

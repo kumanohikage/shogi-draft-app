@@ -835,7 +835,7 @@ function renderOptions() {
   const o = optionsOf();
   // 順番指名の巡が1つもなければ、順番の設定は使わない
   setDisabled($('opt-order'), !o.roundModes.slice(0, S.rounds).includes('order'));
-  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-lotmode', o.lotteryMode], ['opt-lotfx', o.lotFx], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
+  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
   $('opt-timershow').checked = !!o.timerShow;
   $('opt-timerauto').checked = !!o.timerAuto;
   // 巡: 1行に1巡(指名のしかた＋待ち時間の画像)
@@ -843,10 +843,11 @@ function renderOptions() {
   if (rows.contains(document.activeElement) && document.activeElement.matches('select')) return;
   const map = o.waitImages || {};
   rows.innerHTML = Array.from({ length: S.rounds }, (_, i) => {
-    const r = i + 1, m = o.roundModes[i] || 'bid', list = map[r] || [];
+    const r = i + 1, m = o.roundModes[i] || 'bid', list = map[r] || [], lm = C.lotteryModeOf(S, r);
     const now = r === S.round;
     return `<div class="flex flex-wrap items-center gap-3 p-3 ${CARD} ${now ? 'border-primary-500/60' : ''}" data-round-row="${r}"><b class="w-16 flex-none text-base text-[var(--text-heading)]">第${r}巡</b>
       <div class="relative"><label class="sr-only" for="rm-${i}">第${r}巡の指名のしかた</label><select id="rm-${i}" data-round-mode="${i}" class="appearance-none w-36 pl-3 pr-10 ${INPUT} cursor-pointer"><option value="bid" ${m === 'bid' ? 'selected' : ''}>一斉入札</option><option value="order" ${m === 'order' ? 'selected' : ''}>順番指名</option></select>${ICON.chevron}</div>
+      <span class="text-xs text-[var(--text-muted)]">抽選</span><div class="relative"><label class="sr-only" for="lm-${i}">第${r}巡の抽選の方式</label><select id="lm-${i}" data-lot-mode="${i}" ${m === 'order' ? 'disabled title="順番指名の巡は重複しないので抽選はありません"' : ''} class="appearance-none w-52 pl-3 pr-10 ${INPUT} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">${Object.entries(C.LOTTERY_LABEL).map(([k, v]) => `<option value="${k}" ${lm === k ? 'selected' : ''}>${v}</option>`).join('')}</select>${ICON.chevron}</div>
       <span class="text-xs text-[var(--text-muted)]">待ち時間の画像</span>
       ${list.map((f, k) => `<span class="relative"><img src="${img(f)}" alt="第${r}巡の${k + 1}枚目" class="w-24 h-14 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><span class="absolute left-1 top-1 px-1.5 rounded bg-black/70 text-xs text-white">${k + 1}</span>
         <button type="button" data-wait-del="${r}:${k}" aria-label="第${r}巡の${k + 1}枚目を外す" class="absolute -right-2 -top-2 w-7 h-7 inline-flex items-center justify-center rounded-full bg-[var(--bg-page-alt)] border border-[var(--border-strong)] text-[var(--text-default)] cursor-pointer ${FOCUS}"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></span>`).join('')}
@@ -858,12 +859,13 @@ document.addEventListener('change', (e) => {
   if (t.dataset.roundMode !== undefined) {
     const m = [...optionsOf().roundModes]; m[+t.dataset.roundMode] = t.value;
     setOption({ roundModes: Array.from({ length: S.rounds }, (_, i) => m[i] || 'bid') });
+  } else if (t.dataset.lotMode !== undefined) {
+    // 抽選の方式(巡ごと)。くじを選ぶ方式が1つでもあれば、くじの色と紛らわしいので枠はリーダーの色をやめる(大会の見た目で戻せる)
+    const lm = Array.from({ length: S.rounds }, (_, i) => C.lotteryModeOf(S, i + 1)); lm[+t.dataset.lotMode] = t.value;
+    setOption({ lotteryModes: lm, leaderColors: lm.every((x) => x === 'roulette') });
   } else if (t.id === 'opt-order') setOption({ orderStyle: t.value });
   else if (t.id === 'opt-lottery') setOption({ lotteryStyle: t.value });
-  // くじを選ぶ方式では、くじの色と紛らわしいので、枠はリーダーの色をやめて落ち着いた色に(大会の見た目で戻せる)
-  else if (t.id === 'opt-lotmode') setOption({ lotteryMode: t.value, leaderColors: t.value === 'roulette' });
   else if (t.id === 'opt-leadercolors') setOption({ leaderColors: t.checked });
-  else if (t.id === 'opt-lotfx') setOption({ lotFx: t.value });
   else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 300)) });
   else if (t.id === 'opt-timershow') setOption({ timerShow: t.checked });
   else if (t.id === 'opt-timerauto') setOption({ timerAuto: t.checked });
