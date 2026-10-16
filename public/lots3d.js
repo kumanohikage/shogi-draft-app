@@ -133,12 +133,12 @@ const fitHud = () => { $('hud').style.transform = `scale(${innerWidth / W})`; };
 addEventListener('resize', fitHud); fitHud();
 
 /* ---------- 背景: ルーレットの「光」の後光(カメラに付けて、画面に対して動かない=酔いにくい目印) ---------- */
-const bgU = { uTime: { value: 0 }, uReach: { value: 0 }, uWin: { value: 0 }, uDim: { value: 0 }, uGlow: { value: 0.45 }, uTier: { value: new THREE.Color(1, 1, 1) }, uZebra: { value: 0 }, uAspect: { value: W / H } };
+const bgU = { uTime: { value: 0 }, uReach: { value: 0 }, uWin: { value: 0 }, uDim: { value: 0 }, uGlow: { value: 0.45 }, uTier: { value: new THREE.Color(1, 1, 1) }, uZebra: { value: 0 }, uAspect: { value: W / H }, uSat: { value: 1 } };
 const bg = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
   uniforms: bgU, depthWrite: false, depthTest: false,
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: `
-    uniform float uTime, uReach, uWin, uDim, uGlow, uAspect, uZebra; uniform vec3 uTier; varying vec2 vUv;
+    uniform float uTime, uReach, uWin, uDim, uGlow, uAspect, uZebra, uSat; uniform vec3 uTier; varying vec2 vUv;
     void main(){
       vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0) * 2.0;
       float r = length(p), a = atan(p.y, p.x);
@@ -153,6 +153,7 @@ const bg = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMateria
       col += uWin * (rays * 0.35 + 0.05) * rb;
       col *= 1.0 - uDim * 0.8;
       col *= 1.0 - 0.5 * smoothstep(0.7, 2.3, r);
+      col = max(mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, uSat), 0.0); // 彩度(封筒は少し濃く)
       gl_FragColor = vec4(col, 1.0);
     }`,
 }));
@@ -792,10 +793,10 @@ function frame() {
   fx.win += (fx.winT - fx.win) * k(3); fx.dim += (fx.dimT - fx.dim) * k(4);
   bgU.uTime.value = t; bgU.uWin.value = fx.win; bgU.uDim.value = fx.dim;
   fx.heatNow += (fx.heat - fx.heatNow) * k(2);
-  // 封筒は板(縁の光)がないぶん暗く見えるので、背景の光と露出を少し強く
+  // 封筒は板(縁の光)がないぶん暗く見えるので、背景の光を少し強く。露出は上げない(上げると白っぽく色が薄くなる)。かわりに色を少し濃く
   const env = world && world.mode !== 'amida';
   bgU.uGlow.value = 0.4 + 0.6 * Math.min(1, fx.amb / 3.4) + fx.heatNow * 0.22 + (env ? 0.3 : 0);
-  renderer.toneMappingExposure = env ? 1.12 : 1.0;
+  bgU.uSat.value = env ? 1.3 : 1;
   tierLight.intensity = fx.win * 4; tierLight.color.setHSL((t * 0.4) % 1, 1, 0.6);
   bloom.strength = 0.45 + fx.win * 0.45;
   // カメラ(時間あたり一定の減衰でついていく。回さない)
