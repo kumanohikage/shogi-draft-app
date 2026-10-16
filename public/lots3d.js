@@ -516,9 +516,8 @@ function buildEnvelope(d) {
       if (proto()) {
         // 絞り: ゆっくり少しだけ出て(ふちの色がのぞく)、止まって、一気に出る
         // 最後から2番目(ここの結果で最後まで決まる)は、心音に合わせてゆっくり。カメラも少しずつ口へ寄る
-        const big = promoOf(e.lot, win) && !isLast(lot), SQ = big ? 2.8 : 1.1;
-        if (penult(lot)) heartbeats(Math.round(SQ / 0.56), 0.56);
-        if (big) { fx.dimT = 0.5; camTo(new THREE.Vector3(e.x, top.y + 0.1, zm.pos.z * 0.68), new THREE.Vector3(e.x, top.y - 0.15, 0), SQ); }
+        const big = (promoOf(e.lot, win) || penult(lot)) && !isLast(lot), SQ = big ? 2.8 : 1.1;
+        if (big) { heartbeats(Math.round(SQ / 0.56), 0.56); fx.dimT = 0.5; camTo(new THREE.Vector3(e.x, top.y + 0.1, zm.pos.z * 0.68), new THREE.Vector3(e.x, top.y - 0.15, 0), SQ); }
         // 中袋は封筒の口から出す: 口より下は切り取って見せない(上のふちだけがのぞく)
         const mouth = new THREE.Vector3(); e.g.localToWorld(mouth.set(0, 2.3 / 2, 0));
         e.card.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -mouth.y)]; e.card.material.needsUpdate = true;
@@ -676,31 +675,36 @@ function buildAmida(d) {
       // 当たりの列を下っている(縦の線)なら、ゆっくり。上の方では焦らさない(下 2/3 だけ)
       const nextTurnSeen = (s) => { const c = p.cross.find(([, , at]) => at > s); if (!c) return false; const o = rungMeshes[c[0]].find((x) => x.i === c[1]); return !!(o && o.m.visible); };
       const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3 && !nextTurnSeen(s);
-      // 最後から2番目は、もっとゆっくり・心音・少しずつ寄る
-      const big = proto() && penult(lane);
+      // 「チャンス!!」のときと最後から2番目は、もっとゆっくり・心音・少しずつ寄る
+      const big = tease && (promoOf(lot, win) || penult(lane));
+      // ゆっくりの時間は、残りの距離に関係なく同じにする(最後の短い線でもちゃんと焦らす)
+      const SLOW_T = big ? 3.0 : 1.4;
       // 当たりの列をゆっくり下りてきて、そこから離れていく横線(迷わず、さっと曲がる)
       const leaveSeg = (s) => tease && s > 0 && slowSeg(s - 1) && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) > 1e-3;
       joint(p.pts[0], mat); const joined = new Set([0]); const crossed = new Set();
       sound.shoot(BASE); fx.dimT = 0.6; fx.bulb = 'spin';
       const col = lc, head = new THREE.Vector3();
-      let s = 0, q = 0, speed = 0, t = 0, beatAt = 0, slowNow = false;
+      const vert = (i) => Math.abs(segs[i].userData.a.x - segs[i].userData.b.x) < 1e-3;
+      let s = 0, q = 0, vel = 0, t = 0, beatAt = 0, slowNow = false, slowSegAt = -1, slowV = 0;
       await ticker((dt) => {
         t += dt;
-        const lastSeg = s >= segs.length - 1;
-        const want = slowSeg(s) ? (big ? (lastSeg ? 0.08 : 0.12) : lastSeg ? 0.22 : 0.3) : leaveSeg(s) ? 2.2 : 1;
-        if (want < 1 && !slowNow) {
+        const slow = s < segs.length && slowSeg(s);
+        // ゆっくりの線に入ったら、残りの距離を SLOW_T 秒で進む速さにする
+        if (slow && slowSegAt !== s) { slowSegAt = s; slowV = Math.max(0.05, (lens[s] * (1 - q)) / SLOW_T); vel = slowV; } // ぐっとブレーキ
+        const target = slow ? slowV : V * (s < segs.length && leaveSeg(s) ? 2.2 : 1) * (vert(Math.min(s, segs.length - 1)) ? 0.8 : 1.8);
+        if (slow && !slowNow) {
           slowNow = true; fx.dimT = 0.85; beatAt = 0;
           // 当たりの列とゴールのあいだへ、ゆっくりまっすぐ寄る(回さない)
-          if (big) { const midY = (segs[s].userData.a.y + goals[d.amida.goal].position.y) / 2; camTo(new THREE.Vector3(gx * 0.6, midY, home.pos.z * 0.72), new THREE.Vector3(gx * 0.6, midY, 0), 3.2); }
+          if (big) { const midY = (segs[s].userData.a.y + goals[d.amida.goal].position.y) / 2; camTo(new THREE.Vector3(gx * 0.6, midY, home.pos.z * 0.72), new THREE.Vector3(gx * 0.6, midY, 0), SLOW_T); }
         }
-        if (want >= 1 && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
-        const nearEnd = s >= segs.length - 1 && lens[segs.length - 1] * (1 - q) < 0.9;
-        if (slowNow && t >= beatAt && !nearEnd) { if (penult(lane)) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
+        if (!slow && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
+        // 心音: ゆっくりのあいだ(着く直前には新しく鳴らさない)
+        const leftT = s < segs.length ? (lens[s] * (1 - q)) / Math.max(vel, 1e-3) : 0;
+        if (slowNow && t >= beatAt && leftT > 0.35) { if (big) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
 
         {
-          speed += (want - speed) * (1 - Math.exp(-dt * (want < speed ? 5 : 14)));
-          const vert = (i) => Math.abs(segs[i].userData.a.x - segs[i].userData.b.x) < 1e-3;
-          let step = V * speed * dt * (vert(Math.min(s, segs.length - 1)) ? 0.8 : 1.8);
+          vel += (target - vel) * (1 - Math.exp(-dt * (target < vel ? 10 : 14)));
+          let step = vel * dt;
           while (step > 0 && s < segs.length) {
             const left = lens[s] * (1 - q);
             if (step < left) { q += step / lens[s]; step = 0; }
