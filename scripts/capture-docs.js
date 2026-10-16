@@ -24,6 +24,7 @@ app.whenReady().then(async () => {
   const send = async (m) => { ws.send(JSON.stringify(m)); await wait(300); };
   const act = (a) => send({ type: 'action', action: a });
   await send({ type: 'mode', mode: 'demo', fresh: true });
+  await act({ type: 'setOption', patch: { lotteryMode: 'roulette' } });
   await act({ type: 'setTitle', title: 'ドラフト会議' });
 
   const ct = new BrowserWindow({ width: 1360, height: 900, show: false });

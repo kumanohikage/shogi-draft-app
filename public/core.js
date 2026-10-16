@@ -12,7 +12,7 @@
   // くじの色。色の見分けが苦手な人にも分かるよう、番号(①②…)と一緒に出す
   const LOT_COLORS = [['赤', '#d93a3a'], ['青', '#2f6fd6'], ['緑', '#2e9e55'], ['黄', '#e2b100'], ['紫', '#8a4fbf'], ['橙', '#ec7a00'], ['桃', '#e0559a'], ['水', '#14a3b8'], ['茶', '#8a5a2b'], ['紺', '#2c3e8f'], ['黄緑', '#79b51c'], ['灰', '#7a7f87']];
   const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫';
-  const lotsFor = (n) => Array.from({ length: n }, (_, i) => ({ name: LOT_COLORS[i][0], color: LOT_COLORS[i][1], label: LOT_COLORS[i][0] + CIRCLED[i] }));
+  const lotsFor = (n) => Array.from({ length: n }, (_, i) => ({ name: LOT_COLORS[i][0], color: LOT_COLORS[i][1], label: CIRCLED[i] + LOT_COLORS[i][0] }));
   // あみだくじ: 横線をランダムに引く(隣どうしの横線は同じ段に並べない)。lane の線が最後に着く場所を返す
   function amidaRungs(n, rng) {
     const rows = Math.max(6, n * 2 + 2), rungs = [];
@@ -144,7 +144,7 @@
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'roulette', leaderColors: true };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'wheel', leaderColors: false };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
@@ -353,7 +353,6 @@
         if (taken.has(action.lot) || !L.lots[action.lot]) throw new Error('そのくじはもう選ばれています');
         L.picks[who] = action.lot; taken.add(action.lot);
         const rest = L.leaders.filter((id) => L.picks[id] == null);
-        if (rest.length === 1) L.picks[rest[0]] = L.lots.findIndex((_, i) => !taken.has(i)); // 残り物
         if (L.leaders.every((id) => L.picks[id] != null)) {
           // 全員選んだ: 当たりのくじを選んだリーダーが交渉権。結果はまだ見せない(開ける・回すまで)
           const winner = L.leaders.find((id) => L.picks[id] === L.winLot);

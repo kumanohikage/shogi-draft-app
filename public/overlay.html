@@ -53,7 +53,10 @@
   @keyframes bandIn2 { from { opacity: 0; transform: translateY(20px); } }
   @keyframes tFadeIn { from { opacity: 0; } }
   /* ---------- くじ(選ぶ・封筒・あみだ) ---------- */
-  .lotshead { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 6px; }
+  .lotshead { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 0; }
+  #sc-lots h1 { padding-bottom: 12px; }
+  .lotshead img { width: 100px !important; height: 100px !important; }
+  .lotshead .pn { font-size: 64px !important; }
   .lotshead img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
   .lotshead .pn { font: normal 76px 'Dela Gothic One', sans-serif; color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00; }
   .lotshead .pk { padding: 8px 26px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 34px 'Noto Sans JP'; }
@@ -74,13 +77,14 @@
   .env .res.win { background: linear-gradient(160deg, #fff7d6, #ffd54a); color: #a3150f; text-shadow: none; box-shadow: inset 0 0 0 6px #c0261e; }
   .env .res.lose { background: #e9e4dc; color: #6a6258; text-shadow: none; }
   .env .res.anim { animation: envOpen .7s cubic-bezier(.3,1.4,.5,1) both; }
+  .env .res.late { animation: envOpen .6s 1.8s cubic-bezier(.3,1.4,.5,1) both; }
   @keyframes envOpen { from { transform: rotateX(90deg); } }
   .lot.win .face { box-shadow: 0 0 0 8px #ffd54a, 0 0 60px 12px rgba(255,200,60,.9); }
   .lotsnote { align-self: center; margin: 0 0 36px; padding: 12px 40px; border-radius: 999px; background: rgba(20,14,8,.85); color: #fff3d6; font: 900 40px 'Noto Sans JP'; white-space: nowrap; }
   /* あみだ */
   .amida { position: relative; }
   .amida svg { display: block; overflow: visible; }
-  .amida .cover { position: absolute; left: -20px; right: -20px; top: 120px; bottom: 100px; border-radius: 22px; background: repeating-linear-gradient(45deg, #3a2410, #3a2410 22px, #2c1a0a 22px, #2c1a0a 44px); box-shadow: 0 14px 30px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; color: #f3d27a; font: normal 90px 'Dela Gothic One', sans-serif; transition: opacity .6s; }
+  .amida .cover { position: absolute; left: -30px; right: -30px; top: 138px; bottom: 120px; border-radius: 22px; background: repeating-linear-gradient(45deg, #3a2410, #3a2410 22px, #2c1a0a 22px, #2c1a0a 44px); box-shadow: 0 14px 30px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; color: #f3d27a; font: normal 90px 'Dela Gothic One', sans-serif; transition: opacity .6s; }
   .amida .cover.off { opacity: 0; }
   .amida .trace { fill: none; stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
   .amida .trace.anim { animation: amidaTrace 2.6s ease-in-out both; }

@@ -69,6 +69,8 @@
       const who = L.leaders.find((id) => L.picks[id] == null), k = L.leaders.indexOf(who) + 1;
       const taken = new Set(Object.values(L.picks));
       const choices = L.lots.map((x, i) => ({ key: 'lotPick', arg: String(i), label: x.label, color: x.color, off: taken.has(i) }));
+      // 最後の1人は残ったくじに自動で決まる(少し間をあけて)
+      if (L.leaders.filter((id) => L.picks[id] == null).length === 1) return { step: 2, text: `<b>${esc(C.teamLabel(S, C.leaderById(S, who)))}</b> は残りのくじ <b>${esc(L.lots.find((_, i) => !taken.has(i)).label)}</b> に決まります`, main: { label: '残り物を配っています…', off: true } };
       return { step: 2, text: `<b>${name(L.playerId)}</b> の抽選: <b>${esc(C.teamLabel(S, C.leaderById(S, who)))}</b> がくじを選びます（${k} / ${L.leaders.length}人目）`, choices, main: { label: 'くじを選んでください', off: true } };
     }
     if (L && L.phase === 'ready') {

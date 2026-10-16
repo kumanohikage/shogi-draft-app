@@ -65,6 +65,7 @@ app.whenReady().then(async () => {
   await tab('leaders'); await check('02-leaders-empty');
   // 2. お試しモード(ダミー名簿)
   await send({ type: 'mode', mode: 'demo' });
+  await act({ type: 'setOption', patch: { lotteryMode: 'roulette' } }); // この検査は選ばないルーレットの流れ(くじを選ぶ方式は別のテスト)
   // 進行表のドラフトの場面へ(お試しは進行表の最初=オープニングから始まる)
   await act({ type: 'progGo', idx: C.programOf(S).findIndex((g) => g.type === 'draft') });
   await check('03-roster-demo');

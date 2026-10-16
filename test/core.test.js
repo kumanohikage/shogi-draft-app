@@ -1,8 +1,10 @@
 // node test/core.test.js
 const assert = require('assert');
 const C = require('../public/core.js');
+// 抽選まわりの昔からのテストは「選ばないルーレット」で確かめる(初期値は「くじの色を選んでルーレット」)
+const init0 = () => C.apply(C.initialState(), { type: 'setOption', patch: { lotteryMode: 'roulette' } });
 
-let s = C.initialState();
+let s = C.apply(init0(), { type: 'setOption', patch: { lotteryMode: 'roulette' } }); // ここは選ばないルーレットの流れを確かめる
 for (let i = 0; i < 6; i++) s = C.apply(s, { type: 'addLeader', name: `L${i}` });
 s = C.apply(s, { type: 'addPlayers', players: Array.from({ length: 20 }, (_, i) => ({ name: `P${i}` })) });
 const L = s.leaders.map((l) => l.id), P = s.players.map((p) => p.id);
@@ -35,7 +37,7 @@ assert.strictEqual(s.round, 2);
 assert.deepStrictEqual(s.noms, {});
 
 // 抽選の公平性: rng を均等に振ると各リーダーが同じ回数当たる
-let t = C.initialState();
+let t = C.apply(init0(), { type: 'setOption', patch: { lotteryMode: 'roulette' } });
 for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
 t = C.apply(t, { type: 'addPlayers', players: [{ name: 'X' }] });
 for (const l of t.leaders) t = C.apply(t, { type: 'nominate', leaderId: l.id, playerId: t.players[0].id });
@@ -54,7 +56,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 
 // 1人ずつ公開: 全員公開するまでは確定しない(後から重複が出ることがあるため)
 {
-  let t = C.initialState();
+  let t = init0();
   for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
   t = C.apply(t, { type: 'addPlayers', players: [{ name: 'a' }, { name: 'b' }] });
   const [l0, l1, l2] = t.leaders.map((l) => l.id), [pa, pb] = t.players.map((p) => p.id);
@@ -75,7 +77,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 
 // 重複が2件: 全部抽選し終わるまで再指名できない(プロ野球のドラフトと同じ)
 {
-  let t = C.initialState();
+  let t = init0();
   for (let i = 0; i < 4; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
   t = C.apply(t, { type: 'addPlayers', players: ['a', 'b', 'c', 'd'].map((name) => ({ name })) });
   const L = t.leaders.map((l) => l.id), [pa, pb, pc] = t.players.map((p) => p.id);
@@ -94,7 +96,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 
 // ピックアップ公開: 1人ずつ spot に出る。全員出るまで確定しない。spotEnd で一覧へ
 {
-  let t = C.initialState();
+  let t = init0();
   for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
   t = C.apply(t, { type: 'addPlayers', players: ['a', 'b', 'c'].map((name) => ({ name })) });
   const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
@@ -115,7 +117,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 
 // 欠場・削除の制限・ひとこと
 {
-  let t = C.initialState();
+  let t = init0();
   for (let i = 0; i < 2; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
   t = C.apply(t, { type: 'addPlayers', players: [{ name: 'a', note: '初段' }, { name: 'b' }] });
   const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
@@ -130,7 +132,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 
 // 順番指名(スネーク): 1巡目は一斉入札、2・3巡目は順番指名。2巡目は登録順、3巡目は逆順
 {
-  let t = C.initialState();
+  let t = init0();
   for (let i = 0; i < 3; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
   t = C.apply(t, { type: 'addPlayers', players: Array.from({ length: 9 }, (_, i) => ({ name: `p${i}` })) });
   t = C.apply(t, { type: 'setOption', patch: { roundModes: ['bid', 'order', 'order'], orderStyle: 'snake' } });
@@ -151,7 +153,7 @@ assert.deepStrictEqual(C.rosterFromCSV('種類,名前,チーム名,色,画像フ
 
 // 抽選の記録・リセット・タイマー
 {
-  let t = C.initialState();
+  let t = init0();
   for (let i = 0; i < 2; i++) t = C.apply(t, { type: 'addLeader', name: `L${i}` });
   t = C.apply(t, { type: 'addPlayers', players: [{ name: 'a' }] });
   const L = t.leaders.map((l) => l.id), P = t.players.map((p) => p.id);
@@ -176,14 +178,14 @@ console.log('core OK');
 
 // 略称: 帯は「チーム＋略称」、略称が無ければフルネーム。CSV の略称列も往復できる
 {
-  let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: '飛鳥 りく', short: '飛鳥' }, { name: '角田 みお' }], players: [] });
+  let s = C.apply(init0(), { type: 'replaceRoster', leaders: [{ name: '飛鳥 りく', short: '飛鳥' }, { name: '角田 みお' }], players: [] });
   assert.strictEqual(C.teamLabel(s, s.leaders[0]), 'チーム飛鳥');
   assert.strictEqual(C.teamLabel(s, s.leaders[1]), 'チーム角田 みお');
   assert.strictEqual(C.rosterFromCSV(C.rosterToCSV(s)).leaders[0].short, '飛鳥');
 }
 // 巡のはじめ: 待ち時間の画像が無ければ待ち時間の画面は飛ばす / タイマーは自動でスタート(設定で止められる)
 {
-  let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p1' }, { name: 'p2' }, { name: 'p3' }, { name: 'p4' }] });
+  let s = C.apply(init0(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }], players: [{ name: 'p1' }, { name: 'p2' }, { name: 'p3' }, { name: 'p4' }] });
   s = C.apply(s, { type: 'progGo', idx: 4, now: 1000 });
   assert.strictEqual(s.scene, 'round'); // 巡の見出し
   assert.strictEqual(s.timer.endsAt, null);
@@ -204,10 +206,10 @@ console.log('core OK');
 console.log('略称・巡のはじめ ok');
 // 番組の CSV: 書き出し → 読み込みで同じ番組になる
 {
-  let s = C.apply(C.initialState(), { type: 'setOption', patch: { roundModes: ['bid', 'order', 'order'], orderStyle: 'waiver', timerSec: 240, flowStand: false, waitImages: { 2: ['a.png', 'b.png'] }, teamPrefix: '' } });
+  let s = C.apply(init0(), { type: 'setOption', patch: { roundModes: ['bid', 'order', 'order'], orderStyle: 'waiver', timerSec: 240, flowStand: false, waitImages: { 2: ['a.png', 'b.png'] }, teamPrefix: '' } });
   s = C.apply(s, { type: 'addSlide', kind: 'image', toProgram: true, at: 1 });
   const csv = C.showToCSV(s);
-  let t = C.apply(C.initialState(), { type: 'replaceShow', ...C.showFromCSV(csv) });
+  let t = C.apply(init0(), { type: 'replaceShow', ...C.showFromCSV(csv) });
   assert.strictEqual(C.showToCSV(t), csv);
   assert.deepStrictEqual(C.optionsOf(t).waitImages, { 1: [], 2: ['a.png', 'b.png'], 3: [] });
   assert.strictEqual(C.slideById(t, C.programOf(t).find((g) => g.label === 'ドラフト説明').slideId).rules, true);
@@ -219,7 +221,7 @@ console.log('略称・巡のはじめ ok');
 console.log('番組の CSV ok');
 // 場面の BGM: 決めていれば場面の曲、'-' は無音、決めていなければ音のボタンの曲。番組の CSV でも往復できる
 {
-  let s = C.apply(C.initialState(), { type: 'setAudio', patch: { bgm: 'main.mp3' } });
+  let s = C.apply(init0(), { type: 'setAudio', patch: { bgm: 'main.mp3' } });
   const [open, about] = C.programOf(s);
   assert.strictEqual(C.sceneBgm(s), 'main.mp3');
   s = C.apply(s, { type: 'updateProgram', id: open.id, patch: { bgm: 'op.mp3' } });
@@ -229,13 +231,13 @@ console.log('番組の CSV ok');
   assert.strictEqual(C.sceneBgm(s), '');
   s = C.apply(s, { type: 'progGo', idx: 2 });
   assert.strictEqual(C.sceneBgm(s), 'main.mp3');
-  const t = C.apply(C.initialState(), { type: 'replaceShow', ...C.showFromCSV(C.showToCSV(s)) });
+  const t = C.apply(init0(), { type: 'replaceShow', ...C.showFromCSV(C.showToCSV(s)) });
   assert.deepStrictEqual(C.programOf(t).slice(0, 2).map((g) => g.bgm), ['op.mp3', '-']);
 }
 console.log('場面の BGM ok');
 // くじを選ぶ抽選: 並び順に選ぶ → 当たりのくじを選んだ人が交渉権。選び終わるまで確定しない。最後の1人は残り物
 for (const mode of ['wheel', 'envelope', 'amida']) {
-  let s = C.apply(C.initialState(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }, { name: 'C' }], players: [{ name: 'p' }, { name: 'q' }, { name: 'r' }] });
+  let s = C.apply(init0(), { type: 'replaceRoster', leaders: [{ name: 'A' }, { name: 'B' }, { name: 'C' }], players: [{ name: 'p' }, { name: 'q' }, { name: 'r' }] });
   s = C.apply(s, { type: 'setOption', patch: { lotteryMode: mode } });
   const [a, b, c] = s.leaders, p = s.players[0];
   for (const l of [a, b, c]) s = C.apply(s, { type: 'nominate', leaderId: l.id, playerId: p.id });
@@ -246,7 +248,9 @@ for (const mode of ['wheel', 'envelope', 'amida']) {
   assert.strictEqual(s.picks.length, 0); // まだ確定しない
   s = C.apply(s, { type: 'lotPick', lot: 2 }); // A は ③
   assert.throws(() => C.apply(s, { type: 'lotPick', lot: 2 })); // 同じくじは選べない
-  s = C.apply(s, { type: 'lotPick', lot: 1 }); // B は ②(当たり) → C は残りの ①
+  s = C.apply(s, { type: 'lotPick', lot: 1 }); // B は ②(当たり)
+  assert.strictEqual(s.lottery.phase, 'pick'); // C の残り物はサーバーが少し待ってから配る
+  s = C.apply(s, { type: 'lotPick', lot: 0 });
   assert.deepStrictEqual(s.lottery.picks, { [a.id]: 2, [b.id]: 1, [c.id]: 0 });
   assert.strictEqual(s.lottery.winner, b.id);
   assert.strictEqual(s.lottery.phase, 'ready');

@@ -214,6 +214,17 @@ function start(opts = {}) {
           // 抽選の演出完了の知らせと音の設定は「戻す」の対象にしない
           if (!NO_UNDO.has(msg.action.type)) { history.push(state); if (history.length > HISTORY_MAX) history.shift(); }
           state = next;
+          // くじ: 残り1人になったら、少し待ってから残りのくじを配る(同時だとどちらを選んだか分かりにくい)
+          if (msg.action.type === 'lotPick') {
+            const L = state.lottery, rest = L ? L.leaders.filter((id) => L.picks[id] == null) : [];
+            if (L && L.phase === 'pick' && rest.length === 1) {
+              const id = L.id, lot = L.lots.findIndex((_, i) => !Object.values(L.picks).includes(i));
+              setTimeout(() => {
+                if (!state.lottery || state.lottery.id !== id || state.lottery.phase !== 'pick') return;
+                history.push(state); state = Core.apply(state, { type: 'lotPick', lot }); broadcast(snapshot());
+              }, 1400);
+            }
+          }
           if (msg.action.type === 'drawLottery' && state.lottery && state.lottery.mode && state.lottery.mode !== 'roulette') { /* くじを選ぶ方式: 選び終わるまで待つ */ }
           else if (msg.action.type === 'drawLottery' || msg.action.type === 'lotSpin') {
             // 配信画面が開いていなければ演出は流れないので、その場で結果を出す

@@ -440,21 +440,22 @@ function renderLots() {
     // 開けた封筒: 選んだ順で opened 人目まで
     const openedSet = new Set(L.leaders.slice(0, L.opened));
     $('lots-body').innerHTML = `<div class="lots">${L.lots.map((x, i) => {
-      const o = owner(i), isOpen = isEnv && o && openedSet.has(o), win = isOpen && o === L.winner;
+      const o = owner(i), late = isEnv && L.done && o && !openedSet.has(o); // 当たりのあと、残りもまとめて開く
+      const isOpen = isEnv && o && (openedSet.has(o) || late), win = isOpen && o === L.winner;
       const justPicked = live && o && !fresh && picked > lotsPrev.picked && L.picks[L.leaders[picked - 1]] === i && L.phase !== 'ready';
       const justOpened = live && isOpen && o === L.leaders[L.opened - 1] && L.opened > lotsPrev.opened;
       return `<div class="lot ${isEnv ? 'env' : ''} ${o ? 'taken' : ''} ${justPicked ? 'pop' : ''} ${win ? 'win' : ''}" style="--lc:${x.color}">
-        <div class="face">${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫'[i]}${isOpen ? `<div class="res ${win ? 'win' : 'lose'} ${justOpened ? 'anim' : ''}">${win ? '交渉権確定' : '外れ'}</div>` : ''}</div>
+        <div class="face">${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫'[i]}${isOpen ? `<div class="res ${win ? 'win' : 'lose'} ${justOpened ? 'anim' : late && live && L.opened > lotsPrev.opened ? 'late' : ''}">${win ? '交渉権確定' : '外れ'}</div>` : ''}</div>
         <div class="cl">${esc(x.label)}</div><div class="nm">${o ? team(o) : '？'}</div></div>`;
     }).join('')}</div>`;
-    if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.stamp(), 500); }
+    if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.win(), 450); }
     else if (live && picked > lotsPrev.picked) SE.pop();
   }
   lotsPrev = { id: L.id, picked, opened: L.opened, phase: L.phase };
 }
 // あみだくじ: 上にくじ(色＋番号)と選んだ人。横線は開けるまで隠す。たどった線は選んだ人のくじの色
 function renderAmida(L, owner, live, fresh) {
-  const n = L.lots.length, W = Math.min(1500, n * 260), H = 380, top = 20, bot = H - 20;
+  const n = L.lots.length, W = Math.min(1500, n * 300), H = 330, top = 20, bot = H - 20;
   const xs = Array.from({ length: n }, (_, i) => (n === 1 ? W / 2 : 60 + i * ((W - 120) / (n - 1))));
   const rows = L.amida.rungs.length, ys = Array.from({ length: rows }, (_, r) => top + (r + 1) * ((bot - top) / (rows + 1)));
   const path = (lane) => { let x = lane; const pts = [[xs[x], top - 10]]; L.amida.rungs.forEach((row, r) => { const y = ys[r]; if (row.includes(x)) { pts.push([xs[x], y], [xs[x + 1], y]); x++; } else if (row.includes(x - 1)) { pts.push([xs[x], y], [xs[x - 1], y]); x--; } }); pts.push([xs[x], bot + 10]); return { pts, end: x }; };
@@ -462,15 +463,15 @@ function renderAmida(L, owner, live, fresh) {
   const opened = L.leaders.slice(0, L.opened);
   const traces = opened.map((id, k) => { const lane = L.picks[id], { pts, end } = path(lane); return { id, lane, pts, end, len: len(pts), last: k === opened.length - 1 }; });
   const ends = new Map(traces.map((t) => [t.end, t]));
-  const svg = `<svg width="${W}" height="${H + 110}" viewBox="0 -10 ${W} ${H + 110}">
+  const svg = `<svg width="${W}" height="${H + 130}" viewBox="0 -10 ${W} ${H + 130}">
     ${xs.map((x) => `<line x1="${x}" y1="${top - 10}" x2="${x}" y2="${bot + 10}" stroke="#fffaf0" stroke-width="10" stroke-linecap="round"/>`).join('')}
     ${L.amida.rungs.map((row, r) => row.map((i) => `<line x1="${xs[i]}" y1="${ys[r]}" x2="${xs[i + 1]}" y2="${ys[r]}" stroke="#fffaf0" stroke-width="10" stroke-linecap="round"/>`).join('')).join('')}
     ${traces.map((t) => `<polyline class="trace ${t.last && live && L.opened > lotsPrev.opened ? 'anim' : ''}" points="${t.pts.map((p) => p.join(',')).join(' ')}" stroke="${L.lots[t.lane].color}" style="--len:${t.len};stroke-dasharray:${t.len}"/>`).join('')}
-    ${xs.map((x, i) => { const t = ends.get(i), hit = t && t.id === L.winner; return `<g transform="translate(${x},${bot + 58})"><circle r="40" fill="${t ? (hit ? '#ffd54a' : '#e9e4dc') : '#3a2410'}" stroke="#fff" stroke-width="5"/><text y="16" text-anchor="middle" font-family="Noto Sans JP" font-weight="900" font-size="${hit ? 30 : 40}" fill="${t ? (hit ? '#a3150f' : '#6a6258') : '#f3d27a'}">${t ? (hit ? '当たり' : '×') : '？'}</text></g>`; }).join('')}
+    ${xs.map((x, i) => { const t = ends.get(i), hit = t && t.id === L.winner; return `<g transform="translate(${x},${bot + 66})"><circle r="50" fill="${t ? (hit ? '#ffd54a' : '#e9e4dc') : '#3a2410'}" stroke="#fff" stroke-width="5"/><text y="16" text-anchor="middle" font-family="Noto Sans JP" font-weight="900" font-size="${hit ? 26 : 40}" fill="${t ? (hit ? '#a3150f' : '#6a6258') : '#f3d27a'}">${t ? (hit ? '当たり' : '×') : '？'}</text></g>`; }).join('')}
   </svg>`;
-  const heads = L.lots.map((x, i) => { const o = owner(i); return `<div style="position:absolute;left:${xs[i] - 110}px;top:0;width:220px;display:flex;flex-direction:column;align-items:center;gap:8px"><div class="cl" style="background:${x.color};color:#fff;font:900 34px 'Noto Sans JP';padding:6px 22px;border-radius:999px">${esc(x.label)}</div><div class="nm" style="font:900 30px 'Noto Sans JP';padding:2px 16px;border-radius:10px;${o ? 'background:#fffaf0;color:#2a1606' : 'color:#fff'}">${o ? esc(C.teamLabel(S, C.leaderById(S, o))) : '？'}</div></div>`; }).join('');
-  $('lots-body').innerHTML = `<div class="amida" style="width:${W}px;padding-top:110px">${heads}${svg}<div class="cover ${L.phase === 'reveal' ? 'off' : ''}">？</div></div>`;
-  if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.stamp(), 2600); }
+  const heads = L.lots.map((x, i) => { const o = owner(i); return `<div style="position:absolute;left:${xs[i] - 110}px;top:0;width:220px;display:flex;flex-direction:column;align-items:center;gap:10px"><div class="cl" style="background:${x.color};color:#fff;font:900 34px 'Noto Sans JP';padding:6px 22px;border-radius:999px">${esc(x.label)}</div><div class="nm" style="font:900 30px 'Noto Sans JP';padding:2px 16px;border-radius:10px;${o ? 'background:#fffaf0;color:#2a1606' : 'color:#fff'}">${o ? esc(C.teamLabel(S, C.leaderById(S, o))) : '？'}</div></div>`; }).join('');
+  $('lots-body').innerHTML = `<div class="amida" style="width:${W}px;padding-top:130px">${heads}${svg}<div class="cover ${L.phase === 'reveal' ? 'off' : ''}">？</div></div>`;
+  if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.win(), 2600); }
   else if (live && Object.keys(L.picks).length > lotsPrev.picked) SE.pop();
 }
 
