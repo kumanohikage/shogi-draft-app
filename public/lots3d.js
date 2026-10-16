@@ -792,7 +792,10 @@ function frame() {
   fx.win += (fx.winT - fx.win) * k(3); fx.dim += (fx.dimT - fx.dim) * k(4);
   bgU.uTime.value = t; bgU.uWin.value = fx.win; bgU.uDim.value = fx.dim;
   fx.heatNow += (fx.heat - fx.heatNow) * k(2);
-  bgU.uGlow.value = 0.4 + 0.6 * Math.min(1, fx.amb / 3.4) + fx.heatNow * 0.22;
+  // 封筒は板(縁の光)がないぶん暗く見えるので、背景の光と露出を少し強く
+  const env = world && world.mode !== 'amida';
+  bgU.uGlow.value = 0.4 + 0.6 * Math.min(1, fx.amb / 3.4) + fx.heatNow * 0.22 + (env ? 0.3 : 0);
+  renderer.toneMappingExposure = env ? 1.12 : 1.0;
   tierLight.intensity = fx.win * 4; tierLight.color.setHSL((t * 0.4) % 1, 1, 0.6);
   bloom.strength = 0.45 + fx.win * 0.45;
   // カメラ(時間あたり一定の減衰でついていく。回さない)

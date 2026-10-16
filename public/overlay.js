@@ -340,12 +340,13 @@ function standHtml(l, tag, full) {
     ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
     <div class="band">${esc(full ? l.name : C.teamLabel(S, l))}</div></div>`;
 }
-// 出揃いました: 一斉入札で全員の指名がそろった(再指名のときは「再指名」)
+// 入札完了: 一斉入札で全員の指名がそろった(巡の見出しと同じ見た目。再指名のときは「再指名 入札完了」)
 let prevAllInKey = '';
 function renderAllIn() {
   const renom = S.picks.some((p) => p.round === S.round) || S.lotteries.some((x) => x.round === S.round);
   $('allin-head').innerHTML = titleHtml('');
-  $('allin-sub').textContent = `第${S.round}巡 ${renom ? '再指名' : '選択希望選手'}`;
+  $('allin-no').textContent = `第${S.round}巡`;
+  $('allin-sub').textContent = renom ? '再指名 入札完了' : '入札完了';
   const key = S.scene === 'allin' ? `${S.round}:${S.confirmedKey}` : '';
   if (key && key !== prevAllInKey && !first) { const b = $('allin-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); }
   prevAllInKey = key;
