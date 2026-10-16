@@ -365,7 +365,8 @@ function finish(at, team, size = 1) {
 /* ---------- カメラ: なめらかに(フレームの速さに左右されない減衰で)目標へ。回さない ---------- */
 const cam = { pos: new THREE.Vector3(0, 3, 14), look: new THREE.Vector3(0, 1, 0) };
 const camNow = { pos: cam.pos.clone(), look: cam.look.clone() };
-function camTo(pos, look, dur = 1) { const p0 = cam.pos.clone(), l0 = cam.look.clone(); return tween(dur, (k) => { cam.pos.lerpVectors(p0, pos, k); cam.look.lerpVectors(l0, look, k); }, 'sine'); }
+let camGen = 0;
+function camTo(pos, look, dur = 1) { const g = ++camGen, p0 = cam.pos.clone(), l0 = cam.look.clone(); return tween(dur, (k) => { if (g !== camGen) return; cam.pos.lerpVectors(p0, pos, k); cam.look.lerpVectors(l0, look, k); }, 'sine'); }
 function camSet(v) { cam.pos.copy(v.pos); cam.look.copy(v.look); camNow.pos.copy(v.pos); camNow.look.copy(v.look); }
 
 /* ---------- 世界を作り直す ---------- */
@@ -489,11 +490,9 @@ function buildEnvelope(d) {
       await Promise.all([camTo(zm.pos, zm.look, 0.6), tween(0.6, (k) => { e.g.position.y = e.base.y + k * 0.3; }, 'sine')]);
       e.g.updateMatrixWorld(); e.g.localToWorld(top.set(0, 2.3 * 0.5, 0)); // 封筒の口(浮いたあとの位置)
       // 2. チーム名のカットイン(選んだくじの色)
-      const sure = proto() && isLast(lot); // もう当たりと決まっている(ウイニングラン)
       await teamCutin(e.lot, team, isLast(lot), win);
-      // 3. ためて、震える(試作: 心音2つぶん、止まってもう一度。決まっているときはためない)
-      if (sure) await sleep(0.1);
-      else await tween(0.5, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.02 * k; }, 'lin');
+      // 3. ためて、震える
+      await tween(0.5, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.02 * k; }, 'lin');
       e.g.rotation.z = 0;
       // 4. 開ける: 一瞬だけくじの色で光り、火花があふれる(光は残さない)
       sound.gata(); flash('#fff', 0.3, 0.45);
@@ -501,10 +500,10 @@ function buildEnvelope(d) {
       const cols = [hdr(c), hdr(c, 1.4), new THREE.Color(2, 2, 2)];
       for (let i = 0; i < 140; i++) { const a = rand(0.2, Math.PI - 0.2), sp = rand(2, 6.5); sparks.emit(top.x + rand(-0.4, 0.4), top.y, top.z + 0.3, Math.cos(a) * sp, Math.sin(a) * sp, rand(-0.5, 2), cols[i % cols.length], rand(0.05, 0.14), rand(0.7, 1.4), -6, 0.96); }
       tween(0.6, (k) => { const f = 1 - k; e.glow.material.opacity = f * 0.7; e.glow.scale.setScalar(3 + k * 3); e.light.intensity = f * 5; }, 'out');
-      await tween(sure ? 0.3 : 0.45, (k) => { e.mz.position.y = MZY - k * 0.6; e.mz.material.opacity = 1 - k; e.pivot.rotation.x = FLAP * ease.out(k); }, 'lin');
+      await tween(0.45, (k) => { e.mz.position.y = MZY - k * 0.6; e.mz.material.opacity = 1 - k; e.pivot.rotation.x = FLAP * ease.out(k); }, 'lin');
       e.mz.visible = false;
       // 試作: 口から光の粒が噴き出し、少し止まる(宝箱を開けるときのように)
-      if (proto() && !sure) {
+      if (proto()) {
         sound.kakutei();
         let left = 0.6;
         await ticker((dt) => { left -= dt; for (let i = 0; i < 6; i++) sparks.emit(top.x + rand(-0.45, 0.45), top.y, top.z + 0.2, rand(-1.2, 1.2), rand(3, 7), rand(-0.3, 1), i % 3 ? hdr(c) : new THREE.Color(2.2, 1.9, 1.2), rand(0.05, 0.12), rand(0.6, 1.1), -5, 0.97); return left <= 0; });
@@ -512,11 +511,7 @@ function buildEnvelope(d) {
       }
       // 5. 中袋が上がる
       e.card.material.map = cardTex(win); e.card.material.needsUpdate = true;
-      if (sure) {
-        // 決まっているときは堂々と: 一気に出して、大きく光る
-        impact(1.4);
-        await tween(0.35, (k) => { e.card.material.opacity = Math.min(1, k * 3); e.card.position.set(0, k * 1.05, 0.01 + k * 0.11); }, 'out');
-      } else if (proto()) {
+      if (proto()) {
         // 絞り: ゆっくり少しだけ出て(ふちの色がのぞく)、止まって、一気に出る
         // 最後から2番目(ここの結果で最後まで決まる)は、心音に合わせてゆっくり。カメラも少しずつ口へ寄る
         const big = penult(lot), SQ = big ? 2.8 : 1.1;
@@ -679,32 +674,32 @@ function buildAmida(d) {
       const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3;
       // 最後から2番目は、もっとゆっくり・心音・少しずつ寄る
       const big = proto() && penult(lane);
-      // 当たりの列をゆっくり下りてきて、そこから離れていく横線(「このまま行くか…行かない!」で一瞬迷う)
+      // 当たりの列をゆっくり下りてきて、そこから離れていく横線(迷わず、さっと曲がる)
       const leaveSeg = (s) => tease && s > 0 && slowSeg(s - 1) && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) > 1e-3;
       joint(p.pts[0], mat); const joined = new Set([0]); const crossed = new Set();
       sound.shoot(BASE); fx.dimT = 0.6; fx.bulb = 'spin';
       const col = lc, head = new THREE.Vector3();
-      let s = 0, q = 0, speed = 0, t = 0, pause = 0, paused = new Set(), beatAt = 0, slowNow = false;
+      let s = 0, q = 0, speed = 0, t = 0, beatAt = 0, slowNow = false;
       await ticker((dt) => {
         t += dt;
-        const want = slowSeg(s) ? (big ? 0.14 : 0.3) : 1;
+        const lastSeg = s >= segs.length - 1;
+        const want = slowSeg(s) ? (big ? (lastSeg ? 0.08 : 0.12) : lastSeg ? 0.22 : 0.3) : leaveSeg(s) ? 2.2 : 1;
         if (want < 1 && !slowNow) {
           slowNow = true; fx.dimT = 0.85; beatAt = 0;
           // 当たりの列とゴールのあいだへ、ゆっくりまっすぐ寄る(回さない)
           if (big) { const midY = (segs[s].userData.a.y + goals[d.amida.goal].position.y) / 2; camTo(new THREE.Vector3(gx * 0.6, midY, home.pos.z * 0.72), new THREE.Vector3(gx * 0.6, midY, 0), 3.2); }
         }
-        if (want === 1 && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
+        if (want >= 1 && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
         if (slowNow && t >= beatAt) { if (penult(lane)) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
-        if (leaveSeg(s) && q === 0 && !paused.has(s)) { paused.add(s); pause = 0.5; sound.stopThud(); }
-        if (pause > 0) { pause -= dt; met.glow.material.opacity = 0.45 + 0.35 * Math.abs(Math.sin(t * 14)); }
-        else {
-          speed += (want - speed) * (1 - Math.exp(-dt * (want < speed ? 5 : 3)));
+
+        {
+          speed += (want - speed) * (1 - Math.exp(-dt * (want < speed ? 5 : 14)));
           const vert = (i) => Math.abs(segs[i].userData.a.x - segs[i].userData.b.x) < 1e-3;
           let step = V * speed * dt * (vert(Math.min(s, segs.length - 1)) ? 0.8 : 1.8);
           while (step > 0 && s < segs.length) {
             const left = lens[s] * (1 - q);
             if (step < left) { q += step / lens[s]; step = 0; }
-            else { step -= left; setSeg(segs[s], 1); q = 0; s++; if (s < segs.length && !joined.has(s)) { joined.add(s); joint(p.pts[s], mat); } if (s < segs.length && (leaveSeg(s) && !paused.has(s))) step = 0; }
+            else { step -= left; setSeg(segs[s], 1); q = 0; s++; if (s < segs.length && !joined.has(s)) { joined.add(s); joint(p.pts[s], mat); }  }
           }
         }
         const si = Math.min(s, segs.length - 1), qi = s >= segs.length ? 1 : q;
