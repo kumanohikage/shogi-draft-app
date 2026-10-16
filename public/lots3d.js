@@ -11,7 +11,6 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const W = 1920, H = 1080, TAU = Math.PI * 2;
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const rand = (a, b) => a + Math.random() * (b - a);
 
 /* ---------- 効果音(ルーレットと同じ音。Web Audio 合成) ---------- */
@@ -184,16 +183,8 @@ const haloTex = tex(256, 256, (g) => { const r = g.createRadialGradient(128, 128
 function halo(color, size) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); s.scale.set(size, size, 1); return s; }
 const GOLD = () => new THREE.MeshStandardMaterial({ color: 0xd9a420, metalness: 1, roughness: 0.28 });
 
-/* ---------- 期待度(ルーレットと同じ序列: 青 < 緑 < 赤 < 金 < ゼブラ < 虹)。虹は当たり確定。色は演出だけ ---------- */
-const TIER = { blue: 0x3aa0ff, green: 0x22e57a, red: 0xff2a2a, gold: 0xffc21a, zebra: 0xffd23a, rainbow: 0xffffff };
-const TIER_ORDER = ['blue', 'green', 'red', 'gold', 'zebra', 'rainbow'];
-const TABLE = { win: [2, 6, 18, 34, 20, 20], lose: [40, 31, 18, 9, 2, 0] };
-function hash(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 100000) / 100000; }
-function tierOf(id, lot, win) { const r = hash(`${id}:${lot}`) * 100, t = TABLE[win ? 'win' : 'lose']; let a = 0; for (let i = 0; i < t.length; i++) { a += t[i]; if (r < a) return TIER_ORDER[i]; } return 'blue'; }
-const tierColor = (name, t = now(), out = new THREE.Color()) => (name === 'rainbow' ? out.setHSL((t * 0.7) % 1, 1, 0.6) : name === 'zebra' ? out.set(Math.floor(t * 8) % 2 ? 0xffffff : 0xffd23a) : out.set(TIER[name]));
-
 /* ---------- 演出の値(ルーレットと同じく、目標へなめらかに寄せる) ---------- */
-const fx = { reach: 0, reachT: 0, win: 0, winT: 0, dim: 0, dimT: 0, tier: 'gold', amb: 0.15, ambT: 0.15 };
+const fx = { win: 0, winT: 0, dim: 0, dimT: 0, amb: 0.15, ambT: 0.15, bulb: 'idle' };
 
 /* ---------- 火花(ルーレットと同じ粒) ---------- */
 const sparkTex = (() => {
@@ -245,10 +236,10 @@ class Particles {
 const sparks = new Particles(3000, sparkTex);
 scene.add(sparks.points);
 const WIN_COLS = [new THREE.Color(2.2, 1.6, 0.5), new THREE.Color(2, 2, 2), new THREE.Color(2.4, 0.6, 0.3)];
-function burst(at, n, cols = WIN_COLS, speed = 1) {
+function burst(at, n, cols = WIN_COLS, speed = 1, size = 1) {
   for (let i = 0; i < n; i++) {
     const a = rand(0, TAU), sp = rand(4, 16) * speed, up = rand(-0.2, 1);
-    sparks.emit(at.x, at.y, at.z + 0.5, Math.cos(a) * sp, Math.sin(a) * sp + up * 3, rand(-2, 6), cols[i % cols.length], rand(0.15, 0.45), rand(1.2, 2.6), -7, 0.965);
+    sparks.emit(at.x, at.y, at.z + 0.5, Math.cos(a) * sp, Math.sin(a) * sp + up * 3, rand(-2, 6), cols[i % cols.length], rand(0.15, 0.45) * size, rand(1.2, 2.6), -7, 0.965);
   }
 }
 // 期待度の色の火花(HDR にしてブルームで光らせる)
@@ -258,7 +249,7 @@ function emitAmbient(dt) {
   fx.amb += (fx.ambT - fx.amb) * (1 - Math.exp(-dt * 2.5));
   const vh = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z, vw = vh * camera.aspect;
   let n = 26 * fx.amb * dt;
-  while (n > 0) { if (Math.random() < n) sparks.emit(camera.position.x + rand(-vw, vw), camNow.look.y - vh * 1.3, rand(-6, 3), rand(-0.3, 0.3), rand(1, 2.6), 0, AMB, rand(0.12, 0.32), rand(5, 9), 0, 1); n -= 1; }
+  while (n > 0) { if (Math.random() < n) sparks.emit(camera.position.x + rand(-vw, vw), camNow.look.y - vh * 1.3, rand(-6, 3), rand(-0.3, 0.3), rand(1, 2.6), 0, AMB, rand(0.07, 0.18), rand(5, 9), 0, 1); n -= 1; }
 }
 
 /* ---------- 紙吹雪(ルーレットと同じ。画面に対して降らせるのでカメラに付ける) ---------- */
@@ -299,17 +290,21 @@ function updateConfetti(dt, time) {
 
 /* ---------- 画面の上の文字 ---------- */
 let D = null;
-function hud(d) { $('head').innerHTML = `${d.player.icon ? `<img src="${esc(d.player.icon)}" alt="">` : ''}<span class="pn">${esc(d.player.name)}</span><span class="pk">${d.lots.length}チームが競合</span>`; }
-const note = (t) => { $('note').innerHTML = esc(t); $('note').style.visibility = t ? '' : 'hidden'; };
 function showResult(team, on) {
   if (on) { $('result-nm').textContent = `指名：${D.player.name}`; $('result-who').textContent = team; }
   $('result').classList.toggle('show', on);
 }
 function flash(color = '#fff', dur = 0.5, op = 0.9) { const f = $('flash'); f.style.background = color; f.style.setProperty('--fd', `${dur}s`); f.style.setProperty('--fo', op); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
 // カットイン(ルーレットと同じ帯と文字)
-function cutin(text, cls, { dur = 1400, sub = '', small = false } = {}) {
+function cutin(text, cls, { dur = 1400, sub = '', small = false, color = null } = {}) {
   const el = document.createElement('div');
   el.className = `cutin ${cls}${small ? ' small' : ''}`;
+  if (color) {
+    const c = new THREE.Color(color), hi = `#${c.clone().lerp(new THREE.Color('#fff'), 0.35).getHexString()}`, lo = `#${c.clone().multiplyScalar(0.45).getHexString()}`;
+    el.style.setProperty('--band', `linear-gradient(180deg, ${hi}, ${color} 50%, ${lo})`);
+    el.style.setProperty('--glow', color);
+    el.style.setProperty('--txt', `linear-gradient(180deg, #fff, ${hi} 45%, ${color} 60%, ${lo})`);
+  }
   el.style.setProperty('--d', `${dur}ms`);
   el.innerHTML = `<div class="band"></div><div class="wrap"><div class="main"></div>${sub ? '<div class="sub"></div>' : ''}</div>`;
   el.querySelector('.main').textContent = text;
@@ -324,49 +319,42 @@ function cutin(text, cls, { dur = 1400, sub = '', small = false } = {}) {
   $('fx').appendChild(el);
   return sleep(dur / 1000).then(() => el.remove());
 }
-// 期待度のカットイン: チーム名を期待度の色で(虹なら当たり)
-function tierCutin(tier, team, sub) {
-  sound.holdChange(TIER_ORDER.indexOf(tier));
-  if (tier === 'rainbow') sound.kakutei();
-  if (TIER_ORDER.indexOf(tier) >= 3) flash('#fff', 0.35, 0.5);
-  fx.tier = tier; fx.reachT = 0.6;
-  return cutin(team, `t-${tier}`, { dur: 1200, sub, small: team.length > 7 }).then(() => { fx.reachT = 0; });
-}
+// 開ける(たどる)前のカットイン: チーム名を、選んだくじの色で
+function teamCutin(lot, team) { sound.holdChange(1); return cutin(team, 't-gold', { dur: 1200, small: team.length > 7, color: lot.color }); }
 // 開幕: 指名された選手と競合数(ルーレットと同じ)
 function intro(d) { sound.reach(2); return cutin(d.player.name, 't-gold', { dur: 1500, sub: `${d.lots.length}チーム競合!!`, small: d.player.name.length > 8 }); }
 // 当たり: ルーレットの決着と同じ音・光・紙吹雪
-function finish(at, team) {
+function finish(at, team, size = 1) {
   sound.kyuin(); setTimeout(() => sound.win('light'), 250);
   flash('#fff', 0.8, 1);
-  fx.winT = 1; fx.ambT = 5; fx.reachT = 0;
-  burst(at, 450); launchConfetti(300);
-  setTimeout(() => { if (fx.winT) { burst(at, 250); launchConfetti(150); } }, 900);
+  fx.winT = 1; fx.ambT = 5; fx.bulb = 'win';
+  burst(at, 450, WIN_COLS, size, size); launchConfetti(300);
+  setTimeout(() => { if (fx.winT) { burst(at, 250, WIN_COLS, size, size); launchConfetti(150); } }, 900);
   setTimeout(() => { if (fx.winT) launchConfetti(150); }, 1900);
-  note(`${team} が交渉権を獲得`);
+
   return sleep(0.35).then(() => showResult(team, true));
 }
 
 /* ---------- カメラ: なめらかに(フレームの速さに左右されない減衰で)目標へ。回さない ---------- */
 const cam = { pos: new THREE.Vector3(0, 3, 14), look: new THREE.Vector3(0, 1, 0) };
 const camNow = { pos: cam.pos.clone(), look: cam.look.clone() };
-function camTo(pos, look, dur = 1) { const p0 = cam.pos.clone(), l0 = cam.look.clone(); return tween(dur, (k) => { cam.pos.lerpVectors(p0, pos, k); cam.look.lerpVectors(l0, look, k); }, 'sine'); }
 function camSet(v) { cam.pos.copy(v.pos); cam.look.copy(v.look); camNow.pos.copy(v.pos); camNow.look.copy(v.look); }
 
 /* ---------- 世界を作り直す ---------- */
 let world = null;
 function clearWorld() {
   if (world) { world.cancel = true; scene.remove(world.root); }
-  world = null; tweens = []; meteors.clear(); showResult('', false); fx.reachT = fx.reach = 0; fx.winT = fx.win = 0; fx.dimT = 0; fx.ambT = 0.15; tierLight.intensity = 0;
+  world = null; tweens = []; meteors.clear(); showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.ambT = 0.15; tierLight.intensity = 0;
   $('fx').innerHTML = '';
 }
 function onData(d) {
-  hud(d); D = d;
+  D = d;
   if (!world || world.id !== d.id || world.mode !== d.mode) {
     clearWorld();
     world = d.mode === 'amida' ? buildAmida(d) : buildEnvelope(d);
     world.id = d.id; world.mode = d.mode; world.running = false;
     // 決着済み(配信画面を開き直した等)なら、終わった姿で出す。まだなら最初から演出する
-    if (d.done) { world.applyStatic(d); world.played = d.opened; note(`${d.owners[d.winLot]} が交渉権を獲得`); } else { world.played = 0; note(d.note); }
+    if (d.done) { world.applyStatic(d); world.played = d.opened; } else { world.played = 0; }
   }
   d.owners.forEach((o, i) => world.setOwner(i, o));
   if (!world.running && !d.done && d.opened > world.played) run(world, d);
@@ -374,7 +362,7 @@ function onData(d) {
 async function run(w, d) {
   w.running = true;
   const alive = () => !w.cancel;
-  if (w.played === 0) { note(''); await intro(d); }
+  if (w.played === 0) { await intro(d); }
   for (let k = w.played; k < d.opened && alive(); k++) {
     const lot = d.order[k];
     await w.open(lot, lot === d.winLot);
@@ -418,13 +406,9 @@ const PAPER = 0xb9b0a0;
 function buildEnvelope(d) {
   const root = new THREE.Group(); scene.add(root);
   const n = d.lots.length, gap = n <= 4 ? 2.4 : n <= 8 ? 2.0 : 1.7, BW = 1.3, BH = 2.3, MZY = -BH * 0.27;
-  const R0 = n * gap * 0.5 + 1.4;
-  const stage = new THREE.Mesh(new THREE.CylinderGeometry(R0, R0 + 0.2, 0.24, 64), new THREE.MeshStandardMaterial({ color: 0x1a0d04, metalness: 0.6, roughness: 0.35 }));
-  stage.position.set(0, -0.12, -0.6); root.add(stage);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(R0 + 0.1, 0.07, 12, 96), GOLD()); rim.rotation.x = Math.PI / 2; rim.position.set(0, 0, -0.6); root.add(rim);
   const envs = d.lots.map((lot, i) => {
-    const x = (i - (n - 1) / 2) * gap, z = -0.12 * x * x / Math.max(1, n / 3);
-    const g = new THREE.Group(); g.position.set(x, BH / 2 + 0.25, z); g.rotation.y = -x * 0.03; root.add(g);
+    const x = (i - (n - 1) / 2) * gap, z = 0;
+    const g = new THREE.Group(); g.position.set(x, BH / 2 + 0.25, z); root.add(g);
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.62, 0.22, 40), GOLD()); ped.position.set(x, 0.11, z); root.add(ped);
     const front = new THREE.MeshStandardMaterial({ map: frontTexture(lot, i), color: PAPER, roughness: 0.85, metalness: 0, envMapIntensity: 0.5 });
     const back = new THREE.MeshStandardMaterial({ map: washi(256, 440), color: PAPER, roughness: 0.9, envMapIntensity: 0.5 });
@@ -444,7 +428,8 @@ function buildEnvelope(d) {
     return { g, pivot, mz, glow, light, card, tag, lot, x, z, team: d.owners[i], base: g.position.clone(), open: false };
   });
   const fit = Math.max(n * gap + 2.5, 7.5), tanH = Math.tan((17.5 * Math.PI) / 180);
-  const overview = () => { const dist = Math.max((BH + 4.2) / 2 / tanH, fit / 2 / tanH / (W / H)) * 1.05; return { pos: new THREE.Vector3(0, 2.2, dist), look: new THREE.Vector3(0, 1.15, 0) }; };
+  // 上に中袋が出ても入る高さ。ルーレットと同じく、全体を少し引いて見せる
+  const overview = () => { const dist = Math.max((BH + 4.8) / 2 / tanH, fit / 2 / tanH / (W / H)) * 1.12; return { pos: new THREE.Vector3(0, 2.0, dist), look: new THREE.Vector3(0, 1.6, 0) }; };
   camSet(overview());
   const cardTex = (win) => tex(360, 460, (c, w, h) => {
     roundRect(c, 4, 4, w - 8, h - 8, 18);
@@ -465,22 +450,22 @@ function buildEnvelope(d) {
     setOwner(i, team) { const e = envs[i]; if (e.team === team) return; e.team = team; e.tag.material.map = tagTexture(e.lot, team); e.tag.material.needsUpdate = true; },
     applyStatic(dd) { for (let k = 0; k < dd.opened; k++) setOpenStatic(envs[dd.order[k]], dd.order[k] === dd.winLot); if (dd.done) envs.forEach((e, i) => { if (!e.open) setOpenStatic(e, i === dd.winLot); }); },
     async open(lot, win) {
-      const e = envs[lot], tier = tierOf(D.id, lot, win), team = D.owners[lot];
+      const e = envs[lot], team = D.owners[lot], c = new THREE.Color(e.lot.color);
       const top = new THREE.Vector3(); e.g.localToWorld(top.set(0, 2.3 * 0.5, 0.2));
-      note(`${team} の封筒`);
-      // 1. 寄る(回さない)
-      await Promise.all([camTo(new THREE.Vector3(e.x * 0.85, 2.2, e.z + 8.6), new THREE.Vector3(e.x, 1.45, e.z), 0.7), tween(0.7, (k) => { e.g.position.y = e.base.y + k * 0.25; }, 'sine')]);
-      // 2. 期待度のカットイン
-      await tierCutin(tier, team);
+
+      // 1. この封筒が少し浮く(カメラは全体のまま)
+      await tween(0.5, (k) => { e.g.position.y = e.base.y + k * 0.3; }, 'sine');
+      // 2. チーム名のカットイン(選んだくじの色)
+      await teamCutin(e.lot, team);
       // 3. ためて、震える
       await tween(0.5, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.02 * k; }, 'lin');
       e.g.rotation.z = 0;
-      // 4. 開ける: 一瞬だけ期待度の色で光り、火花があふれる(光は残さない)
-      sound.gata(); flash('#fff', 0.3, 0.55);
-      const c = tierColor(tier); e.glow.material.color.copy(c); e.light.color.copy(c);
-      const cols = tier === 'rainbow' ? [0, 1, 2, 3, 4].map((h) => hdr(new THREE.Color().setHSL(h / 5, 1, 0.6))) : [hdr(c), hdr(c, 1.4), new THREE.Color(2, 2, 2)];
-      for (let i = 0; i < 220; i++) { const a = rand(0.15, Math.PI - 0.15), sp = rand(3, 11); sparks.emit(top.x + rand(-0.5, 0.5), top.y, top.z + 0.3, Math.cos(a) * sp, Math.sin(a) * sp, rand(-1, 4), cols[i % cols.length], rand(0.15, 0.4), rand(0.8, 1.8), -8, 0.96); }
-      tween(0.7, (k) => { const f = 1 - k; e.glow.material.opacity = f * 0.9; e.glow.scale.setScalar(4 + k * 5); e.light.intensity = f * 6; }, 'out');
+      // 4. 開ける: 一瞬だけくじの色で光り、火花があふれる(光は残さない)
+      sound.gata(); flash('#fff', 0.3, 0.45);
+      e.glow.material.color.copy(c); e.light.color.copy(c);
+      const cols = [hdr(c), hdr(c, 1.4), new THREE.Color(2, 2, 2)];
+      for (let i = 0; i < 140; i++) { const a = rand(0.2, Math.PI - 0.2), sp = rand(2, 6.5); sparks.emit(top.x + rand(-0.4, 0.4), top.y, top.z + 0.3, Math.cos(a) * sp, Math.sin(a) * sp, rand(-0.5, 2), cols[i % cols.length], rand(0.05, 0.14), rand(0.7, 1.4), -6, 0.96); }
+      tween(0.6, (k) => { const f = 1 - k; e.glow.material.opacity = f * 0.7; e.glow.scale.setScalar(3 + k * 3); e.light.intensity = f * 5; }, 'out');
       await tween(0.45, (k) => { e.mz.position.y = MZY - k * 0.6; e.mz.material.opacity = 1 - k; e.pivot.rotation.x = -Math.PI * 0.98 * ease.out(k); }, 'lin');
       e.mz.visible = false;
       // 5. 中袋が上がる
@@ -488,17 +473,16 @@ function buildEnvelope(d) {
       await tween(0.6, (k) => { e.card.material.opacity = Math.min(1, k * 2); e.card.position.set(0, k * 1.05, 0.01 + k * 0.09); }, 'out');
       e.open = true;
       if (!win) {
-        sound.lose(); note(`${team}: 外れ`);
+        sound.lose();
         await sleep(0.7);
-        await tween(0.4, (k) => { e.g.position.y = e.base.y + 0.25 * (1 - k); }, 'sine');
+        await tween(0.4, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine');
         return;
       }
       // 6. 当たり: ルーレットと同じ決着
-      await finish(top, team);
+      await finish(top, team, 0.6);
       await sleep(2.6);
       showResult('', false);
-      const o = overview();
-      await Promise.all([camTo(o.pos, o.look, 0.9), tween(0.9, (k) => { e.g.position.y = e.base.y + 0.25 * (1 - k); }, 'sine')]);
+      await tween(0.6, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine');
       openRest(); fx.winT = 0.4; fx.ambT = 1;
       await sleep(0.4 + envs.length * 0.22);
     },
@@ -541,15 +525,31 @@ function buildAmida(d) {
   const n = d.lots.length, gap = n <= 3 ? 4.2 : n <= 5 ? 3.4 : n <= 8 ? 2.6 : 2.0, TOP = 5, BOT = -5, rungs = d.amida.rungs, R = rungs.length;
   const xs = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * gap);
   const ys = Array.from({ length: R }, (_, r) => TOP - (r + 1) * ((TOP - BOT) / (R + 1)));
-  const RAD = 0.075, TR = 0.1;
+  const RAD = 0.03, TR = 0.07;
   const cyl = (len, mat, r) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 16), mat);
   const ball = (mat, r) => new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), mat);
-  const laneMat = new THREE.MeshStandardMaterial({ color: 0xb8892a, metalness: 1, roughness: 0.3, emissive: 0x3a2300, emissiveIntensity: 0.6 });
-  xs.forEach((x) => { const m = cyl(TOP - BOT, laneMat, RAD); m.position.set(x, 0, 0); root.add(m); [TOP, BOT].forEach((y) => { const b = ball(laneMat, RAD); b.position.set(x, y, 0); root.add(b); }); });
+  const laneMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.52, 0.2), toneMapped: false, transparent: true, opacity: 0.7 });
+  xs.forEach((x) => { const m = cyl(TOP - BOT, laneMat, RAD); m.position.set(x, 0, 0); root.add(m); });
+  // 電飾(ルーレットの縁と同じく、順に点いて流れる)
+  const BULB_GAP = 0.42, perLane = Math.floor((TOP - BOT) / BULB_GAP) + 1, NB = perLane * n;
+  const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 12, 8), new THREE.MeshBasicMaterial({ toneMapped: false }), NB);
+  { const dm = new THREE.Object3D(); for (let i = 0; i < NB; i++) { const l = Math.floor(i / perLane), j = i % perLane; dm.position.set(xs[l], TOP - j * BULB_GAP, -0.08); dm.updateMatrix(); bulbs.setMatrixAt(i, dm.matrix); bulbs.setColorAt(i, new THREE.Color(1, 1, 1)); } }
+  root.add(bulbs);
+  const BASE_BULB = new THREE.Color(3.2, 2.2, 0.7), bc = new THREE.Color();
+  function updateBulbs(t) {
+    for (let i = 0; i < NB; i++) {
+      const j = i % perLane;
+      if (fx.bulb === 'win') bc.setHSL((j / perLane + t * 0.9) % 1, 1, 0.5).multiplyScalar(3.5 * (0.6 + 0.4 * ((j + Math.floor(t * 12)) % 2)));
+      else if (fx.bulb === 'spin') bc.copy(BASE_BULB).multiplyScalar((j + Math.floor(t * 28)) % 4 === 0 ? 1.3 : 0.2);
+      else bc.copy(BASE_BULB).multiplyScalar((perLane - j + Math.floor(t * 7)) % 6 < 2 ? 1 : 0.12);
+      bulbs.setColorAt(i, bc);
+    }
+    bulbs.instanceColor.needsUpdate = true;
+  }
   // 横の線: 最初は隠す。流れ星が着いたときに光って現れる。決着したら全部見せる
-  const rungMat = () => new THREE.MeshStandardMaterial({ color: 0xffe6a0, metalness: 0.6, roughness: 0.25, emissive: 0xffc04a, emissiveIntensity: 0.9, transparent: true, opacity: 0 });
+  const rungMat = () => new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.52, 0.2), toneMapped: false, transparent: true, opacity: 0 });
   const rungMeshes = rungs.map((row, r) => row.map((i) => { const m = cyl(gap, rungMat(), RAD); m.rotation.z = Math.PI / 2; m.position.set((xs[i] + xs[i + 1]) / 2, ys[r], 0); m.visible = false; root.add(m); return { m, i, r }; }));
-  const showRung = (r, i, flashIt) => { const o = rungMeshes[r].find((x) => x.i === i); if (!o || o.m.visible) return; o.m.visible = true; if (flashIt) tween(0.4, (k) => { o.m.material.opacity = k; o.m.material.emissiveIntensity = 3.2 * (1 - k) + 0.9; }, 'out'); else o.m.material.opacity = 1; };
+  const showRung = (r, i, flashIt) => { const o = rungMeshes[r].find((x) => x.i === i); if (!o || o.m.visible) return; o.m.visible = true; if (flashIt) tween(0.4, (k) => { o.m.material.opacity = 0.7 * k; o.m.material.color.setRGB(0.75 + 2.5 * (1 - k), 0.52 + 2 * (1 - k), 0.2 + 1 * (1 - k)); }, 'out'); else o.m.material.opacity = 0.7; };
   const tw = Math.min(gap * 0.9, 3.4);
   const owners = d.owners.slice();
   const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i]), tw, tw * 0.446); s.position.set(xs[i], TOP + tw * 0.3, 0); root.add(s); return s; });
@@ -563,8 +563,6 @@ function buildAmida(d) {
   const gs = Math.min(gap * 0.6, 1.7);
   const goals = xs.map((x) => { const s = sprite(goalTex('hide'), gs, gs); s.position.set(x, BOT - gs * 0.62, 0); root.add(s); return s; });
   const setGoal = (i, state) => { goals[i].material.map = goalTex(state); goals[i].material.needsUpdate = true; };
-  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(gap * 0.32, gap * 0.45, 30, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
-  pillar.position.set(0, 9, -0.6); root.add(pillar);
   function pathOf(lane, z = 0.02) {
     let x = lane; const pts = [new THREE.Vector3(xs[x], TOP, z)], cross = [];
     rungs.forEach((row, r) => { const y = ys[r]; if (row.includes(x)) { pts.push(new THREE.Vector3(xs[x], y, z), new THREE.Vector3(xs[x + 1], y, z)); cross.push([r, x, pts.length - 2]); x++; } else if (row.includes(x - 1)) { pts.push(new THREE.Vector3(xs[x], y, z), new THREE.Vector3(xs[x - 1], y, z)); cross.push([r, x - 1, pts.length - 2]); x--; } });
@@ -573,8 +571,11 @@ function buildAmida(d) {
   }
   // 通ったあとの線(くじの色)。曲がり角には玉を置いて切れ目なくつなぐ。前の線は暗くして奥へ
   const trails = [];
-  const trail = (color) => { const m = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9, metalness: 0.2, roughness: 0.3 }); trails.push(m); return m; };
-  const dimTrails = () => trails.forEach((m) => { const e0 = m.emissiveIntensity; tween(0.5, (k) => { m.emissiveIntensity = e0 + (0.25 - e0) * k; }); });
+  const trail = (color) => { const m = new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(1.6), toneMapped: false, transparent: true }); m.userData.base = color.clone(); trails.push(m); return m; };
+  const dimTrail = (m, to = 0.8) => { const c0 = m.color.clone(), c1 = m.userData.base.clone().multiplyScalar(to); tween(0.5, (k) => m.color.lerpColors(c0, c1, k)); };
+  const dimTrails = () => trails.forEach((m) => dimTrail(m));
+  // まだ通っていない道を、くじの色で(薄く)見せる
+  function drawPath(lane, z, mat) { const p = pathOf(lane, z); p.cross.forEach(([r, i]) => showRung(r, i, false)); for (let s = 0; s < p.pts.length - 1; s++) setSeg(trailSeg(p.pts[s], p.pts[s + 1], mat), 1); p.pts.forEach((q) => joint(q, mat)); return p; }
   function trailSeg(a, b, mat) { const len = a.distanceTo(b); const m = cyl(1, mat, TR); m.position.copy(a); m.lookAt(b); m.rotateX(Math.PI / 2); m.scale.set(1, 0.0001, 1); m.visible = false; m.userData = { a, b, len }; root.add(m); return m; }
   function setSeg(m, k) { const { a, b, len } = m.userData; m.visible = k > 0.002; m.scale.y = Math.max(0.0001, len * k); m.position.copy(a).lerp(b, k / 2); }
   function joint(p, mat) { const b = ball(mat, TR); b.position.copy(p); root.add(b); return b; }
@@ -585,80 +586,76 @@ function buildAmida(d) {
   return {
     root,
     setOwner(i, team) { if (owners[i] === team) return; owners[i] = team; tags[i].material.map = tagTexture(d.lots[i], team); tags[i].material.needsUpdate = true; },
+    update: updateBulbs,
     applyStatic(dd) {
-      for (let k = 0; k < dd.opened; k++) {
-        const lane = dd.order[k], p = pathOf(lane, 0.02 + k * 0.04), mat = trail(new THREE.Color(dd.lots[lane].color));
-        if (lane !== dd.winLot) mat.emissiveIntensity = 0.25;
-        p.cross.forEach(([r, i]) => showRung(r, i, false));
-        for (let s = 0; s < p.pts.length - 1; s++) setSeg(trailSeg(p.pts[s], p.pts[s + 1], mat), 1);
-        p.pts.forEach((q) => joint(q, mat));
-        setGoal(p.end, lane === dd.winLot ? 'win' : 'lose');
-      }
-      if (dd.done) { rungMeshes.flat().forEach((o) => showRung(o.r, o.i, false)); goals.forEach((_, i) => { if (i !== d.amida.goal) setGoal(i, 'lose'); }); }
+      // 決着済み: 全部の道を見せる(当たりの道を明るく、いちばん手前に)
+      const lanes = dd.lots.map((_, i) => i).sort((a, b) => (a === dd.winLot) - (b === dd.winLot));
+      lanes.forEach((lane, k) => { const mat = trail(new THREE.Color(dd.lots[lane].color)); if (lane !== dd.winLot) mat.color.copy(mat.userData.base).multiplyScalar(0.8); const p = drawPath(lane, 0.02 + k * 0.04, mat); setGoal(p.end, lane === dd.winLot ? 'win' : 'lose'); });
+      rungMeshes.flat().forEach((o) => showRung(o.r, o.i, false));
     },
     async open(lane, win) {
-      const team = D.owners[lane], tier = tierOf(D.id, lane, win);
-      note(`${team} のあみだくじ`);
+      const team = D.owners[lane], lot = d.lots[lane], lc = new THREE.Color(lot.color);
+
       tween(0.4, (k) => { tags[lane].scale.set(tw * (1 + 0.15 * Math.sin(k * Math.PI)), tw * 0.446 * (1 + 0.15 * Math.sin(k * Math.PI)), 1); });
-      // 1. 期待度のカットイン
-      await tierCutin(tier, team);
+      // 1. チーム名のカットイン(選んだくじの色)
+      await teamCutin(lot, team);
       dimTrails();
       const p = pathOf(lane, 0.02 + trails.length * 0.04), mat = trail(new THREE.Color(d.lots[lane].color));
-      // 2. 流れ星: 期待度の色の尾を引いて、一定の速さでたどる(動き出しと止まりだけなめらか)
+      // 2. 流れ星: くじの色の尾を引いて、一定の速さでたどる(動き出しと止まりだけなめらか)
       const met = new Meteor(); root.add(met.points, met.head, met.glow);
       const segs = []; for (let s = 0; s < p.pts.length - 1; s++) segs.push(trailSeg(p.pts[s], p.pts[s + 1], mat));
       const lens = segs.map((m) => m.userData.len), total = lens.reduce((a, b) => a + b, 0), DUR = 2.6 + total * 0.02;
       joint(p.pts[0], mat); const joined = new Set([0]); const crossed = new Set();
-      sound.shoot(DUR); fx.dimT = 0.6;
-      const col = new THREE.Color(), head = new THREE.Vector3();
+      sound.shoot(DUR); fx.dimT = 0.6; fx.bulb = 'spin';
+      const col = lc, head = new THREE.Vector3();
       await tween(DUR, (k) => {
         let dist = k * total, s = 0;
         while (s < segs.length - 1 && dist > lens[s]) { setSeg(segs[s], 1); if (!joined.has(s + 1)) { joined.add(s + 1); joint(p.pts[s + 1], mat); } dist -= lens[s]; s++; }
         const q = Math.min(1, dist / lens[s]); setSeg(segs[s], q);
         head.copy(segs[s].userData.a).lerp(segs[s].userData.b, q); head.z += 0.25;
-        tierColor(tier, now(), col); met.u.uCol.value.copy(col); met.glow.material.color.copy(col); met.push(head);
+        met.u.uCol.value.copy(col); met.glow.material.color.copy(col); met.push(head);
         // こぼれるきらめき
         for (let j = 0; j < 3; j++) sparks.emit(head.x + rand(-0.1, 0.1), head.y + rand(-0.1, 0.1), head.z, rand(-0.8, 0.8), rand(-0.6, 1.2), rand(-0.3, 0.3), Math.random() < 0.4 ? new THREE.Color(2, 2, 2) : hdr(col), rand(0.08, 0.22), rand(0.5, 1.1), -1.5, 0.97);
         p.cross.forEach(([r, i, at]) => { if (s >= at && !crossed.has(at)) { crossed.add(at); showRung(r, i, true); sound.tick(1.1); } });
       }, 'inOut');
       setSeg(segs[segs.length - 1], 1); joint(p.pts[p.pts.length - 1], mat);
-      fx.dimT = 0;
+      fx.dimT = 0; fx.bulb = 'idle';
       // 3. ゴール: 流れ星がはじけて結果
       const end = head.clone();
-      const cols = tier === 'rainbow' ? [0, 1, 2, 3, 4].map((h) => hdr(new THREE.Color().setHSL(h / 5, 1, 0.6))) : [hdr(col), new THREE.Color(2, 2, 2)];
-      burst(end, win ? 120 : 70, cols, 0.6);
+      burst(end, win ? 120 : 70, [hdr(col), new THREE.Color(2, 2, 2)], 0.6, 0.7);
       tween(0.6, (k) => { met.u.uFade.value = 1 - k; met.head.material.opacity = 1 - k; met.glow.material.opacity = 0.45 * (1 - k); }, 'out').then(() => { root.remove(met.points, met.head, met.glow); meteors.delete(met); });
       setGoal(p.end, win ? 'win' : 'lose');
       tween(0.4, (k) => goals[p.end].scale.setScalar(gs * (1 + Math.sin(k * Math.PI) * 0.3)), 'out');
-      if (!win) { sound.lose(); note(`${team}: 外れ`); await sleep(0.9); return; }
-      // 4. 当たり: ルーレットと同じ決着。光の柱と、横線を全部見せる(公平に決まったことがわかるように)
-      pillar.position.x = xs[p.end]; tween(0.6, (k) => { pillar.material.opacity = 0.45 * k; }, 'out');
-      await finish(end, team);
+      if (!win) { sound.lose(); await sleep(0.9); return; }
+      // 4. 当たり: ルーレットと同じ決着。そのあと、まだ通っていない道も全部見せる(公平に決まったことがわかるように)
+      await finish(end, team, 0.8);
       await sleep(2.6);
       showResult('', false);
-      rungMeshes.flat().forEach((x, k) => setTimeout(() => showRung(x.r, x.i, true), k * 45));
-      goals.forEach((_, i) => { if (i !== p.end) setTimeout(() => setGoal(i, 'lose'), 500); });
-      fx.winT = 0.4; fx.ambT = 1;
-      tween(1.4, (k) => { pillar.material.opacity = 0.45 * (1 - k * 0.5); });
-      await sleep(1.0);
+      fx.winT = 0.4; fx.ambT = 1; fx.bulb = 'idle';
+      const done = new Set(D.order.slice(0, D.opened));
+      const rest = d.lots.map((_, i) => i).filter((i) => !done.has(i));
+      for (const l of rest) {
+        const m = trail(new THREE.Color(d.lots[l].color)); m.color.copy(m.userData.base).multiplyScalar(0.8); m.opacity = 0;
+        const q = drawPath(l, 0.01, m); setGoal(q.end, 'lose'); sound.tick(0.8);
+        await tween(0.35, (k) => { m.opacity = k; });
+      }
+      rungMeshes.flat().forEach((x) => showRung(x.r, x.i, false));
+      await sleep(0.6);
     },
   };
 }
 
 /* ---------- 毎フレーム ---------- */
 let last = now();
-const tmpC = new THREE.Color();
 function frame() {
   const t = now(), dt = Math.min(0.05, t - last); last = t;
   tweens = tweens.filter((tw) => { const k = Math.min(1, (t - tw.t0) / tw.dur); tw.fn(tw.e(k)); if (k >= 1) { tw.res(); return false; } return true; });
   const k = (rate) => 1 - Math.exp(-dt * rate);
-  fx.reach += (fx.reachT - fx.reach) * k(4); fx.win += (fx.winT - fx.win) * k(3); fx.dim += (fx.dimT - fx.dim) * k(4);
-  bgU.uTime.value = t; bgU.uReach.value = fx.reach; bgU.uWin.value = fx.win; bgU.uDim.value = fx.dim;
+  fx.win += (fx.winT - fx.win) * k(3); fx.dim += (fx.dimT - fx.dim) * k(4);
+  bgU.uTime.value = t; bgU.uWin.value = fx.win; bgU.uDim.value = fx.dim;
   bgU.uGlow.value = 0.4 + 0.6 * Math.min(1, fx.amb / 3.4);
-  bgU.uZebra.value = fx.tier === 'zebra' ? 1 : 0; tierColor(fx.tier, t, bgU.uTier.value);
-  tierLight.intensity = fx.reach * 3 + fx.win * 4;
-  if (fx.win > 0.01) tierLight.color.setHSL((t * 0.4) % 1, 1, 0.6); else tierLight.color.copy(tierColor(fx.tier, t, tmpC));
-  bloom.strength = 0.45 + fx.reach * 0.25 + fx.win * 0.45;
+  tierLight.intensity = fx.win * 4; tierLight.color.setHSL((t * 0.4) % 1, 1, 0.6);
+  bloom.strength = 0.45 + fx.win * 0.45;
   // カメラ(時間あたり一定の減衰でついていく。回さない)
   camNow.pos.lerp(cam.pos, k(10)); camNow.look.lerp(cam.look, k(10));
   camera.position.copy(camNow.pos); camera.lookAt(camNow.look);
@@ -666,6 +663,7 @@ function frame() {
   if (fx.win > 0.5 && Math.random() < dt * 12) burst(camNow.look, 8);
   sparks.update(dt);
   meteors.forEach((m) => m.update());
+  if (world && world.update) world.update(t);
   updateConfetti(dt, t);
   composer.render();
   requestAnimationFrame(frame);
@@ -675,7 +673,7 @@ requestAnimationFrame(frame);
 addEventListener('message', (e) => {
   const m = e.data || {};
   if (m.type === 'lots') onData(m.data);
-  else if (m.type === 'lots-reset') { clearWorld(); note(''); }
+  else if (m.type === 'lots-reset') { clearWorld(); }
   else if (m.type === 'volume') { sound.vol = m.v; sound.apply(); }
   else if (m.type === 'silence') { sound.silent = !!m.on; sound.apply(); }
 });

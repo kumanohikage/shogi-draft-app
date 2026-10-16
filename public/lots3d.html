@@ -16,11 +16,6 @@
   #c { display: block; width: 100%; height: 100%; }
   /* 1920×1080 の文字(画面の上にかぶせる。ルーレットと同じ作り) */
   #hud { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none; font-family: 'Noto Sans JP', sans-serif; overflow: hidden; --vw: 19.2px; --vh: 10.8px; --heavy: 'Dela Gothic One', sans-serif; }
-  .head { position: absolute; left: 0; right: 0; top: 30px; display: flex; align-items: center; justify-content: center; gap: 22px; }
-  .head img { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; border: 5px solid #ffe29a; box-shadow: 0 0 24px rgba(255,200,80,.7); }
-  .head .pn { font: normal 62px 'Dela Gothic One', sans-serif; letter-spacing: .04em; background: linear-gradient(180deg, #fffbe0, #ffe066 45%, #e09b00 60%, #7a4200); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 2px #3a1a00; filter: drop-shadow(0 0 14px rgba(255,170,40,.6)) drop-shadow(0 5px 0 rgba(0,0,0,.5)); }
-  .head .pk { padding: 8px 24px; border-radius: 999px; background: rgba(20,12,4,.8); border: 2px solid #a8741a; color: #ffe9b8; font: 900 30px 'Noto Sans JP'; }
-  .note { position: absolute; left: 50%; bottom: 38px; transform: translateX(-50%); padding: 12px 40px; border-radius: 999px; background: rgba(20,12,4,.85); border: 2px solid #a8741a; color: #fff3d6; font: 900 38px 'Noto Sans JP'; white-space: nowrap; }
   /* 結果: ルーレットと同じ「◯◯ 交渉権確定!」 */
   #result { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
   #result.show { display: flex; }
@@ -77,8 +72,6 @@
 <body>
 <canvas id="c" width="1920" height="1080"></canvas>
 <div id="hud">
-  <div class="head" id="head"></div>
-  <div class="note" id="note"></div>
   <div id="fx"></div>
   <div id="flash"></div>
   <div id="result"><div class="rbg"></div><div class="nm" id="result-nm"></div><div class="who" id="result-who"></div><div class="ok">交渉権確定!</div><div class="shine"><i></i></div></div>
