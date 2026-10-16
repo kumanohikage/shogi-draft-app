@@ -180,7 +180,14 @@ function tagTexture(lot, team, plain = false) {
     if (plain) { g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = 10; g.shadowOffsetY = 3; }
     roundRect(g, w / 2 - 120, 34, 240, 84, 42); g.fillStyle = lot.color; g.fill(); g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke();
     g.fillStyle = '#fff'; g.font = FONT(60); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lot.label, w / 2, 77);
-    g.fillStyle = team ? '#ffe9b8' : 'rgba(255,233,184,.6)'; g.font = FONT(team && team.length > 7 ? 54 : 70); g.fillText(team || '？', w / 2, 204);
+    g.fillStyle = team ? '#ffe9b8' : 'rgba(255,233,184,.6)'; // 長い名前は、幅に収まるまで文字を小さくする(となりの名札と重ならない)
+    const name = team || '？', fit = (t, max) => { let px = max; g.font = FONT(px); while (px > 26 && g.measureText(t).width > w - 48) { px -= 2; g.font = FONT(px); } return px; };
+    if (fit(name, 70) >= 46 || name.length < 6) g.fillText(name, w / 2, 204);
+    else { // とても長い名前は2行に分けて、文字を大きめに保つ
+      const mid = Math.ceil(name.length / 2), l1 = name.slice(0, mid), l2 = name.slice(mid);
+      const px = Math.min(fit(l1, 58), fit(l2, 58)); g.font = FONT(px);
+      g.fillText(l1, w / 2, 204 - px * 0.55); g.fillText(l2, w / 2, 204 + px * 0.55);
+    }
   });
 }
 function sprite(texture, w, h) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false })); s.scale.set(w, h, 1); return s; }
@@ -631,7 +638,7 @@ function buildAmida(d) {
   // 画角は全体が入る位置で固定(動かさない)
   // 板の大きさ: 名札からゴールまでと、左右の名札がおさまる角丸の四角
   const boardTop = TOP + tw * 0.27 + (tw * TAG_AR) / 2 + 0.65, boardBot = BOT - gs * 1.12 - 1.05;
-  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw * 0.72, gs) / 2 + 1.5, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
+  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw, gs) / 2 + 1.1, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
   const roundRectShape = (hw, hh, r) => { const sh = new THREE.Shape(); sh.moveTo(-hw + r, -hh); sh.lineTo(hw - r, -hh); sh.absarc(hw - r, -hh + r, r, -Math.PI / 2, 0); sh.lineTo(hw, hh - r); sh.absarc(hw - r, hh - r, r, 0, Math.PI / 2); sh.lineTo(-hw + r, hh); sh.absarc(-hw + r, hh - r, r, Math.PI / 2, Math.PI); sh.lineTo(-hw, -hh + r); sh.absarc(-hw + r, -hh + r, r, Math.PI, Math.PI * 1.5); return sh; };
   const ringCurve = (hw, hh, r, z) => new THREE.CatmullRomCurve3(roundRectShape(hw, hh, r).getSpacedPoints(240).slice(0, -1).map((p) => new THREE.Vector3(p.x, p.y + boardCY, z)), true);
   const board = new THREE.Group(); root.add(board);
