@@ -273,8 +273,8 @@
           for (const id of ids) { const n = s.noms[id]; if (n && n.revealed && !pickOf(s, id, s.round)) s.picks.push({ round: s.round, leaderId: id, playerId: n.playerId, by: 'order' }); }
         } else confirmSingles(s);
         s.scene = 'board'; s.spotStand = false; // 公開はボードで見せる
-        // めくる演出が終わるまで次に進めない(続けて押して抽選に飛ばないように)。1枚ずつ0.26秒
-        s.busyUntil = (action.now || Date.now()) + (action.spot ? 900 : 120 + ids.length * 260 + 950);
+        // 一斉公開は、めくる演出が終わるまで次に進めない(続けて押して抽選に飛ばないように)。1枚ずつ0.26秒。ピックアップでめくるときは止めない
+        if (!action.spot) s.busyUntil = (action.now || Date.now()) + 120 + ids.length * 260 + 950;
         // spot: true なら、その人を配信画面に大きく出す(ピックアップ公開)
         s.spot = action.spot && action.leaderId ? action.leaderId : null;
         break;
