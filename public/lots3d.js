@@ -175,9 +175,9 @@ const goldGrad = (g, y0, y1) => { const gr = g.createLinearGradient(0, y0, 0, y1
 function tagTexture(lot, team) {
   return tex(560, 250, (g, w) => {
     roundRect(g, 6, 6, w - 12, 238, 26); g.fillStyle = 'rgba(20,12,4,.88)'; g.fill(); g.lineWidth = 8; g.strokeStyle = goldGrad(g, 0, 250); g.stroke();
-    roundRect(g, w / 2 - 110, 22, 220, 78, 39); g.fillStyle = lot.color; g.fill(); g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke();
-    g.fillStyle = '#fff'; g.font = FONT(52); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lot.label, w / 2, 62);
-    g.fillStyle = team ? '#ffe9b8' : 'rgba(255,233,184,.6)'; g.font = FONT(team && team.length > 7 ? 46 : 56); g.fillText(team || '？', w / 2, 172);
+    roundRect(g, w / 2 - 120, 18, 240, 88, 44); g.fillStyle = lot.color; g.fill(); g.lineWidth = 4; g.strokeStyle = 'rgba(255,255,255,.6)'; g.stroke();
+    g.fillStyle = '#fff'; g.font = FONT(60); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(lot.label, w / 2, 63);
+    g.fillStyle = team ? '#ffe9b8' : 'rgba(255,233,184,.6)'; g.font = FONT(team && team.length > 7 ? 54 : 70); g.fillText(team || '？', w / 2, 176);
   });
 }
 function sprite(texture, w, h) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false })); s.scale.set(w, h, 1); return s; }
@@ -186,7 +186,18 @@ function halo(color, size) { const s = new THREE.Sprite(new THREE.SpriteMaterial
 const GOLD = () => new THREE.MeshStandardMaterial({ color: 0xd9a420, metalness: 1, roughness: 0.28 });
 
 /* ---------- 演出の値(ルーレットと同じく、目標へなめらかに寄せる) ---------- */
-const fx = { win: 0, winT: 0, dim: 0, dimT: 0, amb: 0.15, ambT: 0.15, bulb: 'idle', shake: 0, freezeUntil: 0 };
+const fx = { win: 0, winT: 0, dim: 0, dimT: 0, amb: 0.15, ambT: 0.15, bulb: 'idle', shake: 0, freezeUntil: 0, heat: 0, heatNow: 0 };
+// 抽選ごとに決まった乱数(配信画面を開き直しても同じ演出になる)
+function hash(str) { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 100000) / 100000; }
+// 毎フレーム進める処理(fn(dt) が true を返したら終わり)
+let tickers = [];
+const ticker = (fn) => new Promise((res) => tickers.push({ fn, res }));
+// 外れのスタンプ: 3D の位置に重ねて「外れ」をドンと押す
+function stamp(text, at) {
+  const v = at.clone().project(camera), el = document.createElement('div');
+  el.className = 'stamp'; el.textContent = text; el.style.left = `${(v.x * 0.5 + 0.5) * W}px`; el.style.top = `${(-v.y * 0.5 + 0.5) * H}px`;
+  $('fx').appendChild(el); setTimeout(() => el.remove(), 950);
+}
 // 試作(チェック画面の「試作」で入る): 焦らしと手ごたえ。D.proto のときだけ使う
 const proto = () => !!(D && D.proto);
 // ヒットストップ: 決まった瞬間に 0.08 秒ほど動きを止め、光と揺れを重ねる(ゲームの「手ごたえ」の定番)
@@ -255,7 +266,7 @@ const AMB = new THREE.Color(2.4, 1.7, 0.6);
 function emitAmbient(dt) {
   fx.amb += (fx.ambT - fx.amb) * (1 - Math.exp(-dt * 2.5));
   const vh = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z, vw = vh * camera.aspect;
-  let n = 26 * fx.amb * dt;
+  let n = 26 * (fx.amb + fx.heatNow * 0.6) * dt;
   while (n > 0) { if (Math.random() < n) sparks.emit(camera.position.x + rand(-vw, vw), camNow.look.y - vh * 1.3, rand(-6, 3), rand(-0.3, 0.3), rand(1, 2.6), 0, AMB, rand(0.07, 0.18), rand(5, 9), 0, 1); n -= 1; }
 }
 
@@ -327,9 +338,16 @@ function cutin(text, cls, { dur = 1400, sub = '', small = false, color = null } 
   return sleep(dur / 1000).then(() => el.remove());
 }
 // 開ける(たどる)前のカットイン: チーム名を、選んだくじの色で
-function teamCutin(lot, team, last = false) {
+async function teamCutin(lot, team, last = false, win = false) {
   if (last && proto()) { sound.kakutei(); sound.holdChange(5); flash('#fff', 0.5, 0.7); return cutin(team, 't-rainbow', { dur: 1700, sub: '残り物には福がある!!', small: team.length > 7 }); }
-  sound.holdChange(1); return cutin(team, 't-gold', { dur: 1200, small: team.length > 7, color: lot.color });
+  sound.holdChange(1);
+  const promo = proto() && hash(`${D.id}:${lot.label}:promo`) < (win ? 0.5 : 0.08);
+  if (!promo) return cutin(team, 't-gold', { dur: 1200, small: team.length > 7, color: lot.color });
+  // 昇格: 1回目の帯が消えかけたところで、もう一回、赤い帯で来る
+  cutin(team, 't-gold', { dur: 1000, small: team.length > 7, color: lot.color });
+  await sleep(0.85);
+  sound.gata(); sound.holdChange(4); flash('#fff', 0.45, 0.7); fx.shake = 0.6;
+  return cutin(team, 't-red', { dur: 1300, sub: 'チャンス!!', small: team.length > 7 });
 }
 // 最後に残った1チームか(それまで全部外れ)
 const isLast = (lot) => D.order.indexOf(lot) === D.lots.length - 1;
@@ -357,7 +375,7 @@ function camSet(v) { cam.pos.copy(v.pos); cam.look.copy(v.look); camNow.pos.copy
 let world = null;
 function clearWorld() {
   if (world) { world.cancel = true; scene.remove(world.root); }
-  world = null; tweens = []; meteors.clear(); showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.ambT = 0.15; tierLight.intensity = 0;
+  world = null; tweens = []; tickers = []; meteors.clear(); fx.heat = 0; showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.ambT = 0.15; tierLight.intensity = 0;
   $('fx').innerHTML = '';
 }
 function onData(d) {
@@ -473,9 +491,11 @@ function buildEnvelope(d) {
       const zm = zoom(e), ov = overview();
       await Promise.all([camTo(zm.pos, zm.look, 0.6), tween(0.6, (k) => { e.g.position.y = e.base.y + k * 0.3; }, 'sine')]);
       // 2. チーム名のカットイン(選んだくじの色)
-      await teamCutin(e.lot, team, isLast(lot));
-      // 3. ためて、震える(試作: 心音2つぶん、止まってもう一度)
-      if (proto()) {
+      const sure = proto() && isLast(lot); // もう当たりと決まっている(ウイニングラン)
+      await teamCutin(e.lot, team, isLast(lot), win);
+      // 3. ためて、震える(試作: 心音2つぶん、止まってもう一度。決まっているときはためない)
+      if (sure) await sleep(0.1);
+      else if (proto()) {
         heartbeats(2);
         await tween(0.55, (k) => { e.g.rotation.z = Math.sin(now() * 40) * 0.018 * Math.sin(k * Math.PI); }, 'lin');
         await sleep(0.25);
@@ -488,11 +508,22 @@ function buildEnvelope(d) {
       const cols = [hdr(c), hdr(c, 1.4), new THREE.Color(2, 2, 2)];
       for (let i = 0; i < 140; i++) { const a = rand(0.2, Math.PI - 0.2), sp = rand(2, 6.5); sparks.emit(top.x + rand(-0.4, 0.4), top.y, top.z + 0.3, Math.cos(a) * sp, Math.sin(a) * sp, rand(-0.5, 2), cols[i % cols.length], rand(0.05, 0.14), rand(0.7, 1.4), -6, 0.96); }
       tween(0.6, (k) => { const f = 1 - k; e.glow.material.opacity = f * 0.7; e.glow.scale.setScalar(3 + k * 3); e.light.intensity = f * 5; }, 'out');
-      await tween(0.45, (k) => { e.mz.position.y = MZY - k * 0.6; e.mz.material.opacity = 1 - k; e.pivot.rotation.x = FLAP * ease.out(k); }, 'lin');
+      await tween(sure ? 0.3 : 0.45, (k) => { e.mz.position.y = MZY - k * 0.6; e.mz.material.opacity = 1 - k; e.pivot.rotation.x = FLAP * ease.out(k); }, 'lin');
       e.mz.visible = false;
+      // 試作: 口から光の粒が噴き出し、少し止まる(宝箱を開けるときのように)
+      if (proto() && !sure) {
+        sound.kakutei();
+        let left = 0.6;
+        await ticker((dt) => { left -= dt; for (let i = 0; i < 6; i++) sparks.emit(top.x + rand(-0.45, 0.45), top.y, top.z + 0.2, rand(-1.2, 1.2), rand(3, 7), rand(-0.3, 1), i % 3 ? hdr(c) : new THREE.Color(2.2, 1.9, 1.2), rand(0.05, 0.12), rand(0.6, 1.1), -5, 0.97); return left <= 0; });
+        await sleep(0.2);
+      }
       // 5. 中袋が上がる
       e.card.material.map = cardTex(win); e.card.material.needsUpdate = true;
-      if (proto()) {
+      if (sure) {
+        // 決まっているときは堂々と: 一気に出して、大きく光る
+        impact(1.4);
+        await tween(0.35, (k) => { e.card.material.opacity = Math.min(1, k * 3); e.card.position.set(0, k * 1.05, 0.01 + k * 0.11); }, 'out');
+      } else if (proto()) {
         // 絞り: ゆっくり少しだけ出て(ふちの色がのぞく)、止まって、一気に出る
         heartbeats(3, 0.5);
         // 中袋は封筒の口から出す: 口より下は切り取って見せない(上のふちだけがのぞく)
@@ -509,6 +540,7 @@ function buildEnvelope(d) {
       e.open = true;
       if (!win) {
         sound.lose();
+        if (proto()) { const at = new THREE.Vector3(); e.card.getWorldPosition(at); stamp('外れ', at); fx.heat += 1; }
         await sleep(0.7);
         await Promise.all([camTo(ov.pos, ov.look, 0.5), tween(0.5, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine')]);
         return;
@@ -557,7 +589,7 @@ class Meteor {
 }
 function buildAmida(d) {
   const root = new THREE.Group(); scene.add(root);
-  const n = d.lots.length, gap = Math.max(2.0, Math.min(10, 17 / Math.max(1, n - 1))), TOP = 5, BOT = -5, rungs = d.amida.rungs, R = rungs.length;
+  const n = d.lots.length, gap = Math.max(2.0, Math.min(10, 17 / Math.max(1, n - 1))), TOP = 4.5, BOT = -4.5, rungs = d.amida.rungs, R = rungs.length;
   const xs = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * gap);
   const ys = Array.from({ length: R }, (_, r) => TOP - (r + 1) * ((TOP - BOT) / (R + 1)));
   const RAD = 0.03, TR = 0.07;
@@ -585,7 +617,7 @@ function buildAmida(d) {
   const rungMat = () => new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.52, 0.2), toneMapped: false, transparent: true, opacity: 0 });
   const rungMeshes = rungs.map((row, r) => row.map((i) => { const m = cyl(gap, rungMat(), RAD); m.rotation.z = Math.PI / 2; m.position.set((xs[i] + xs[i + 1]) / 2, ys[r], 0); m.visible = false; root.add(m); return { m, i, r }; }));
   const showRung = (r, i, flashIt) => { const o = rungMeshes[r].find((x) => x.i === i); if (!o || o.m.visible) return; o.m.visible = true; if (flashIt) tween(0.4, (k) => { o.m.material.opacity = 0.7 * k; o.m.material.color.setRGB(0.75 + 2.5 * (1 - k), 0.52 + 2 * (1 - k), 0.2 + 1 * (1 - k)); }, 'out'); else o.m.material.opacity = 0.7; };
-  const tw = Math.min(gap * 0.9, 3.6);
+  const tw = Math.min(gap * 0.9, 4.6);
   const owners = d.owners.slice();
   const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i]), tw, tw * 0.446); s.position.set(xs[i], TOP + tw * 0.3, 0); root.add(s); return s; });
   const goalTex = (state) => tex(256, 256, (c, w, h) => {
@@ -595,7 +627,7 @@ function buildAmida(d) {
     c.fillStyle = state === 'win' ? '#7a0d08' : state === 'lose' ? '#cfc4b4' : '#ffe9b8'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = FONT(state === 'win' ? 70 : 120); c.fillText(state === 'win' ? '当たり' : state === 'lose' ? '×' : '？', w / 2, h / 2 + 6);
   });
-  const gs = Math.min(gap * 0.6, 2.0);
+  const gs = Math.min(gap * 0.6, 2.4);
   const goals = xs.map((x) => { const s = sprite(goalTex('hide'), gs, gs); s.position.set(x, BOT - gs * 0.62, 0); root.add(s); return s; });
   const setGoal = (i, state) => { goals[i].material.map = goalTex(state); goals[i].material.needsUpdate = true; };
   function pathOf(lane, z = 0.02) {
@@ -616,7 +648,7 @@ function buildAmida(d) {
   function joint(p, mat) { const b = ball(mat, TR); b.position.copy(p); root.add(b); return b; }
   // 画角は全体が入る位置で固定(動かさない)
   const spanTop = TOP + tw * 0.56, spanBot = BOT - gs * 1.2, fullW = n * gap + 2, tanH = Math.tan((17.5 * Math.PI) / 180);
-  const h0 = (spanTop - spanBot) / 0.78, cy = (spanTop + spanBot) / 2 + 0.25;
+  const h0 = (spanTop - spanBot) / 0.87, cy = (spanTop + spanBot) / 2;
   camSet({ pos: new THREE.Vector3(0, cy, Math.max(h0 / 2 / tanH, fullW / 2 / tanH / (W / H))), look: new THREE.Vector3(0, cy, 0) });
   return {
     root,
@@ -639,32 +671,50 @@ function buildAmida(d) {
 
       tween(0.4, (k) => { tags[lane].scale.set(tw * (1 + 0.15 * Math.sin(k * Math.PI)), tw * 0.446 * (1 + 0.15 * Math.sin(k * Math.PI)), 1); });
       // 1. チーム名のカットイン(選んだくじの色)
-      await teamCutin(lot, team, isLast(lane));
+      const sure = proto() && isLast(lane);
+      await teamCutin(lot, team, isLast(lane), win);
       dimTrails();
       const p = pathOf(lane, 0.02 + trails.length * 0.04), mat = trail(new THREE.Color(d.lots[lane].color));
       // 2. 流れ星: くじの色の尾を引いて、一定の速さでたどる(動き出しと止まりだけなめらか)
       const met = new Meteor(); root.add(met.points, met.head, met.glow);
       const segs = []; for (let s = 0; s < p.pts.length - 1; s++) segs.push(trailSeg(p.pts[s], p.pts[s + 1], mat));
-      const lens = segs.map((m) => m.userData.len), total = lens.reduce((a, b) => a + b, 0), slow = proto(), DUR = 2.6 + total * 0.02 + (slow ? 1.6 : 0);
-      // 試作: 時間の最後 35% で、道のりの最後 10% だけ進む(ゴール前でスロー)
-      const progress = (k) => (!slow ? k : k < 0.65 ? (k / 0.65) * 0.9 : 0.9 + ((k - 0.65) / 0.35) * 0.1);
-      let slowed = false;
+      const lens = segs.map((m) => m.userData.len), total = lens.reduce((a, b) => a + b, 0), BASE = 2.6 + total * 0.02, V = total / BASE;
+      const tease = proto() && !sure, gx = xs[d.amida.goal], onGoal = (m) => Math.abs(m.userData.a.x - gx) < 1e-3;
+      // 当たりの列を下っている(縦の線)なら、ゆっくり。上の方では焦らさない(下 2/3 だけ)
+      const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3 && segs[s].userData.a.y < TOP - (TOP - BOT) / 3;
+      // 当たりの列をゆっくり下りてきて、そこから離れていく横線(「このまま行くか…行かない!」で一瞬迷う)
+      const leaveSeg = (s) => tease && s > 0 && slowSeg(s - 1) && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) > 1e-3;
       joint(p.pts[0], mat); const joined = new Set([0]); const crossed = new Set();
-      sound.shoot(DUR); fx.dimT = 0.6; fx.bulb = 'spin';
+      sound.shoot(BASE); fx.dimT = 0.6; fx.bulb = 'spin';
       const col = lc, head = new THREE.Vector3();
-      await tween(DUR, (k) => {
-        if (slow && k > 0.65 && !slowed) { slowed = true; heartbeats(3, 0.5); fx.dimT = 0.8; }
-        let dist = progress(k) * total, s = 0;
-        while (s < segs.length - 1 && dist > lens[s]) { setSeg(segs[s], 1); if (!joined.has(s + 1)) { joined.add(s + 1); joint(p.pts[s + 1], mat); } dist -= lens[s]; s++; }
-        const q = Math.min(1, dist / lens[s]); setSeg(segs[s], q);
-        head.copy(segs[s].userData.a).lerp(segs[s].userData.b, q); head.z += 0.25;
+      let s = 0, q = 0, speed = 0, t = 0, pause = 0, paused = new Set(), beatAt = 0, slowNow = false;
+      await ticker((dt) => {
+        t += dt;
+        const want = slowSeg(s) ? 0.28 : 1;
+        if (want < 1 && !slowNow) { slowNow = true; fx.dimT = 0.85; beatAt = 0; }
+        if (want === 1 && slowNow) { slowNow = false; fx.dimT = 0.6; }
+        if (slowNow && t >= beatAt) { sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
+        if (leaveSeg(s) && q === 0 && !paused.has(s)) { paused.add(s); pause = 0.5; sound.stopThud(); }
+        if (pause > 0) { pause -= dt; met.glow.material.opacity = 0.45 + 0.35 * Math.abs(Math.sin(t * 14)); }
+        else {
+          speed += (want - speed) * (1 - Math.exp(-dt * (want < speed ? 5 : 3)));
+          let step = V * speed * dt;
+          while (step > 0 && s < segs.length) {
+            const left = lens[s] * (1 - q);
+            if (step < left) { q += step / lens[s]; step = 0; }
+            else { step -= left; setSeg(segs[s], 1); q = 0; s++; if (s < segs.length && !joined.has(s)) { joined.add(s); joint(p.pts[s], mat); } if (s < segs.length && (leaveSeg(s) && !paused.has(s))) step = 0; }
+          }
+        }
+        const si = Math.min(s, segs.length - 1), qi = s >= segs.length ? 1 : q;
+        setSeg(segs[si], qi);
+        head.copy(segs[si].userData.a).lerp(segs[si].userData.b, qi); head.z += 0.25;
         met.u.uCol.value.copy(col); met.glow.material.color.copy(col); met.push(head);
-        // こぼれるきらめき
         for (let j = 0; j < 3; j++) sparks.emit(head.x + rand(-0.1, 0.1), head.y + rand(-0.1, 0.1), head.z, rand(-0.8, 0.8), rand(-0.6, 1.2), rand(-0.3, 0.3), Math.random() < 0.4 ? new THREE.Color(2, 2, 2) : hdr(col), rand(0.08, 0.22), rand(0.5, 1.1), -1.5, 0.97);
-        p.cross.forEach(([r, i, at]) => { if (s >= at && !crossed.has(at)) { crossed.add(at); showRung(r, i, true); sound.tick(1.1); } });
-      }, slow ? 'sine' : 'inOut');
+        p.cross.forEach(([r, i, at]) => { if (si >= at && !crossed.has(at)) { crossed.add(at); showRung(r, i, true); sound.tick(1.1); } });
+        return s >= segs.length;
+      });
       setSeg(segs[segs.length - 1], 1); joint(p.pts[p.pts.length - 1], mat);
-      if (slow) impact(win ? 1.4 : 0.6);
+      if (proto()) impact(win ? 1.4 : 0.6);
       fx.dimT = 0; fx.bulb = 'idle';
       // 3. ゴール: 流れ星がはじけて結果
       const end = head.clone();
@@ -672,7 +722,7 @@ function buildAmida(d) {
       tween(0.6, (k) => { met.u.uFade.value = 1 - k; met.head.material.opacity = 1 - k; met.glow.material.opacity = 0.45 * (1 - k); }, 'out').then(() => { root.remove(met.points, met.head, met.glow); meteors.delete(met); });
       setGoal(p.end, win ? 'win' : 'lose');
       tween(0.4, (k) => goals[p.end].scale.setScalar(gs * (1 + Math.sin(k * Math.PI) * 0.3)), 'out');
-      if (!win) { sound.lose(); await sleep(0.9); return; }
+      if (!win) { sound.lose(); if (proto()) { stamp('外れ', goals[p.end].position.clone().applyMatrix4(root.matrixWorld)); fx.heat += 1; } await sleep(0.9); return; }
       // 4. 当たり: ルーレットと同じ決着。そのあと、まだ通っていない道も全部見せる(公平に決まったことがわかるように)
       await finish(end, team, 0.8);
       await sleep(2.6);
@@ -697,11 +747,13 @@ function frame() {
   const t = now(), dt = Math.min(0.05, t - last); last = t;
   const frozen = t < fx.freezeUntil;
   if (frozen) tweens.forEach((tw) => { tw.t0 += dt; });
-  else tweens = tweens.filter((tw) => { const k = Math.min(1, (t - tw.t0) / tw.dur); tw.fn(tw.e(k)); if (k >= 1) { tw.res(); return false; } return true; });
+  else tickers = tickers.filter((tk) => { if (tk.fn(dt)) { tk.res(); return false; } return true; });
+  if (!frozen) tweens = tweens.filter((tw) => { const k = Math.min(1, (t - tw.t0) / tw.dur); tw.fn(tw.e(k)); if (k >= 1) { tw.res(); return false; } return true; });
   const k = (rate) => 1 - Math.exp(-dt * rate);
   fx.win += (fx.winT - fx.win) * k(3); fx.dim += (fx.dimT - fx.dim) * k(4);
   bgU.uTime.value = t; bgU.uWin.value = fx.win; bgU.uDim.value = fx.dim;
-  bgU.uGlow.value = 0.4 + 0.6 * Math.min(1, fx.amb / 3.4);
+  fx.heatNow += (fx.heat - fx.heatNow) * k(2);
+  bgU.uGlow.value = 0.4 + 0.6 * Math.min(1, fx.amb / 3.4) + fx.heatNow * 0.22;
   tierLight.intensity = fx.win * 4; tierLight.color.setHSL((t * 0.4) % 1, 1, 0.6);
   bloom.strength = 0.45 + fx.win * 0.45;
   // カメラ(時間あたり一定の減衰でついていく。回さない)
