@@ -587,7 +587,7 @@ class Meteor {
 }
 function buildAmida(d) {
   const root = new THREE.Group(); scene.add(root);
-  const n = d.lots.length, gap = Math.max(2.0, Math.min(6.5, 12 / Math.max(1, n - 1))), TOP = 4.5, BOT = -4.5, rungs = d.amida.rungs, R = rungs.length;
+  const n = d.lots.length, gap = Math.max(2.0, Math.min(4.8, 9 / Math.max(1, n - 1))), TOP = 4.5, BOT = -4.5, rungs = d.amida.rungs, R = rungs.length;
   const xs = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * gap);
   const ys = Array.from({ length: R }, (_, r) => TOP - (r + 1) * ((TOP - BOT) / (R + 1)));
   const RAD = 0.03, TR = 0.07;
@@ -631,7 +631,7 @@ function buildAmida(d) {
   // 画角は全体が入る位置で固定(動かさない)
   // 板の大きさ: 名札からゴールまでと、左右の名札がおさまる角丸の四角
   const boardTop = TOP + tw * 0.27 + (tw * TAG_AR) / 2 + 0.65, boardBot = BOT - gs * 1.12 - 1.05;
-  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw * 0.72, gs) / 2 + 0.8, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
+  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw * 0.72, gs) / 2 + 1.5, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
   const roundRectShape = (hw, hh, r) => { const sh = new THREE.Shape(); sh.moveTo(-hw + r, -hh); sh.lineTo(hw - r, -hh); sh.absarc(hw - r, -hh + r, r, -Math.PI / 2, 0); sh.lineTo(hw, hh - r); sh.absarc(hw - r, hh - r, r, 0, Math.PI / 2); sh.lineTo(-hw + r, hh); sh.absarc(-hw + r, hh - r, r, Math.PI / 2, Math.PI); sh.lineTo(-hw, -hh + r); sh.absarc(-hw + r, -hh + r, r, Math.PI, Math.PI * 1.5); return sh; };
   const ringCurve = (hw, hh, r, z) => new THREE.CatmullRomCurve3(roundRectShape(hw, hh, r).getSpacedPoints(240).slice(0, -1).map((p) => new THREE.Vector3(p.x, p.y + boardCY, z)), true);
   const board = new THREE.Group(); root.add(board);
