@@ -217,3 +217,19 @@ console.log('略称・巡のはじめ ok');
   assert.strictEqual(C.normalize({ rounds: 10, round: 1 }).rounds, 3);
 }
 console.log('番組の CSV ok');
+// 場面の BGM: 決めていれば場面の曲、'-' は無音、決めていなければ音のボタンの曲。番組の CSV でも往復できる
+{
+  let s = C.apply(C.initialState(), { type: 'setAudio', patch: { bgm: 'main.mp3' } });
+  const [open, about] = C.programOf(s);
+  assert.strictEqual(C.sceneBgm(s), 'main.mp3');
+  s = C.apply(s, { type: 'updateProgram', id: open.id, patch: { bgm: 'op.mp3' } });
+  s = C.apply(s, { type: 'updateProgram', id: about.id, patch: { bgm: '-' } });
+  assert.strictEqual(C.sceneBgm(s), 'op.mp3');
+  s = C.apply(s, { type: 'progGo', idx: 1 });
+  assert.strictEqual(C.sceneBgm(s), '');
+  s = C.apply(s, { type: 'progGo', idx: 2 });
+  assert.strictEqual(C.sceneBgm(s), 'main.mp3');
+  const t = C.apply(C.initialState(), { type: 'replaceShow', ...C.showFromCSV(C.showToCSV(s)) });
+  assert.deepStrictEqual(C.programOf(t).slice(0, 2).map((g) => g.bgm), ['op.mp3', '-']);
+}
+console.log('場面の BGM ok');

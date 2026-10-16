@@ -59,7 +59,7 @@ function connect() {
     }
     else if (m.type === 'remote') { remoteInfo = m; renderRemote(); }
     else if (m.type === 'presence') { overlay = m; renderOverlayStatus(); if (S) renderRun(); }
-    else if (m.type === 'bgmList') { bgmList = m.list; if (S) renderAudio(); }
+    else if (m.type === 'bgmList') { bgmList = m.list; if (S) render(); }
     else if (m.type === 'error') toast(m.message, true);
   };
 }
@@ -174,7 +174,7 @@ function renderRail(sel) {
     const on = g.id === sel.id, now = i === cur, done = i < cur;
     return `<li><button type="button" data-sel="${g.id}" ${on ? 'aria-current="true"' : ''} class="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm border cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12] text-[var(--text-heading)] font-bold' : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-page-alt)] ' + (done ? 'text-[var(--text-muted)]' : 'text-[var(--text-default)]')}">
       <span class="w-5 flex-none text-xs tabular-nums text-[var(--text-muted)]">${done ? '✓' : i + 1}</span><span class="min-w-0 flex-1 truncate">${esc(g.label)}</span>
-      ${now ? '<span class="flex-none px-2 rounded-full text-[11px] font-bold bg-red-500/[.12] text-red-300">映している</span>' : `<span class="flex-none text-[11px] text-[var(--text-muted)]">${esc(typeLabel(g))}</span>`}</button></li>`;
+      ${g.bgm && g.bgm !== '-' ? `<span class="flex-none text-xs text-primary-300" title="BGM: ${esc(g.bgm)}" aria-label="BGM あり">♪</span>` : ''}${now ? '<span class="flex-none px-2 rounded-full text-[11px] font-bold bg-red-500/[.12] text-red-300">映している</span>' : `<span class="flex-none text-[11px] text-[var(--text-muted)]">${esc(typeLabel(g))}</span>`}</button></li>`;
   }).join('');
 }
 // はじめて(名簿が空): 何から始めるか
@@ -230,9 +230,14 @@ function renderSceneEdit(g) {
   } else if (g.type === 'logo') body = '<p class="text-sm text-[var(--text-muted)]">大会のロゴ（なければ大会名）を大きく出します。</p>';
   else if (g.type === 'final') body = '<p class="text-sm text-[var(--text-muted)]">最終のチーム表を出します。</p>';
   else if (g.type === 'blank') body = '<p class="text-sm text-[var(--text-muted)]">配信画面に何も出しません。</p>';
+  // その場面の BGM(同じ曲が続く場面では止めずにそのまま流れる)
+  const names = g.bgm && g.bgm !== '-' && !bgmList.includes(g.bgm) ? [...bgmList, g.bgm] : bgmList;
+  const bgmSel = `<div class="leading-normal"><label class="${LABEL}" for="pb-${g.id}">BGM</label><div class="relative w-80"><select id="pb-${g.id}" data-prog-bgm="${g.id}" class="appearance-none w-full pl-3 pr-10 ${INPUT} cursor-pointer">
+      <option value="" ${!g.bgm ? 'selected' : ''}>決めない（音のボタンの曲のまま）</option><option value="-" ${g.bgm === '-' ? 'selected' : ''}>BGM なし</option>
+      ${names.map((nm) => `<option value="${esc(nm)}" ${nm === g.bgm ? 'selected' : ''}>♪ ${esc(nm.replace(/\.[^.]+$/, ''))}${bgmList.includes(nm) ? '' : '（見つかりません）'}</option>`).join('')}</select>${ICON.chevron}</div></div>`;
   const memo = `<div class="leading-normal"><label class="${LABEL}" for="pm-${g.id}">メモ（自分用。配信には出ません）</label><textarea id="pm-${g.id}" rows="6" data-prog-memo="${g.id}" placeholder="話すこと・台本など" class="${TEXTAREA} resize-y">${esc(g.memo || '')}</textarea></div>`;
   // ドラフトの場面は「⚙ 進め方」のときだけメモを出す(本番の画面は指名に集中)
-  el.innerHTML = g.type === 'draft' ? (ui.draftTab === 'setup' ? memo : '') : body + memo;
+  el.innerHTML = g.type === 'draft' ? (ui.draftTab === 'setup' ? bgmSel + memo : '') : body + bgmSel + memo;
 }
 // 本番ビュー: 映している場面・次にやること・メモ・次の場面
 let previewOn = false;
@@ -786,6 +791,7 @@ document.addEventListener('change', (e) => {
   else if (/^opt-flow/.test(t.id)) setOption({ [t.id.slice(4)]: t.checked });
   else if (t.dataset.progLabel) act({ type: 'updateProgram', id: t.dataset.progLabel, patch: { label: t.value.trim() || '（名前なし）' } });
   else if (t.dataset.progMemo) act({ type: 'updateProgram', id: t.dataset.progMemo, patch: { memo: t.value } });
+  else if (t.dataset.progBgm) act({ type: 'updateProgram', id: t.dataset.progBgm, patch: { bgm: t.value } });
   else if (t.dataset.slide) act({ type: 'updateSlide', id: t.dataset.slide, patch: t.dataset.slideF === 'lines' ? { lines: t.value.split('\n') } : { title: t.value } });
 });
 
@@ -915,6 +921,9 @@ function renderAudio() {
     if (document.activeElement !== $(id)) $(id).value = v;
     $(id + '-v').textContent = v;
   }
+  // 場面で曲を決めているときは、そちらが流れる
+  const sb = C.progItem(S)?.bgm;
+  if (bgmList.length && sb) { $('bgm-hint').textContent = sb === '-' ? 'いまの場面は「BGM なし」に決めています（進行表の場面の設定）。' : `いまの場面は「${sb.replace(/\.[^.]+$/, '')}」が流れます（進行表の場面の設定）。`; return; }
   $('bgm-hint').textContent = bgmList.length
     ? '抽選ルーレットの間は BGM がゆっくり消え、ほかの画面に戻るとゆっくり戻ります。'
     : '曲がまだありません。「曲を追加」で音声ファイルを選ぶか、メニューの「ファイル → BGMフォルダを開く」に入れてください。';
@@ -933,7 +942,7 @@ $('bgm-file').addEventListener('change', async (e) => {
   }
   if (files.length) toast(`${files.length}曲を追加しました`);
 });
-fetch('/api/bgm').then((r) => r.json()).then((l) => { bgmList = l; if (S) renderAudio(); }).catch(() => {});
+fetch('/api/bgm').then((r) => r.json()).then((l) => { bgmList = l; if (S) render(); }).catch(() => {});
 
 $('toast').className = TOAST + ' hidden';
 connect();

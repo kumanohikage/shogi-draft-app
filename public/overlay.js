@@ -70,7 +70,7 @@ function render() {
   if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
   SE.setVolume(PREVIEW ? 0 : audio.seVol / 100);
-  BGM.update(PREVIEW ? { ...audio, bgmOn: false } : audio, S.scene === 'roulette');
+  BGM.update(PREVIEW ? { ...audio, bgmOn: false } : { ...audio, bgm: C.sceneBgm(S) }, S.scene === 'roulette');
   const f = $('roulette').contentWindow;
   if (f) {
     f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ

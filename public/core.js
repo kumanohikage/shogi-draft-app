@@ -68,6 +68,8 @@
   // 前の版のデータ(進行表が無い)は、ドラフトの場面から始める
   const progIdxOf = (s) => (s.progIdx ?? Math.max(0, programOf(s).findIndex((g) => g.type === 'draft')));
   const progItem = (s) => programOf(s)[progIdxOf(s)] || null;
+  // いま流す BGM: 場面で決めていればその曲('-' は無音)、決めていなければ音のボタンで選んだ曲
+  const sceneBgm = (s) => { const g = progItem(s), a = Object.assign({}, DEFAULT_AUDIO, s.audio); return g && g.bgm ? (g.bgm === '-' ? '' : g.bgm) : a.bgm; };
   const slideById = (s, id) => (s.slides || []).find((x) => x.id === id);
   // 名前の帯など: 「チーム」＋略称(なければフルネーム)。リーダー紹介だけはフルネーム
   const shortName = (l) => (l ? (l.short || '').trim() || l.name : '');
@@ -427,6 +429,7 @@
         else rows.push(['進行表', sl.rules || sl.id === 'S_draft' ? 'ドラフト説明' : '文字の資料', g.label, sl.title, ...(sl.lines || [])]);
       }
       if (g.memo) rows.push(['進行表', 'メモ', g.memo]); // 自分用のメモ(すぐ上の場面のもの)
+      if (g.bgm) rows.push(['進行表', 'BGM', g.bgm === '-' ? 'なし' : g.bgm]); // その場面の BGM
     }
     return rows.map((r) => r.map((v) => csvCell(v ?? '')).join(',')).join('\r\n') + '\r\n';
   }
@@ -463,6 +466,7 @@
         else if (/^フェード/.test(key)) out.options.fadeSec = Math.max(0, Math.min(2, +v0 || 0));
       } else if (kind === '進行表') {
         if (key === 'メモ') { if (prog.length) prog[prog.length - 1].memo = v.join(','); continue; }
+        if (key === 'BGM') { if (prog.length) prog[prog.length - 1].bgm = v0 === 'なし' ? '-' : v0; continue; }
         const type = Object.keys(SCENE_CSV).find((t) => SCENE_CSV[t] === key);
         if (type) { if (type !== 'draft' || !prog.some((g) => g.type === 'draft')) prog.push({ id: uid('G'), type, label: v0 || key }); }
         else if (key === '文字の資料' || key === 'ドラフト説明' || key === '画像の資料') {
@@ -485,5 +489,5 @@
     return s;
   }
 
-  return { TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  return { TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));
