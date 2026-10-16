@@ -434,6 +434,18 @@ function renderLots() {
     : L.done && L.mode !== 'wheel' ? `${team(L.winner)} が交渉権を獲得`
     : L.phase === 'ready' ? (L.mode === 'wheel' ? 'ルーレットを回します' : `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`)
     : L.mode === 'amida' ? `${team(L.leaders[L.opened - 1])} のくじをたどっています` : `${team(L.leaders[L.opened - 1])} の封筒`;
+  // 3D(封筒・あみだ): 3D の画面に任せる。プレビューでは軽い 2D のまま
+  const use3d = !PREVIEW && C.optionsOf(S).lotFx !== '2d' && (L.mode === 'envelope' || L.mode === 'amida');
+  for (const id of ['lots-title', 'lots-head', 'lots-body', 'lots-note']) $(id).style.display = use3d ? 'none' : '';
+  $('lots3d').style.display = use3d ? 'block' : 'none';
+  if (use3d) {
+    if (!$('lots3d').getAttribute('src')) $('lots3d').setAttribute('src', 'lots3d.html');
+    lots3dSend({ id: L.id, mode: L.mode, lots: L.lots, owners: L.lots.map((_, i) => (owner(i) ? C.teamLabel(S, C.leaderById(S, owner(i))) : null)),
+      order: L.leaders.map((id) => L.picks[id]), opened: L.opened, done: L.done, winLot: L.winLot, amida: L.amida,
+      player: { name: p ? p.name : '', icon: p && p.icon ? img(p.icon) : '' }, note: $('lots-note').textContent });
+    lotsPrev = { id: L.id, picked, opened: L.opened, phase: L.phase };
+    return;
+  }
   if (L.mode === 'amida') renderAmida(L, owner, live, fresh);
   else {
     const isEnv = L.mode === 'envelope';
@@ -474,6 +486,16 @@ function renderAmida(L, owner, live, fresh) {
   if (live && L.opened > lotsPrev.opened) { SE.flip(); if (L.done) setTimeout(() => SE.win(), 2600); }
   else if (live && Object.keys(L.picks).length > lotsPrev.picked) SE.pop();
 }
+
+// 3D のくじの画面へ状態を送る(読み込みが終わるまでは取っておく)
+let lots3dReady = false, lots3dPending = null;
+function lots3dSend(data) { if (lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots', data }, '*'); else lots3dPending = data; }
+addEventListener('message', (e) => {
+  const m = e.data || {};
+  if (m.type === 'lots3d-ready') { lots3dReady = true; if (lots3dPending) { lots3dSend(lots3dPending); lots3dPending = null; } }
+  // 3D の画面からの効果音(音量・プレビューの無音はこちらで)
+  else if (m.type === 'lots-sfx' && !PREVIEW && S && S.scene === 'lots' && SE[m.name]) SE[m.name]();
+});
 
 /* ---------- 抽選ルーレット ---------- */
 function playLottery(force) {

@@ -835,7 +835,7 @@ function renderOptions() {
   const o = optionsOf();
   // 順番指名の巡が1つもなければ、順番の設定は使わない
   setDisabled($('opt-order'), !o.roundModes.slice(0, S.rounds).includes('order'));
-  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-lotmode', o.lotteryMode], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
+  for (const [id, v] of [['opt-order', o.orderStyle], ['opt-lottery', o.lotteryStyle], ['opt-lotmode', o.lotteryMode], ['opt-lotfx', o.lotFx], ['opt-timer', o.timerSec]]) if (document.activeElement !== $(id)) $(id).value = v;
   $('opt-timershow').checked = !!o.timerShow;
   $('opt-timerauto').checked = !!o.timerAuto;
   // 巡: 1行に1巡(指名のしかた＋待ち時間の画像)
@@ -863,6 +863,7 @@ document.addEventListener('change', (e) => {
   // くじを選ぶ方式では、くじの色と紛らわしいので、枠はリーダーの色をやめて落ち着いた色に(大会の見た目で戻せる)
   else if (t.id === 'opt-lotmode') setOption({ lotteryMode: t.value, leaderColors: t.value === 'roulette' });
   else if (t.id === 'opt-leadercolors') setOption({ leaderColors: t.checked });
+  else if (t.id === 'opt-lotfx') setOption({ lotFx: t.value });
   else if (t.id === 'opt-timer') setOption({ timerSec: Math.max(10, Math.min(3600, +t.value || 300)) });
   else if (t.id === 'opt-timershow') setOption({ timerShow: t.checked });
   else if (t.id === 'opt-timerauto') setOption({ timerAuto: t.checked });

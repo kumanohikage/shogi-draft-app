@@ -82,6 +82,20 @@
       [2093, 2637, 3136, 4186, 3136, 4186].forEach((f, i) => tone('sine', f, f, t + 0.6 + i * 0.07, 0.35, 0.05));
       hiss(t + 0.5, 0.6, 0.25, 'highpass', 6000, 4000);
     },
+    // 光がもれる「キュイーン」(上がっていくきらめき)
+    glow() {
+      if (!init()) return;
+      const t = ctx.currentTime;
+      tone('sine', 300, 1200, t, 1.3, 0.12);
+      tone('triangle', 600, 2400, t + 0.1, 1.2, 0.05);
+      hiss(t, 1.3, 0.12, 'bandpass', 800, 6000, 2);
+    },
+    // 外れ「ポン…」(下がる2音)
+    lose() {
+      if (!init()) return;
+      const t = ctx.currentTime;
+      tone('triangle', 523, 523, t, 0.25, 0.16); tone('triangle', 392, 392, t + 0.18, 0.5, 0.16);
+    },
     // チーム表に名前が入る「ポン」
     pop() {
       if (!init()) return;

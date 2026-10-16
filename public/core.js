@@ -140,11 +140,12 @@
   // 見た目: bgImage(全画面の背景) / logoImage(大会ロゴ) / titleMode(大会名を 'text' 文字 | 'logo' ロゴ画像で出す。'' は前の版の扱い = ロゴがあればロゴ) / teamPrefix(名前の帯の「チーム」)
   // lotteryMode: 重複の抽選のしかた = roulette(選ばずにルーレット) | wheel(くじの色を選んでからルーレット) | envelope(封筒を選んで開ける) | amida(あみだくじ)
   //   くじを選ぶ方式では、抽選を始めた瞬間に当たりのくじを決めて隠し、リーダーの並び順にくじを選ぶ。当たりのくじを選んだリーダーが交渉権を得る
+  // lotFx: 封筒・あみだくじの見せ方 = 3d(光と立体でゆっくり) | 2d(シンプル)
   // leaderColors: 配信画面の枠にリーダーの色を使う(くじの色と紛らわしいときは外して落ち着いた色に統一)
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'wheel', leaderColors: false };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, fadeSec: 0.3, lotteryMode: 'wheel', leaderColors: false, lotFx: '3d' };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
@@ -374,8 +375,9 @@
         L.phase = 'reveal';
         const who = L.leaders[L.opened];
         L.opened += 1;
-        s.busyUntil = (action.now || Date.now()) + (L.mode === 'amida' ? 3200 : 1700);
-        if (who === L.winner) L.done = true;
+        const fx3 = optionsOf(s).lotFx !== '2d', win = who === L.winner;
+        s.busyUntil = (action.now || Date.now()) + (L.mode === 'amida' ? (fx3 ? (win ? 9000 : 7300) : 3200) : (fx3 ? (win ? 6800 : 5600) : 1700));
+        if (win) L.done = true;
         break;
       }
       case 'nextRound':
@@ -472,6 +474,7 @@
     rows.push(['進め方', '指名のしかた', ...Array.from({ length: s.rounds }, (_, i) => (roundMode(s, i + 1) === 'order' ? '順番指名' : '一斉入札'))]);
     rows.push(['進め方', '順番指名の順番', o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク']);
     rows.push(['進め方', '抽選の演出', o.lotteryStyle === 'short' ? '短い' : '通常']);
+    rows.push(['進め方', '封筒・あみだの見せ方', o.lotFx === '2d' ? 'シンプル' : '3D']);
     rows.push(['進め方', '抽選の方式', { roulette: 'ルーレット', wheel: '色を選んでルーレット', envelope: '封筒', amida: 'あみだくじ' }[o.lotteryMode] || 'ルーレット']);
     rows.push(['進め方', '制限時間（秒）', o.timerSec]);
     rows.push(['進め方', 'タイマーを自動でスタート', o.timerAuto ? 'する' : 'しない'], ['進め方', 'タイマーを配信画面に出す', o.timerShow ? 'する' : 'しない']);
@@ -507,6 +510,7 @@
         if (key === '指名のしかた') O.roundModes = v.filter((x) => x !== '').map((x) => (/順番/.test(x) ? 'order' : 'bid'));
         else if (key === '順番指名の順番') O.orderStyle = /ウェーバー/.test(v0) ? 'waiver' : 'snake';
         else if (key === '抽選の演出') O.lotteryStyle = /短/.test(v0) ? 'short' : 'full';
+        else if (key === '封筒・あみだの見せ方') O.lotFx = /シンプル|2D/i.test(v0) ? '2d' : '3d';
         else if (key === '抽選の方式') O.lotteryMode = /色/.test(v0) ? 'wheel' : /封筒/.test(v0) ? 'envelope' : /あみだ/.test(v0) ? 'amida' : 'roulette';
         else if (/^制限時間/.test(key)) O.timerSec = Math.max(10, Math.min(3600, +v0 || 300));
         else if (key === 'タイマーを自動でスタート') O.timerAuto = yes(v0);
