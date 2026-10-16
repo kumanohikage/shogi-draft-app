@@ -165,8 +165,9 @@ camera.add(bg);
 const now = () => performance.now() / 1000;
 let tweens = [];
 const ease = { out: (k) => 1 - Math.pow(1 - k, 3), inOut: (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2), sine: (k) => 0.5 - 0.5 * Math.cos(Math.PI * k), lin: (k) => k };
-function tween(dur, fn, e = 'inOut') { return new Promise((res) => tweens.push({ t0: now(), dur, fn, e: ease[e], res })); }
-const sleep = (sec) => new Promise((r) => setTimeout(r, sec * 1000));
+let SPEED = 1; // 確定(残り物)のときは 1.1(早歩き)
+function tween(dur, fn, e = 'inOut') { return new Promise((res) => tweens.push({ t0: now(), dur: dur / SPEED, fn, e: ease[e], res })); }
+const sleep = (sec) => new Promise((r) => setTimeout(r, (sec * 1000) / SPEED));
 function tex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
 const FONT = (px, w = 900) => `${w} ${px}px 'Noto Sans JP', sans-serif`;
 function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -311,6 +312,7 @@ function showResult(team, on) {
 function flash(color = '#fff', dur = 0.5, op = 0.9) { const f = $('flash'); f.style.background = color; f.style.setProperty('--fd', `${dur}s`); f.style.setProperty('--fo', op); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
 // カットイン(ルーレットと同じ帯と文字)
 function cutin(text, cls, { dur = 1400, sub = '', small = false, color = null } = {}) {
+  dur /= SPEED;
   const el = document.createElement('div');
   el.className = `cutin ${cls}${small ? ' small' : ''}`;
   if (color) {
@@ -331,7 +333,7 @@ function cutin(text, cls, { dur = 1400, sub = '', small = false, color = null } 
     band.appendChild(st);
   }
   $('fx').appendChild(el);
-  return sleep(dur / 1000).then(() => el.remove());
+  return new Promise((r) => setTimeout(r, dur)).then(() => el.remove());
 }
 // 開ける(たどる)前のカットイン: チーム名を、選んだくじの色で
 // 「チャンス!!」のカットインが出るか(当たりで半分くらい、外れでまれ。抽選ごとに決まる)
@@ -376,7 +378,7 @@ function camSet(v) { cam.pos.copy(v.pos); cam.look.copy(v.look); camNow.pos.copy
 let world = null;
 function clearWorld() {
   if (world) { world.cancel = true; scene.remove(world.root); }
-  world = null; tweens = []; tickers = []; meteors.clear(); fx.heat = 0; showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.team = null; fx.ambT = 0.15; tierLight.intensity = 0;
+  world = null; tweens = []; tickers = []; SPEED = 1; meteors.clear(); fx.heat = 0; showResult('', false); fx.winT = fx.win = 0; fx.dimT = 0; fx.bulb = 'idle'; fx.team = null; fx.ambT = 0.15; tierLight.intensity = 0;
   $('fx').innerHTML = '';
 }
 function onData(d) {
@@ -397,7 +399,9 @@ async function run(w, d) {
   if (w.played === 0) { await intro(d); if (w.afterIntro && alive()) await w.afterIntro(); }
   for (let k = w.played; k < d.opened && alive(); k++) {
     const lot = d.order[k];
+    SPEED = proto() && k === d.lots.length - 1 ? 1.1 : 1;
     await w.open(lot, lot === d.winLot);
+    SPEED = 1;
     w.played = k + 1;
   }
   if (alive()) parent.postMessage({ type: 'lots3d-done', id: d.id }, '*');
@@ -447,8 +451,10 @@ function buildEnvelope(d) {
     const back = new THREE.MeshStandardMaterial({ map: washi(256, 440), color: PAPER, roughness: 0.9, envMapIntensity: 0.5 });
     g.add(new THREE.Mesh(new THREE.BoxGeometry(BW, BH, 0.07), [back, back, back, back, front, back]));
     const pivot = new THREE.Group(); pivot.position.set(0, BH / 2, 0.045); g.add(pivot);
-    const flap = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH * 0.3), new THREE.MeshStandardMaterial({ map: flapTexture(), color: PAPER, roughness: 0.85, envMapIntensity: 0.5, side: THREE.DoubleSide }));
+    const flap = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH * 0.3), new THREE.MeshStandardMaterial({ map: flapTexture(), color: PAPER, roughness: 0.85, envMapIntensity: 0.5, side: THREE.FrontSide }));
     flap.position.y = -BH * 0.15; pivot.add(flap);
+    const flapBack = new THREE.Mesh(flap.geometry, new THREE.MeshStandardMaterial({ map: washi(256, 140), color: PAPER, roughness: 0.85, envMapIntensity: 0.5, side: THREE.BackSide }));
+    flapBack.position.y = -BH * 0.15; pivot.add(flapBack);
     const mz = new THREE.Mesh(new THREE.PlaneGeometry(BW * 1.04, BW * 0.54), new THREE.MeshStandardMaterial({ map: mizuhikiTexture(lot.color), transparent: true, roughness: 0.4, metalness: 0.3 }));
     mz.position.set(0, MZY, 0.05); g.add(mz);
     // 開けた瞬間だけ光る(残さない)
@@ -595,7 +601,7 @@ function buildAmida(d) {
   const showRung = (r, i, flashIt) => { const o = rungMeshes[r].find((x) => x.i === i); if (!o || o.m.visible) return; o.m.visible = true; if (flashIt) tween(0.4, (k) => { o.m.material.opacity = 0.7 * k; o.m.material.color.setRGB(0.75 + 2.5 * (1 - k), 0.52 + 2 * (1 - k), 0.2 + 1 * (1 - k)); }, 'out'); else o.m.material.opacity = 0.7; };
   const tw = Math.min(gap * 0.9, 4.6);
   const owners = d.owners.slice();
-  const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i], true), tw, tw * TAG_AR); s.position.set(xs[i], TOP + tw * 0.4, 0); root.add(s); return s; });
+  const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i], true), tw, tw * TAG_AR); s.position.set(xs[i], TOP + tw * 0.27, 0); root.add(s); return s; });
   const goalTex = (state) => tex(256, 256, (c, w, h) => {
     roundRect(c, 8, 8, w - 16, h - 16, 40);
     if (state === 'win') { const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#fff3b0'); gr.addColorStop(0.5, '#ffc21a'); gr.addColorStop(1, '#b06a00'); c.fillStyle = gr; } else c.fillStyle = state === 'lose' ? '#4a4038' : 'rgba(20,12,4,.9)';
@@ -624,22 +630,22 @@ function buildAmida(d) {
   function joint(p, mat) { const b = ball(mat, TR); b.position.copy(p); root.add(b); return b; }
   // 画角は全体が入る位置で固定(動かさない)
   // 板の大きさ: 名札からゴールまでと、左右の名札がおさまる角丸の四角
-  const boardTop = TOP + tw * 0.4 + (tw * TAG_AR) / 2 + 0.65, boardBot = BOT - gs * 1.12 - 1.05;
-  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw, gs) / 2 + 0.75, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
+  const boardTop = TOP + tw * 0.27 + (tw * TAG_AR) / 2 + 0.65, boardBot = BOT - gs * 1.12 - 1.05;
+  const boardHW = ((n - 1) * gap) / 2 + Math.max(tw * 0.72, gs) / 2 + 0.8, boardCY = (boardTop + boardBot) / 2, boardHH = (boardTop - boardBot) / 2;
   const roundRectShape = (hw, hh, r) => { const sh = new THREE.Shape(); sh.moveTo(-hw + r, -hh); sh.lineTo(hw - r, -hh); sh.absarc(hw - r, -hh + r, r, -Math.PI / 2, 0); sh.lineTo(hw, hh - r); sh.absarc(hw - r, hh - r, r, 0, Math.PI / 2); sh.lineTo(-hw + r, hh); sh.absarc(-hw + r, hh - r, r, Math.PI / 2, Math.PI); sh.lineTo(-hw, -hh + r); sh.absarc(-hw + r, -hh + r, r, Math.PI, Math.PI * 1.5); return sh; };
   const ringCurve = (hw, hh, r, z) => new THREE.CatmullRomCurve3(roundRectShape(hw, hh, r).getSpacedPoints(240).slice(0, -1).map((p) => new THREE.Vector3(p.x, p.y + boardCY, z)), true);
   const board = new THREE.Group(); root.add(board);
   const panelMat = new THREE.MeshStandardMaterial({ color: 0x1c120a, metalness: 0.85, roughness: 0.32, emissive: 0x000000 });
   const panel = new THREE.Mesh(new THREE.ShapeGeometry(roundRectShape(boardHW, boardHH, 0.9), 12), panelMat); panel.position.set(0, boardCY, -0.35); board.add(panel);
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xffc94a, metalness: 1, roughness: 0.22 });
-  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW, boardHH, 0.9, -0.1), 400, 0.26, 18, true), goldMat));
-  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW + 0.6, boardHH + 0.6, 1.3, -0.25), 400, 0.09, 12, true), goldMat));
+  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW, boardHH, 0.9, -0.1), 400, 0.2, 18, true), goldMat));
+  board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW + 0.5, boardHH + 0.5, 1.2, -0.25), 400, 0.07, 12, true), goldMat));
   // 内側の光の線(いまのチームの色に光る)
   const innerMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.42, 0.15), toneMapped: false });
   board.add(new THREE.Mesh(new THREE.TubeGeometry(ringCurve(boardHW - 0.42, boardHH - 0.42, 0.55, -0.2), 400, 0.035, 8, true), innerMat));
   // 縁の電飾
   const rimCurve = ringCurve(boardHW, boardHH, 0.9, 0.18), NF = Math.round(rimCurve.getLength() / 0.55);
-  const frameBulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 14, 10), new THREE.MeshBasicMaterial({ toneMapped: false }), NF);
+  const frameBulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.1, 14, 10), new THREE.MeshBasicMaterial({ toneMapped: false }), NF);
   { const dm = new THREE.Object3D(); for (let i = 0; i < NF; i++) { dm.position.copy(rimCurve.getPointAt(i / NF)); dm.updateMatrix(); frameBulbs.setMatrixAt(i, dm.matrix); frameBulbs.setColorAt(i, new THREE.Color(1, 1, 1)); } }
   board.add(frameBulbs);
   const FRAME_GOLD = new THREE.Color(3.2, 2.2, 0.7), fc = new THREE.Color(), teamC = new THREE.Color(), panelEm = new THREE.Color();
@@ -776,7 +782,7 @@ function frame() {
   const t = now(), dt = Math.min(0.05, t - last); last = t;
   const frozen = t < fx.freezeUntil;
   if (frozen) tweens.forEach((tw) => { tw.t0 += dt; });
-  else tickers = tickers.filter((tk) => { if (tk.fn(dt)) { tk.res(); return false; } return true; });
+  else tickers = tickers.filter((tk) => { if (tk.fn(dt * SPEED)) { tk.res(); return false; } return true; });
   if (!frozen) tweens = tweens.filter((tw) => { const k = Math.min(1, (t - tw.t0) / tw.dur); tw.fn(tw.e(k)); if (k >= 1) { tw.res(); return false; } return true; });
   const k = (rate) => 1 - Math.exp(-dt * rate);
   fx.win += (fx.winT - fx.win) * k(3); fx.dim += (fx.dimT - fx.dim) * k(4);
