@@ -333,10 +333,12 @@ function cutin(text, cls, { dur = 1400, sub = '', small = false, color = null } 
   return sleep(dur / 1000).then(() => el.remove());
 }
 // 開ける(たどる)前のカットイン: チーム名を、選んだくじの色で
+// 「チャンス!!」のカットインが出るか(当たりで半分くらい、外れでまれ。抽選ごとに決まる)
+const promoOf = (lot, win) => proto() && hash(`${D.id}:${lot.label}:promo`) < (win ? 0.5 : 0.08);
 async function teamCutin(lot, team, last = false, win = false) {
   if (last && proto()) { sound.kakutei(); sound.holdChange(5); flash('#fff', 0.5, 0.7); return cutin(team, 't-rainbow', { dur: 1700, sub: '残り物には福がある!!', small: team.length > 7 }); }
   sound.holdChange(1);
-  const promo = proto() && hash(`${D.id}:${lot.label}:promo`) < (win ? 0.5 : 0.08);
+  const promo = promoOf(lot, win);
   if (!promo) return cutin(team, 't-gold', { dur: 1200, small: team.length > 7, color: lot.color });
   // 昇格: 1回目の帯が消えかけたところで、もう一回、赤い帯で来る
   cutin(team, 't-gold', { dur: 1000, small: team.length > 7, color: lot.color });
@@ -514,8 +516,9 @@ function buildEnvelope(d) {
       if (proto()) {
         // 絞り: ゆっくり少しだけ出て(ふちの色がのぞく)、止まって、一気に出る
         // 最後から2番目(ここの結果で最後まで決まる)は、心音に合わせてゆっくり。カメラも少しずつ口へ寄る
-        const big = penult(lot), SQ = big ? 2.8 : 1.1;
-        if (big) { heartbeats(5, 0.56); fx.dimT = 0.5; camTo(new THREE.Vector3(e.x, top.y + 0.1, zm.pos.z * 0.68), new THREE.Vector3(e.x, top.y - 0.15, 0), SQ); }
+        const big = promoOf(e.lot, win) && !isLast(lot), SQ = big ? 2.8 : 1.1;
+        if (penult(lot)) heartbeats(Math.round(SQ / 0.56), 0.56);
+        if (big) { fx.dimT = 0.5; camTo(new THREE.Vector3(e.x, top.y + 0.1, zm.pos.z * 0.68), new THREE.Vector3(e.x, top.y - 0.15, 0), SQ); }
         // 中袋は封筒の口から出す: 口より下は切り取って見せない(上のふちだけがのぞく)
         const mouth = new THREE.Vector3(); e.g.localToWorld(mouth.set(0, 2.3 / 2, 0));
         e.card.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -mouth.y)]; e.card.material.needsUpdate = true;
@@ -671,7 +674,8 @@ function buildAmida(d) {
       const lens = segs.map((m) => m.userData.len), total = lens.reduce((a, b) => a + b, 0), BASE = 2.6 + total * 0.02, V = total / BASE;
       const tease = proto() && !sure, gx = xs[d.amida.goal], onGoal = (m) => Math.abs(m.userData.a.x - gx) < 1e-3;
       // 当たりの列を下っている(縦の線)なら、ゆっくり。上の方では焦らさない(下 2/3 だけ)
-      const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3;
+      const nextTurnSeen = (s) => { const c = p.cross.find(([, , at]) => at > s); if (!c) return false; const o = rungMeshes[c[0]].find((x) => x.i === c[1]); return !!(o && o.m.visible); };
+      const slowSeg = (s) => tease && onGoal(segs[s]) && Math.abs(segs[s].userData.b.x - gx) < 1e-3 && !nextTurnSeen(s);
       // 最後から2番目は、もっとゆっくり・心音・少しずつ寄る
       const big = proto() && penult(lane);
       // 当たりの列をゆっくり下りてきて、そこから離れていく横線(迷わず、さっと曲がる)
@@ -690,7 +694,8 @@ function buildAmida(d) {
           if (big) { const midY = (segs[s].userData.a.y + goals[d.amida.goal].position.y) / 2; camTo(new THREE.Vector3(gx * 0.6, midY, home.pos.z * 0.72), new THREE.Vector3(gx * 0.6, midY, 0), 3.2); }
         }
         if (want >= 1 && slowNow) { slowNow = false; fx.dimT = 0.6; if (big) camTo(home.pos, home.look, 0.8); }
-        if (slowNow && t >= beatAt) { if (penult(lane)) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
+        const nearEnd = s >= segs.length - 1 && lens[segs.length - 1] * (1 - q) < 0.9;
+        if (slowNow && t >= beatAt && !nearEnd) { if (penult(lane)) sound.heartbeat(); beatAt = t + 0.55; tween(0.3, (k) => goals[d.amida.goal].scale.setScalar(gs * (1 + 0.18 * Math.sin(k * Math.PI)))); }
 
         {
           speed += (want - speed) * (1 - Math.exp(-dt * (want < speed ? 5 : 14)));
