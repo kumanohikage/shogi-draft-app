@@ -266,6 +266,15 @@ for (const mode of ['wheel', 'envelope', 'amida']) {
     s = C.apply(s, { type: 'lotOpen' }); assert.strictEqual(s.lottery.opened, 2);
     s = C.apply(s, { type: 'lotteryDone', id: s.lottery.id }); assert.strictEqual(s.lottery.done, true);
   }
-  if (mode === 'amida') assert.strictEqual(C.amidaEnd(s.lottery.amida.rungs, 1), s.lottery.amida.goal);
+  if (mode === 'amida') {
+    assert.strictEqual(C.amidaEnd(s.lottery.amida.rungs, 1), s.lottery.amida.goal);
+    // となり合う縦線は必ず2本以上の横線でつながる(まっすぐ下りる線がない)・同じ高さで横線が触れ合わない
+    for (const n of [2, 3, 5, 8, 12]) for (let k = 0; k < 40; k++) {
+      let x = k * 7919 + n + 1; const rng = k === 0 ? () => 0.5 : () => ((x = (x * 16807) % 2147483647) / 2147483647);
+      const rungs = C.amidaRungs(n, rng);
+      for (let i = 0; i < n - 1; i++) assert.ok(rungs.filter((row) => row.includes(i)).length >= 2, 'となりの縦線との横線が足りない');
+      for (const row of rungs) for (const i of row) assert.ok(!row.includes(i + 1), '同じ高さで横線が触れている');
+    }
+  }
 }
 console.log('くじを選ぶ抽選 ok');

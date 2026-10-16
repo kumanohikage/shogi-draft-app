@@ -17,6 +17,15 @@
   function amidaRungs(n, rng) {
     const rows = Math.max(6, n * 2 + 2), rungs = [];
     for (let r = 0; r < rows; r++) { const row = []; for (let i = 0; i < n - 1; i++) if (rng() < 0.45 && !row.includes(i - 1)) row.push(i); if (!row.length && n > 1) row.push(Math.floor(rng() * (n - 1))); rungs.push(row); }
+    // となり合う縦線どうしは、横線が2本以上あるように足す(同じ高さで1本の縦線に横線が2本触れないように)
+    const free = (row, i) => !row.includes(i) && !row.includes(i - 1) && !row.includes(i + 1);
+    for (let i = 0; i < n - 1; i++) {
+      let have = rungs.filter((row) => row.includes(i)).length;
+      for (let t = 0; have < 2 && t < rows * 2; t++) { const row = rungs[Math.floor(rng() * rows)]; if (free(row, i)) { row.push(i); have++; } }
+      for (let r = 0; have < 2 && r < rungs.length; r++) if (free(rungs[r], i)) { rungs[r].push(i); have++; }
+      while (have < 2) { rungs.splice(Math.floor(rng() * (rungs.length + 1)), 0, [i]); have++; }
+    }
+    rungs.forEach((row) => row.sort((a, b) => a - b));
     return rungs;
   }
   function amidaEnd(rungs, lane) { let x = lane; for (const row of rungs) { if (row.includes(x)) x++; else if (row.includes(x - 1)) x--; } return x; }
@@ -559,5 +568,5 @@
     return s;
   }
 
-  return { LOT_COLORS, amidaEnd, TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  return { LOT_COLORS, amidaEnd, amidaRungs, TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));

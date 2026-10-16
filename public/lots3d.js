@@ -338,6 +338,7 @@ function finish(at, team, size = 1) {
 /* ---------- カメラ: なめらかに(フレームの速さに左右されない減衰で)目標へ。回さない ---------- */
 const cam = { pos: new THREE.Vector3(0, 3, 14), look: new THREE.Vector3(0, 1, 0) };
 const camNow = { pos: cam.pos.clone(), look: cam.look.clone() };
+function camTo(pos, look, dur = 1) { const p0 = cam.pos.clone(), l0 = cam.look.clone(); return tween(dur, (k) => { cam.pos.lerpVectors(p0, pos, k); cam.look.lerpVectors(l0, look, k); }, 'sine'); }
 function camSet(v) { cam.pos.copy(v.pos); cam.look.copy(v.look); camNow.pos.copy(v.pos); camNow.look.copy(v.look); }
 
 /* ---------- 世界を作り直す ---------- */
@@ -362,7 +363,7 @@ function onData(d) {
 async function run(w, d) {
   w.running = true;
   const alive = () => !w.cancel;
-  if (w.played === 0) { await intro(d); }
+  if (w.played === 0) { await intro(d); if (w.afterIntro && alive()) await w.afterIntro(); }
   for (let k = w.played; k < d.opened && alive(); k++) {
     const lot = d.order[k];
     await w.open(lot, lot === d.winLot);
@@ -405,7 +406,7 @@ function mizuhikiTexture(color) {
 const PAPER = 0xb9b0a0;
 function buildEnvelope(d) {
   const root = new THREE.Group(); scene.add(root);
-  const n = d.lots.length, gap = n <= 4 ? 2.4 : n <= 8 ? 2.0 : 1.7, BW = 1.3, BH = 2.3, MZY = -BH * 0.27;
+  const n = d.lots.length, gap = n <= 3 ? 2.3 : n <= 4 ? 2.2 : n <= 8 ? 2.0 : 1.7, BW = 1.3, BH = 2.3, MZY = -BH * 0.27;
   const envs = d.lots.map((lot, i) => {
     const x = (i - (n - 1) / 2) * gap, z = 0;
     const g = new THREE.Group(); g.position.set(x, BH / 2 + 0.25, z); root.add(g);
@@ -427,9 +428,11 @@ function buildEnvelope(d) {
     const tag = sprite(tagTexture(lot, d.owners[i]), tw, tw * 0.446); tag.position.set(x, 0.02, z + 1.25); tag.renderOrder = 5; tag.material.depthTest = false; root.add(tag);
     return { g, pivot, mz, glow, light, card, tag, lot, x, z, team: d.owners[i], base: g.position.clone(), open: false };
   });
-  const fit = Math.max(n * gap + 2.5, 7.5), tanH = Math.tan((17.5 * Math.PI) / 180);
-  // 上に中袋が出ても入る高さ。ルーレットと同じく、全体を少し引いて見せる
-  const overview = () => { const dist = Math.max((BH + 4.8) / 2 / tanH, fit / 2 / tanH / (W / H)) * 1.12; return { pos: new THREE.Vector3(0, 2.0, dist), look: new THREE.Vector3(0, 1.6, 0) }; };
+  // 全体: 名札から、上に出た中袋までが入る高さ。チームが多いときは横幅に合わせて引く
+  const fit = n * gap + 1.2, tanH = Math.tan((17.5 * Math.PI) / 180);
+  const overview = () => { const dist = Math.max(5.1 / 2 / tanH, fit / 2 / tanH / (W / H)); return { pos: new THREE.Vector3(0, 2.0, dist), look: new THREE.Vector3(0, 1.7, 0) }; };
+  // 開けるとき: その封筒に寄る(横にずれるだけで回さない)
+  const zoom = (e) => ({ pos: new THREE.Vector3(e.x * 0.85, 2.2, Math.min(6.6, overview().pos.z * 0.8)), look: new THREE.Vector3(e.x, 2.0, 0) });
   camSet(overview());
   const cardTex = (win) => tex(360, 460, (c, w, h) => {
     roundRect(c, 4, 4, w - 8, h - 8, 18);
@@ -453,8 +456,9 @@ function buildEnvelope(d) {
       const e = envs[lot], team = D.owners[lot], c = new THREE.Color(e.lot.color);
       const top = new THREE.Vector3(); e.g.localToWorld(top.set(0, 2.3 * 0.5, 0.2));
 
-      // 1. この封筒が少し浮く(カメラは全体のまま)
-      await tween(0.5, (k) => { e.g.position.y = e.base.y + k * 0.3; }, 'sine');
+      // 1. この封筒が少し浮いて、カメラが寄る
+      const zm = zoom(e), ov = overview();
+      await Promise.all([camTo(zm.pos, zm.look, 0.6), tween(0.6, (k) => { e.g.position.y = e.base.y + k * 0.3; }, 'sine')]);
       // 2. チーム名のカットイン(選んだくじの色)
       await teamCutin(e.lot, team);
       // 3. ためて、震える
@@ -475,14 +479,14 @@ function buildEnvelope(d) {
       if (!win) {
         sound.lose();
         await sleep(0.7);
-        await tween(0.4, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine');
+        await Promise.all([camTo(ov.pos, ov.look, 0.5), tween(0.5, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine')]);
         return;
       }
       // 6. 当たり: ルーレットと同じ決着
       await finish(top, team, 0.6);
       await sleep(2.6);
       showResult('', false);
-      await tween(0.6, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine');
+      await Promise.all([camTo(ov.pos, ov.look, 0.8), tween(0.8, (k) => { e.g.position.y = e.base.y + 0.3 * (1 - k); }, 'sine')]);
       openRest(); fx.winT = 0.4; fx.ambT = 1;
       await sleep(0.4 + envs.length * 0.22);
     },
@@ -522,7 +526,7 @@ class Meteor {
 }
 function buildAmida(d) {
   const root = new THREE.Group(); scene.add(root);
-  const n = d.lots.length, gap = n <= 3 ? 4.2 : n <= 5 ? 3.4 : n <= 8 ? 2.6 : 2.0, TOP = 5, BOT = -5, rungs = d.amida.rungs, R = rungs.length;
+  const n = d.lots.length, gap = Math.max(2.0, Math.min(10, 17 / Math.max(1, n - 1))), TOP = 5, BOT = -5, rungs = d.amida.rungs, R = rungs.length;
   const xs = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * gap);
   const ys = Array.from({ length: R }, (_, r) => TOP - (r + 1) * ((TOP - BOT) / (R + 1)));
   const RAD = 0.03, TR = 0.07;
@@ -550,7 +554,7 @@ function buildAmida(d) {
   const rungMat = () => new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.52, 0.2), toneMapped: false, transparent: true, opacity: 0 });
   const rungMeshes = rungs.map((row, r) => row.map((i) => { const m = cyl(gap, rungMat(), RAD); m.rotation.z = Math.PI / 2; m.position.set((xs[i] + xs[i + 1]) / 2, ys[r], 0); m.visible = false; root.add(m); return { m, i, r }; }));
   const showRung = (r, i, flashIt) => { const o = rungMeshes[r].find((x) => x.i === i); if (!o || o.m.visible) return; o.m.visible = true; if (flashIt) tween(0.4, (k) => { o.m.material.opacity = 0.7 * k; o.m.material.color.setRGB(0.75 + 2.5 * (1 - k), 0.52 + 2 * (1 - k), 0.2 + 1 * (1 - k)); }, 'out'); else o.m.material.opacity = 0.7; };
-  const tw = Math.min(gap * 0.9, 3.4);
+  const tw = Math.min(gap * 0.9, 3.6);
   const owners = d.owners.slice();
   const tags = d.lots.map((lot, i) => { const s = sprite(tagTexture(lot, owners[i]), tw, tw * 0.446); s.position.set(xs[i], TOP + tw * 0.3, 0); root.add(s); return s; });
   const goalTex = (state) => tex(256, 256, (c, w, h) => {
@@ -560,7 +564,7 @@ function buildAmida(d) {
     c.fillStyle = state === 'win' ? '#7a0d08' : state === 'lose' ? '#cfc4b4' : '#ffe9b8'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = FONT(state === 'win' ? 70 : 120); c.fillText(state === 'win' ? '当たり' : state === 'lose' ? '×' : '？', w / 2, h / 2 + 6);
   });
-  const gs = Math.min(gap * 0.6, 1.7);
+  const gs = Math.min(gap * 0.6, 2.0);
   const goals = xs.map((x) => { const s = sprite(goalTex('hide'), gs, gs); s.position.set(x, BOT - gs * 0.62, 0); root.add(s); return s; });
   const setGoal = (i, state) => { goals[i].material.map = goalTex(state); goals[i].material.needsUpdate = true; };
   function pathOf(lane, z = 0.02) {
@@ -587,6 +591,12 @@ function buildAmida(d) {
     root,
     setOwner(i, team) { if (owners[i] === team) return; owners[i] = team; tags[i].material.map = tagTexture(d.lots[i], team); tags[i].material.needsUpdate = true; },
     update: updateBulbs,
+    async afterIntro() {
+      const g = d.amida.goal; setGoal(g, 'win'); sound.kakutei(); flash('#fff', 0.3, 0.35);
+      burst(goals[g].position.clone(), 60, WIN_COLS, 0.4, 0.6);
+      await tween(0.6, (k) => goals[g].scale.setScalar(gs * (1 + Math.sin(k * Math.PI) * 0.35)), 'out');
+      await sleep(0.5);
+    },
     applyStatic(dd) {
       // 決着済み: 全部の道を見せる(当たりの道を明るく、いちばん手前に)
       const lanes = dd.lots.map((_, i) => i).sort((a, b) => (a === dd.winLot) - (b === dd.winLot));
