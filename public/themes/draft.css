@@ -6,7 +6,7 @@
 [data-theme="draft"] body, [data-theme="draft"] { color: var(--ink); }
 [data-theme="draft"] .bg::before { display: none; }
 /* 3D の背景が無いとき(画像の書き出し)の背景。3D の奥の色と同じ */
-[data-theme="draft"] .bg { background: radial-gradient(ellipse 90% 80% at 50% 35%, #ffffff 0%, #eef0f4 50%, #d7dce5 100%); }
+[data-theme="draft"] .bg, [data-theme="draft"] #backdrop { background: radial-gradient(ellipse 90% 80% at 50% 35%, #ffffff 0%, #eef0f4 50%, #d7dce5 100%); }
 
 /* 見出し: 紺の明朝、左右に細い金の線。下に小さく場面の名前 */
 [data-theme="draft"] h1 { padding: 46px 0 26px; font: 800 50px/1.2 var(--fd); color: var(--navy); text-shadow: none; letter-spacing: .24em; }

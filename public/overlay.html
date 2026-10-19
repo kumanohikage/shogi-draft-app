@@ -14,9 +14,14 @@
   /* 1920×1080 の舞台を窓に合わせて拡大縮小 */
   #stage { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; }
   /* 3D の背景(テーマによる)。場面の後ろにずっと置き、場面の背景は透明にする */
-  #bgimg, #bgfx { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; pointer-events: none; }
-  #stage.bg3d #bgfx.on { display: block; }
-  #stage.bg3d.hasbg #bgimg { display: block; background: var(--bgimg) center / cover no-repeat; }
+  /* 背景の層: テーマの奥の色 → 自分の背景画像 → 3D の背景。場面の切り替えの間も残して、OBS やブラウザの背景を透かさない */
+  #bglayer { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+  #bglayer.on { opacity: 1; }
+  #backdrop, #bgimg, #bgfx { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #backdrop { background: radial-gradient(ellipse at 50% 40%, #fff3c4 0%, #e8b84a 38%, #8a5a12 75%, #3a2408 100%); }
+  #bgimg, #bgfx { display: none; }
+  #stage.hasbg #bgimg { display: block; background: var(--bgimg) center / cover no-repeat; }
+  #stage.bg3d #bgfx.ready { display: block; background: transparent; }
   #stage.bg3d .bg, #stage.bg3d.hasbg .bg { background: transparent; }
   #stage.bg3d .bg::before { display: none; }
   /* 光の世界(3D の抽選)へ入るときの切り替え */
@@ -199,13 +204,14 @@
   @keyframes tSlideIn { from { transform: translateX(100%); } }
   @keyframes tSlideOut { to { transform: translateX(-100%); } }
   @keyframes tWipe { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+  @keyframes tWipeOut { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 100% 0 0); } }
   #roulette { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 </style>
 <link id="theme-css" rel="stylesheet" href="data:text/css,">
 </head>
 <body>
 <div id="stage">
-  <div id="bgimg"></div><iframe id="bgfx" title="背景" tabindex="-1"></iframe>
+  <div id="bglayer"><div id="backdrop"></div><div id="bgimg"></div><iframe id="bgfx" title="背景" tabindex="-1"></iframe></div>
   <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="stand"></div><div id="board-timer" class="timer corner"></div></section>
   <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><img id="wait-img" alt=""></div><div id="wait-timer" class="timer corner"></div></section>
   <section id="sc-lots" class="scene bg"><h1 id="lots-title"></h1><div id="lots-head" class="lotshead"></div><div id="lots-body" class="lotsbody"></div><div id="lots-note" class="lotsnote"></div><iframe id="lots3d" title="くじ 3D" style="position:absolute;inset:0;width:100%;height:100%;border:0;display:none"></iframe></section>

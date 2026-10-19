@@ -22,6 +22,7 @@ const MOCK = new URLSearchParams(location.search).has('mock');
 const MUTE = PREVIEW || (MOCK && !new URLSearchParams(location.search).has('sound'));
 const FORCE_THEME = new URLSearchParams(location.search).get('theme');
 const LITE = PREVIEW || new URLSearchParams(location.search).has('lite'); // 管理画面の小さな見本・プレビュー: 背景を軽く描く
+const STATIC = new URLSearchParams(location.search).has('static'); // Figma へ写すとき: 3D の背景を使わず、テーマの CSS の背景で
 const T = window.DraftThemes;
 const themeId = () => T.idOf(FORCE_THEME || C.optionsOf(S).theme);
 const theme = () => T.themeOf(themeId());
@@ -96,7 +97,22 @@ function render() {
  * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
 const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round', 'allin', 'lots'];
 let shown = null, prevProg = null, transBusy = false;
-function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); updateBg(); }
+/* 切り替えの途中で、OBS やブラウザの背景が透けて見えないように:
+ *  ・背景の層(#bglayer: テーマの奥の色 → 自分の背景画像 → 3D の背景)は、場面の後ろにずっと置いておく(場面の切り替えでは消さない)
+ *  ・3D の背景のテーマでは場面そのものが透明なので、前の場面を消してから次の場面を出す(重ねて混ざらないように)
+ *  ・動いている 3D(ルーレット・くじ)は写しを作らず、本物をそのまま出ていく側にする(写すと読み込み直しで一瞬抜ける)
+ *  ・「何も出さない」へ行くとき・から来るときだけ、背景の層もいっしょに消える/出てくる */
+function bgLayer(on, ms = 0) {
+  const el = $('bglayer');
+  el.style.transition = ms ? `opacity ${ms}ms ease` : 'none';
+  el.classList.toggle('on', on);
+}
+function showScene(scene) {
+  shown = scene;
+  for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k);
+  if (!transBusy) bgLayer(SCENES.includes(scene));
+  updateBg();
+}
 function sceneSwitch(scene) {
   const prog = C.progIdxOf(S), progChanged = prevProg !== null && prog !== prevProg;
   prevProg = prog;
@@ -107,7 +123,7 @@ function sceneSwitch(scene) {
   if (o.transition === 'video' && o.transVideo && !v.src.endsWith(encodeURIComponent(o.transVideo))) v.src = img(o.transVideo);
   if (EXPORT || PREVIEW || first || scene === shown) return showScene(scene);
   // くじの色を選んだあと、ルーレット(光の世界)へ: テーマの入り方で
-  if (shown === 'lots' && scene === 'roulette' && theme().entry !== 'none') { transBusy = true; return playEntry(() => showScene(cur())).finally(() => { transBusy = false; if (shown !== cur()) showScene(cur()); }); }
+  if (shown === 'lots' && scene === 'roulette' && theme().entry !== 'none') { transBusy = true; return playEntry(() => { transBusy = false; showScene(cur()); transBusy = true; }).finally(() => { transBusy = false; if (shown !== cur()) showScene(cur()); }); }
   // 進行表の場面が変わったら設定のトランジション、それ以外(ボード ⇔ チーム表 など)は短いフェード
   if (progChanged && o.transition !== 'none') return runTransition(o);
   if (o.fadeSec > 0) return runTransition({ ...o, transition: 'fade', transSec: o.fadeSec });
@@ -115,19 +131,32 @@ function sceneSwitch(scene) {
 }
 const cur = () => EXPORT || S.scene;
 const later = (ms) => new Promise((r) => setTimeout(r, ms));
+// 動いている 3D を出している場面(ルーレット・3D のくじ)。不透明
+const isLive = (k) => k === 'roulette' || (k === 'lots' && $('lots3d').style.display === 'block');
+// 3D の背景のテーマでは、背景のある場面は透明(後ろの背景の層が見えている)
+const seeThrough = (k) => !!theme().bg && !EXPORT && SCENES.includes(k) && !isLive(k);
+const play = (el, name, ms, ease = 'ease', delay = 0) => { el.style.animation = `${name} ${ms}ms ${ease} ${delay}ms both`; };
 async function runTransition(o) {
   transBusy = true;
   const ms = Math.round((o.transSec || 0.6) * 1000);
-  // 出ていく場面は写しを取って、それを動かす(本物はすぐ次の内容に描き変わるので)
-  const orig = shown && $('sc-' + shown);
-  let ghost = null;
-  if (orig && shown !== 'roulette') {
-    ghost = orig.cloneNode(true);
-    ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
-    orig.parentNode.insertBefore(ghost, orig);
+  const from = shown, fromEl = SCENES.includes(from) ? $('sc-' + from) : null;
+  // 出ていく側: 動いている 3D は本物のまま、ほかは写し(本物はすぐ次の内容に描き変わるので)。写しの iframe は外す
+  let out = null, ghost = null;
+  if (fromEl) {
+    if (isLive(from)) out = fromEl;
+    else {
+      ghost = fromEl.cloneNode(true);
+      ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
+      ghost.querySelectorAll('iframe').forEach((e) => e.remove());
+      fromEl.parentNode.insertBefore(ghost, fromEl);
+      ghost.classList.add('on');
+      out = ghost;
+    }
   }
-  const swap = () => { if (ghost) { ghost.remove(); ghost = null; } showScene(cur()); };
-  showScene(null); if (ghost) ghost.classList.add('on');
+  for (const k of SCENES) if ($('sc-' + k) !== out) $('sc-' + k).classList.remove('on');
+  const next = () => cur(), toEl = () => (SCENES.includes(next()) ? $('sc-' + next()) : null);
+  const fromBg = !!fromEl;
+  const swap = () => { if (ghost) { ghost.remove(); ghost = null; } if (out) { out.style.animation = ''; out = null; } transBusy = false; showScene(next()); transBusy = true; };
   try {
     if (o.transition === 'fadeBlack' || o.transition === 'fadeWhite') {
       // 色で覆ってから入れ替えて、また開ける(半透明で重ねないので透けない)
@@ -138,19 +167,35 @@ async function runTransition(o) {
       swap();
       t.style.transition = `opacity ${ms / 2}ms ease-out`; t.style.opacity = 0;
       await later(ms / 2);
-    } else if (o.transition === 'fade') {
-      // 次の場面を上に重ねて浮かび上がらせる(下の場面は最後まで出したままなので透けない)
-      const to = $('sc-' + cur());
-      if (to) { to.classList.add('on', 't-top'); to.style.animation = `tFadeIn ${ms}ms ease both`; await later(ms); to.style.animation = ''; to.classList.remove('t-top'); }
-      else if (ghost) { ghost.style.animation = `tFadeOut ${ms}ms ease both`; await later(ms); } // 何も出さない: 消えていく
+    } else if (o.transition === 'fade' || ((o.transition === 'slide' || o.transition === 'wipe') && !toEl())) {
+      const to = toEl();
+      if (!to) {
+        // 何も出さない場面へ: 場面と背景の層がいっしょに消えていく
+        if (out) play(out, 'tFadeOut', ms);
+        bgLayer(false, ms);
+        await later(ms);
+      } else if (seeThrough(next())) {
+        // 透明な場面へ: 前の場面を消してから、次の場面を出す(背景の層はそのまま残る)
+        if (!fromBg) bgLayer(true, ms);
+        if (out) { play(out, 'tFadeOut', ms / 2); await later(ms / 2); out.style.visibility = 'hidden'; }
+        to.classList.add('on', 't-top'); play(to, 'tFadeIn', out ? ms / 2 : ms);
+        await later(out ? ms / 2 : ms);
+        to.style.animation = ''; to.classList.remove('t-top');
+      } else {
+        // 不透明な場面へ: 前の場面の上に浮かび上がらせる(下の場面は最後まで出したままなので透けない)
+        if (fromBg) bgLayer(true); else bgLayer(true, ms);
+        to.classList.add('on', 't-top'); play(to, 'tFadeIn', ms);
+        await later(ms);
+        to.style.animation = ''; to.classList.remove('t-top');
+      }
       swap();
     } else if (o.transition === 'slide' || o.transition === 'wipe') {
-      const next = cur(), to = $('sc-' + next);
-      if (!to) return swap(); // 何も出さない場面へ
-      const ease = 'cubic-bezier(.6,0,.3,1)';
+      const to = toEl(), ease = 'cubic-bezier(.6,0,.3,1)';
+      bgLayer(true, fromBg ? 0 : ms);
       to.classList.add('on', 't-top');
-      to.style.animation = `${o.transition === 'slide' ? 'tSlideIn' : 'tWipe'} ${ms}ms ${ease} both`;
-      if (ghost && o.transition === 'slide') ghost.style.animation = `tSlideOut ${ms}ms ${ease} both`;
+      play(to, o.transition === 'slide' ? 'tSlideIn' : 'tWipe', ms, ease);
+      // 出ていく側も同じ速さで動かす(ワイプは、入ってくる線のところで切る)。重ならないので透けない・混ざらない
+      if (out) play(out, o.transition === 'slide' ? 'tSlideOut' : 'tWipeOut', ms, ease);
       await later(ms);
       to.style.animation = ''; to.classList.remove('t-top');
       swap();
@@ -171,8 +216,10 @@ async function runTransition(o) {
     } else swap();
   } finally {
     if (ghost) ghost.remove();
+    if (out) out.style.animation = '';
+    if (fromEl) fromEl.style.visibility = '';
     transBusy = false;
-    if (shown !== cur()) showScene(cur()); // 切り替えの途中でまた場面が変わっていたら合わせる
+    showScene(cur()); // 切り替えの途中でまた場面が変わっていても合わせる
   }
 }
 
@@ -318,19 +365,19 @@ function renderLook() {
     $('theme-css').href = th.css ? `themes/${id}.css` : 'data:text/css,';
     $('bgfx').removeAttribute('src');
   }
-  st.classList.toggle('bg3d', !!th.bg && !EXPORT); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
+  st.classList.toggle('bg3d', !!th.bg && !EXPORT && !STATIC); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
   const motion = !!th.bg && (!o.bgImage || o.bgMotion !== false); // 自分の背景画像の上にも動きを重ねる(なしも選べる)
-  const src = motion && !EXPORT ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}${LITE ? '&lite=1' : ''}` : '';
-  if (($('bgfx').getAttribute('src') || '') !== src) { if (src) $('bgfx').setAttribute('src', src); else $('bgfx').removeAttribute('src'); }
+  const src = motion && !EXPORT && !STATIC ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}${LITE ? '&lite=1' : ''}` : '';
+  if (($('bgfx').getAttribute('src') || '') !== src) { $('bgfx').classList.remove('ready'); if (src) $('bgfx').setAttribute('src', src); else $('bgfx').removeAttribute('src'); }
   updateBg();
 }
 // 3D の背景は、映している場面に背景があるときだけ描く(光の世界・何も出さない・OBS で映っていないときは止める)
 function updateBg() {
-  const f = $('bgfx'), on = !!f.getAttribute('src') && !!shown && $('sc-' + shown)?.classList.contains('bg') && !(shown === 'lots' && $('lots3d').style.display === 'block') && presence.visible !== false;
-  f.classList.toggle('on', on);
+  const f = $('bgfx'), covered = shown === 'roulette' || (shown === 'lots' && $('lots3d').style.display === 'block');
+  const on = !!f.getAttribute('src') && $('bglayer').classList.contains('on') && !covered && presence.visible !== false;
   if (f.contentWindow) f.contentWindow.postMessage({ type: 'bg-run', on }, '*');
 }
-addEventListener('message', (e) => { if ((e.data || {}).type === 'bg-ready') updateBg(); });
+addEventListener('message', (e) => { if ((e.data || {}).type === 'bg-ready' && e.source === $('bgfx').contentWindow) { $('bgfx').classList.add('ready'); updateBg(); } });
 // 光の世界(3D の抽選)へ入るときの切り替え。swap() で後ろを入れ替える(覆っている間に)
 async function playEntry(swap) {
   const kind = theme().entry, E = window.DraftEntry;

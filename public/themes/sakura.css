@@ -6,7 +6,7 @@
   --plum: #6e2346; --pink: #d9577f; --pale: #fde8ef; --line: #f4c6d5; --white-edge: 0 0 0 #fff; }
 [data-theme="sakura"] .bg::before { display: none; }
 /* 3D の背景が無いとき(画像の書き出し)の背景。3D の奥の色と同じ */
-[data-theme="sakura"] .bg { background: linear-gradient(180deg, #fde9ef 0%, #fff6f8 55%, #fbe3ea 100%); }
+[data-theme="sakura"] .bg, [data-theme="sakura"] #backdrop { background: linear-gradient(180deg, #fde9ef 0%, #fff6f8 55%, #fbe3ea 100%); }
 /* 白い縁どり(ぼかさない) */
 [data-theme="sakura"] { --edge: 3px 3px 0 #fff, -3px 3px 0 #fff, 3px -3px 0 #fff, -3px -3px 0 #fff, 0 3px 0 #fff, 0 -3px 0 #fff, 3px 0 0 #fff, -3px 0 0 #fff; }
 

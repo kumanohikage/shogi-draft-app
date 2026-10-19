@@ -5,7 +5,7 @@
   --navy: #0b1633; --blue: #1f5bff; --cyan: #19c3ff; --yellow: #ffd400; --ink: #0b1633; --cut: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
 [data-theme="sports"] .bg::before { display: none; }
 /* 3D の背景が無いとき(画像の書き出し)の背景。3D の奥の色と同じ */
-[data-theme="sports"] .bg { background: radial-gradient(ellipse 80% 70% at 50% 42%, #1b3f8f 0%, #0d1e4a 45%, #050b1f 100%); }
+[data-theme="sports"] .bg, [data-theme="sports"] #backdrop { background: radial-gradient(ellipse 80% 70% at 50% 42%, #1b3f8f 0%, #0d1e4a 45%, #050b1f 100%); }
 
 /* 見出し: 斜めの紺の板に大会名、右に黄色の帯(場面の名前)。OBS の古いブラウザでも動く書き方だけ使う */
 [data-theme="sports"] h1 { display: flex; align-items: center; width: max-content; margin: 34px auto 18px; padding: 16px 40px; font: normal 46px/1 var(--fd); color: #fff; text-shadow: none; letter-spacing: .04em;
