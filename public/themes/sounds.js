@@ -30,7 +30,8 @@
     stamp: ({ tone, t }) => { pluck(tone, 784, t); pluck(tone, 1175, t + 0.08, 0.1); },
     conflict: ({ tone, t }) => { [1175, 988, 880, 784, 659, 587].forEach((f, i) => pluck(tone, f, t + i * 0.07, 0.11)); tone('sine', 147, 140, t + 0.4, 1.4, 0.3); },
     pop: ({ tone, t }) => { tone('sine', 2349, 2349, t, 0.3, 0.07); },
-    entry: ({ tone, hiss, t }) => { hiss(t, 1.2, 0.18, 'bandpass', 800, 2400, 0.7); [1568, 1760, 2093, 2349, 2637, 3136].forEach((f, i) => tone('sine', f, f, t + 0.1 + i * 0.09, 0.8, 0.05)); },
+    // 花吹雪: 風が強まって、埋め尽くしたところで鈴、抜けていく
+    entry: ({ tone, hiss, t }) => { hiss(t, 0.8, 0.22, 'bandpass', 500, 2600, 0.6); hiss(t + 0.7, 1.2, 0.2, 'bandpass', 2600, 700, 0.6); [1568, 2093, 2637].forEach((f, i) => tone('sine', f, f, t + 0.7 + i * 0.08, 1.0, 0.05)); },
   });
 
   // タイトル戦: 拍子木と太鼓
