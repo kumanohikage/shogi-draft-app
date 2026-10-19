@@ -1,0 +1,77 @@
+@import url(../vendor/fonts/zen-maru-gothic/font.css);
+/* テーマ: 桜
+ * 舞い散る花びら(3D の背景)と、やわらかい桜色。丸ゴシックで、文字は濃い紅紫に白い縁(ぼかさない)
+ * チームカラーは使わず桜色で統一 */
+[data-theme="sakura"] { --fd: 'Zen Maru Gothic', sans-serif; --fb: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif; --pill-bg: #d9577f; --pill-fg: #fff;
+  --plum: #6e2346; --pink: #d9577f; --pale: #fde8ef; --line: #f4c6d5; --white-edge: 0 0 0 #fff; }
+[data-theme="sakura"] .bg::before { display: none; }
+/* 3D の背景が無いとき(画像の書き出し)の背景。3D の奥の色と同じ */
+[data-theme="sakura"] .bg { background: linear-gradient(180deg, #fde9ef 0%, #fff6f8 55%, #fbe3ea 100%); }
+/* 白い縁どり(ぼかさない) */
+[data-theme="sakura"] { --edge: 3px 3px 0 #fff, -3px 3px 0 #fff, 3px -3px 0 #fff, -3px -3px 0 #fff, 0 3px 0 #fff, 0 -3px 0 #fff, 3px 0 0 #fff, -3px 0 0 #fff; }
+
+/* 見出し */
+[data-theme="sakura"] h1 { padding: 40px 0 22px; font: 900 54px/1.2 var(--fd); color: var(--plum); text-shadow: var(--edge), 0 8px 0 rgba(217,87,127,.25); letter-spacing: .08em; }
+[data-theme="sakura"] h1 small { display: table; margin: 10px auto 0; padding: 4px 30px; border-radius: 999px; background: #fff; color: var(--pink); font: 700 26px var(--fd); text-shadow: none; letter-spacing: .14em; box-shadow: 0 0 0 2px var(--line); }
+[data-theme="sakura"] h1 small:empty { display: none; }
+[data-theme="sakura"] h1 .logo { filter: drop-shadow(0 4px 0 rgba(217,87,127,.25)); }
+
+[data-theme="sakura"] .logobig b { font: 900 140px/1.25 var(--fd); color: var(--plum); text-shadow: 5px 5px 0 #fff, -5px 5px 0 #fff, 5px -5px 0 #fff, -5px -5px 0 #fff, 0 5px 0 #fff, 0 -5px 0 #fff, 5px 0 0 #fff, -5px 0 0 #fff, 0 14px 0 rgba(217,87,127,.3); letter-spacing: .06em; }
+
+/* 巡の見出し・入札完了: リボンの帯 */
+[data-theme="sakura"] .roundbig b { font: 900 230px/1 var(--fd); color: var(--plum); letter-spacing: .04em; text-shadow: 7px 7px 0 #fff, -7px 7px 0 #fff, 7px -7px 0 #fff, -7px -7px 0 #fff, 0 7px 0 #fff, 0 -7px 0 #fff, 7px 0 0 #fff, -7px 0 0 #fff, 0 18px 0 rgba(217,87,127,.3); }
+[data-theme="sakura"] .roundbig span { padding: 14px 90px; border-radius: 0; background: var(--pink); color: #fff; font: 900 56px var(--fd); letter-spacing: .2em; clip-path: polygon(0 0, 100% 0, calc(100% - 34px) 50%, 100% 100%, 0 100%, 34px 50%); }
+[data-theme="sakura"] .roundbig i { color: var(--plum); text-shadow: var(--edge); font: 700 34px var(--fd); }
+[data-theme="sakura"] .roundbig.enter b { animation: skIn .8s cubic-bezier(.3,1.5,.5,1) both; }
+@keyframes skIn { from { opacity: 0; transform: scale(.6) rotate(-6deg); } }
+
+/* 資料 */
+[data-theme="sakura"] .slidebox { border-radius: 40px; background: rgba(255,255,255,.95); box-shadow: 0 0 0 6px var(--line), 0 18px 40px rgba(217,87,127,.18); }
+[data-theme="sakura"] .slidebox h2 { font-family: var(--fd); color: var(--plum); border-bottom: 8px dotted var(--pink); }
+[data-theme="sakura"] .slidebox li { font-family: var(--fd); color: var(--plum); }
+[data-theme="sakura"] .slidebox li::before { content: '✿'; color: var(--pink); }
+[data-theme="sakura"] .slidecard img, [data-theme="sakura"] #wait-img { border-radius: 28px; box-shadow: 0 0 0 6px #fff, 0 16px 40px rgba(217,87,127,.25); }
+
+/* 指名カード: 白に桜色の縁、上は桜色の帯 */
+[data-theme="sakura"] .face { border-radius: 30px; box-shadow: 0 0 0 4px #fff, 0 14px 30px rgba(217,87,127,.25); }
+[data-theme="sakura"] .front { background: #fff; border: 0; }
+[data-theme="sakura"] .head { background: linear-gradient(90deg, var(--pink), #ee86a6); }
+[data-theme="sakura"] .head .tn { font: 900 32px var(--fd); text-shadow: none; }
+[data-theme="sakura"] .nm b { font: 900 54px/1.15 var(--fd); color: var(--plum); }
+[data-theme="sakura"] .nm small { color: #b0587d; font-family: var(--fd); }
+[data-theme="sakura"] .back { background: radial-gradient(circle at 30% 30%, #fff 0, #ffe6ee 60%, #fbd2df 100%); border: 0; }
+[data-theme="sakura"] .back .who { color: var(--plum); }
+[data-theme="sakura"] .back .koma { background: var(--pink); color: #fff; width: 104px; height: 104px; padding: 0; clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); font: 900 36px var(--fd); }
+[data-theme="sakura"] .back .koma { clip-path: none; border-radius: 50%; }
+[data-theme="sakura"] .back .wait { color: var(--pink); font-family: var(--fd); }
+[data-theme="sakura"] .stamp { border-radius: 999px; transform: rotate(-4deg); font-family: var(--fd); }
+[data-theme="sakura"] .stamp.ok { background: var(--pink); box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--pink); }
+[data-theme="sakura"] .stamp.dup { background: var(--plum); box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--plum); }
+@keyframes skDup { from { box-shadow: 0 0 0 4px #fff, 0 14px 30px rgba(217,87,127,.25); } to { box-shadow: 0 0 0 4px #fff, 0 0 0 12px rgba(217,87,127,.85); } }
+[data-theme="sakura"] .card.dup .front { animation: skDup .8s ease-in-out infinite alternate; }
+
+/* 立ち絵 */
+[data-theme="sakura"] .standwrap .band { border-radius: 999px; background: #fff; color: var(--plum); font: 900 70px var(--fd); box-shadow: 0 0 0 6px var(--pink), 0 14px 30px rgba(217,87,127,.3); }
+[data-theme="sakura"] .standwrap .tag { background: var(--pink); color: #fff; font-family: var(--fd); }
+[data-theme="sakura"] .standwrap .standicon { border-color: #fff; box-shadow: 0 0 0 8px var(--pink), 0 20px 40px rgba(217,87,127,.3); }
+
+/* チーム表 */
+[data-theme="sakura"] .team { border-radius: 28px; border: 0; background: #fff; box-shadow: 0 0 0 4px #fff, 0 0 0 7px var(--line), 0 14px 30px rgba(217,87,127,.2); }
+[data-theme="sakura"] .team .th { background: linear-gradient(180deg, #ee86a6, var(--pink)); }
+[data-theme="sakura"] .team .th .tn { font-family: var(--fd); text-shadow: none; }
+[data-theme="sakura"] .team li { border-bottom: 2px dotted var(--line); color: var(--plum); font-family: var(--fd); }
+[data-theme="sakura"] .team li .r { border-radius: 999px; padding: 2px 10px; }
+[data-theme="sakura"] .team li.empty { color: #e3b4c4; }
+
+/* くじの色を選ぶ */
+[data-theme="sakura"] .lotshead .pn { font: 900 66px var(--fd); color: var(--plum); text-shadow: var(--edge); }
+[data-theme="sakura"] .lotshead img { border-color: #fff; box-shadow: 0 0 0 5px var(--pink); }
+[data-theme="sakura"] .lotshead .pk, [data-theme="sakura"] .lotsnote { font-family: var(--fd); }
+[data-theme="sakura"] .lot .face { border-radius: 40px; box-shadow: 0 0 0 5px #fff, 0 12px 26px rgba(110,35,70,.25); }
+[data-theme="sakura"] .lot .cl { background: #fff; color: var(--plum); box-shadow: 0 0 0 2px var(--line); }
+[data-theme="sakura"] .lot .nm { color: var(--plum); text-shadow: var(--edge); }
+[data-theme="sakura"] .lot.taken .nm { background: var(--plum); color: #fff; text-shadow: none; border-radius: 999px; }
+
+/* 制限時間 */
+[data-theme="sakura"] .timer { font: 900 58px var(--fd); color: var(--plum); text-shadow: var(--edge); }
+[data-theme="sakura"] .timer.end { color: #d9264f; }

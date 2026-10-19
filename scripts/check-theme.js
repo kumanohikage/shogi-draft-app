@@ -17,7 +17,8 @@ app.whenReady().then(async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'draft-theme-'));
   const srv = await start({ port: PORT, dataDir });
-  const win = new BrowserWindow({ width: 1920, height: 1080, show: false, useContentSize: true, webPreferences: { backgroundThrottling: false } });
+  const win = new BrowserWindow({ width: 1920, height: 1080, show: false, useContentSize: true, webPreferences: { backgroundThrottling: false, offscreen: true } });
+  win.webContents.setFrameRate(60);
   win.webContents.on('console-message', (e) => { if (e.level === 'error') console.log('  [画面]', e.message); });
   await win.loadURL(`http://localhost:${PORT}/theme-check.html?theme=${themeId}&lot=${lot}&bare`);
   await wait(1500);

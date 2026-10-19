@@ -21,6 +21,7 @@ const PREVIEW_NEXT = new URLSearchParams(location.search).get('preview') === 'ne
 const MOCK = new URLSearchParams(location.search).has('mock');
 const MUTE = PREVIEW || (MOCK && !new URLSearchParams(location.search).has('sound'));
 const FORCE_THEME = new URLSearchParams(location.search).get('theme');
+const LITE = PREVIEW || new URLSearchParams(location.search).has('lite'); // 管理画面の小さな見本・プレビュー: 背景を軽く描く
 const T = window.DraftThemes;
 const themeId = () => T.idOf(FORCE_THEME || C.optionsOf(S).theme);
 const theme = () => T.themeOf(themeId());
@@ -180,7 +181,7 @@ let prevOpen = new Set(), prevStamp = new Set(), prevDup = new Set();
 // 指名カード1枚(指名ボードとピックアップで共通)
 // wait: 裏面の下の文字(指名待ち / 選択希望選手 など)
 const NEUTRAL = '#5b4632';
-const lc = (l) => (C.optionsOf(S).leaderColors || theme().teamColors ? l.color : NEUTRAL);
+const lc = (l) => (C.optionsOf(S).leaderColors || theme().teamColors ? l.color : theme().neutral || NEUTRAL);
 function cardHtml(l, playerId, stamp, dup, pop, wait = W('cardWait')) {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(lc(l))}"><div class="in">
@@ -317,15 +318,15 @@ function renderLook() {
     $('theme-css').href = th.css ? `themes/${id}.css` : 'data:text/css,';
     $('bgfx').removeAttribute('src');
   }
-  st.classList.toggle('bg3d', !!th.bg);
+  st.classList.toggle('bg3d', !!th.bg && !EXPORT); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
   const motion = !!th.bg && (!o.bgImage || o.bgMotion !== false); // 自分の背景画像の上にも動きを重ねる(なしも選べる)
-  const src = motion && !EXPORT ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}` : '';
+  const src = motion && !EXPORT ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}${LITE ? '&lite=1' : ''}` : '';
   if (($('bgfx').getAttribute('src') || '') !== src) { if (src) $('bgfx').setAttribute('src', src); else $('bgfx').removeAttribute('src'); }
   updateBg();
 }
 // 3D の背景は、映している場面に背景があるときだけ描く(光の世界・何も出さない・OBS で映っていないときは止める)
 function updateBg() {
-  const f = $('bgfx'), on = !!f.getAttribute('src') && !!shown && $('sc-' + shown)?.classList.contains('bg') && $('lots3d').style.display !== 'block' && presence.visible !== false;
+  const f = $('bgfx'), on = !!f.getAttribute('src') && !!shown && $('sc-' + shown)?.classList.contains('bg') && !(shown === 'lots' && $('lots3d').style.display === 'block') && presence.visible !== false;
   f.classList.toggle('on', on);
   if (f.contentWindow) f.contentWindow.postMessage({ type: 'bg-run', on }, '*');
 }
@@ -335,6 +336,7 @@ async function playEntry(swap) {
   const kind = theme().entry, E = window.DraftEntry;
   if (!E || !E[kind] || PREVIEW) { swap(); return; }
   const L = S.lottery, colors = L ? L.leaders.map((id) => C.leaderById(S, id)?.color).filter(Boolean) : [];
+  SE.entry();
   await E[kind]($('entry'), swap, { colors });
 }
 function renderLogo() {

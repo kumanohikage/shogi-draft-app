@@ -25,6 +25,10 @@ copy(path.join(NM, 'three/LICENSE'), path.join(OUT, 'three/LICENSE'));
 const fonts = [
   ['dela-gothic-one', ['400']],
   ['noto-sans-jp', ['700', '900']],
+  // テーマ: ドラフト会議・タイトル戦(明朝) / 桜(丸ゴシック) / タイトル戦の大きな字(筆)
+  ['shippori-mincho-b1', ['500', '800']],
+  ['zen-maru-gothic', ['700', '900']],
+  ['yuji-syuku', ['400']],
 ];
 for (const [pkg, weights] of fonts) {
   const src = path.join(NM, '@fontsource', pkg), dst = path.join(OUT, 'fonts', pkg);

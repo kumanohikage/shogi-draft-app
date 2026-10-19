@@ -821,13 +821,14 @@ $('trans-video-file').addEventListener('change', async (e) => {
 // 選べるテーマ(と、いま使っているテーマ)を、動く小さな画面つきで並べる。小さな画面は大会のタブを開いているときだけ動かす
 const TH = window.DraftThemes;
 function renderThemes(o) {
-  const cur = TH.idOf(o.theme), ids = Object.keys(TH.THEMES).filter((id) => TH.THEMES[id].ready || id === cur);
+  // 試作のテーマも選べる(確かめて良かったものを正式に。試作には印)
+  const cur = TH.idOf(o.theme), ids = Object.keys(TH.THEMES);
   const box = $('themes'), key = ids.join(',');
   if (box.dataset.key !== key) {
     box.dataset.key = key;
     box.innerHTML = ids.map((id) => { const t = TH.THEMES[id]; return `<button type="button" role="radio" data-theme="${id}" class="w-72 flex flex-col text-left rounded-xl border-2 overflow-hidden cursor-pointer ${FOCUS}">
       <span class="block w-full aspect-video bg-black"><iframe data-src="/theme-check.html?theme=${id}&mini" title="${esc(t.name)} の見本" tabindex="-1" class="block w-full h-full pointer-events-none border-0"></iframe></span>
-      <span class="block px-3 py-2"><b class="block text-sm text-[var(--text-heading)]">${esc(t.name)}</b><span class="block text-xs text-[var(--text-muted)]">${esc(t.desc || '')}</span></span></button>`; }).join('');
+      <span class="block px-3 py-2"><b class="block text-sm text-[var(--text-heading)]">${esc(t.name)}${t.ready ? '' : ' <span class="text-xs font-medium text-[var(--text-muted)]">（試作）</span>'}</b><span class="block text-xs text-[var(--text-muted)]">${esc(t.desc || '')}</span></span></button>`; }).join('');
   }
   box.querySelectorAll('[data-theme]').forEach((b) => {
     const on = b.dataset.theme === cur;

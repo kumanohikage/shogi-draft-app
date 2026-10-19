@@ -1,0 +1,84 @@
+@import url(../vendor/fonts/shippori-mincho-b1/font.css);
+/* テーマ: ドラフト会議
+ * 白と紺の会見場(3D の背景)。明朝体、細い金の線。光らせず、影も浅く。チームカラーは使わず紺で統一 */
+[data-theme="draft"] { --fd: 'Shippori Mincho B1', serif; --fb: 'Noto Sans JP', sans-serif; --pill-bg: #1b2a4e; --pill-fg: #fff;
+  --navy: #1b2a4e; --ink: #1b2a4e; --sub: #5d6782; --gold: #b39553; --paper: #ffffff; --line: #d9dde6; }
+[data-theme="draft"] body, [data-theme="draft"] { color: var(--ink); }
+[data-theme="draft"] .bg::before { display: none; }
+/* 3D の背景が無いとき(画像の書き出し)の背景。3D の奥の色と同じ */
+[data-theme="draft"] .bg { background: radial-gradient(ellipse 90% 80% at 50% 35%, #ffffff 0%, #eef0f4 50%, #d7dce5 100%); }
+
+/* 見出し: 紺の明朝、左右に細い金の線。下に小さく場面の名前 */
+[data-theme="draft"] h1 { padding: 46px 0 26px; font: 800 50px/1.2 var(--fd); color: var(--navy); text-shadow: none; letter-spacing: .24em; }
+[data-theme="draft"] h1::before, [data-theme="draft"] h1::after { content: ''; display: inline-block; vertical-align: middle; width: 120px; height: 1px; margin: 0 34px .2em; background: var(--gold); }
+[data-theme="draft"] h1 small { margin-top: 12px; font: 500 26px var(--fd); color: var(--sub); letter-spacing: .3em; }
+[data-theme="draft"] h1 .logo { display: inline-block; vertical-align: middle; filter: none; max-height: 84px; }
+
+[data-theme="draft"] .logobig b { font: 800 128px/1.3 var(--fd); color: var(--navy); text-shadow: none; letter-spacing: .2em; padding-bottom: 30px; border-bottom: 2px solid var(--gold); }
+
+/* 巡の見出し・入札完了 */
+[data-theme="draft"] .roundbig { gap: 34px; }
+[data-theme="draft"] .roundbig b { font: 800 200px/1 var(--fd); color: var(--navy); text-shadow: none; letter-spacing: .12em; }
+[data-theme="draft"] .roundbig span { padding: 14px 90px; border-radius: 0; background: var(--navy); color: #fff; font: 800 56px var(--fd); letter-spacing: .4em; text-indent: .4em; box-shadow: 0 0 0 1px var(--navy), 0 0 0 6px #fff, 0 0 0 7px var(--gold); }
+[data-theme="draft"] .roundbig i { color: var(--sub); text-shadow: none; font: 500 32px var(--fd); letter-spacing: .4em; }
+[data-theme="draft"] .roundbig.enter b { animation: dfIn 1.1s ease both; }
+[data-theme="draft"] .roundbig.enter span { animation: dfIn 1s .45s ease both; }
+[data-theme="draft"] .roundbig.enter i { animation: dfIn 1s .7s ease both; }
+@keyframes dfIn { from { opacity: 0; transform: translateY(14px); } }
+
+/* 資料 */
+[data-theme="draft"] .slidebox { border-radius: 2px; background: #fff; box-shadow: 0 10px 30px rgba(27,42,78,.12); border-top: 10px solid var(--navy); }
+[data-theme="draft"] .slidebox h2 { font-family: var(--fd); font-weight: 800; color: var(--navy); border-bottom: 2px solid var(--gold); letter-spacing: .1em; }
+[data-theme="draft"] .slidebox li { color: var(--ink); font-weight: 700; }
+[data-theme="draft"] .slidebox li::before { content: '―'; color: var(--gold); }
+[data-theme="draft"] .slidecard img, [data-theme="draft"] #wait-img { border-radius: 2px; box-shadow: 0 10px 30px rgba(27,42,78,.15); background: #fff; }
+
+/* 指名カード: 白い紙に紺の帯(チーム名)、名前は大きな明朝 */
+[data-theme="draft"] .face { border-radius: 3px; box-shadow: 0 8px 24px rgba(27,42,78,.14); }
+[data-theme="draft"] .front { background: var(--paper); border: 1px solid var(--line); }
+[data-theme="draft"] .head { background: var(--navy); padding: 12px 20px; border-bottom: 3px solid var(--gold); }
+[data-theme="draft"] .head img, [data-theme="draft"] .head .ava, [data-theme="draft"] .back .who img { border-width: 2px; }
+[data-theme="draft"] .head .tn { font: 800 30px var(--fd); text-shadow: none; letter-spacing: .12em; }
+[data-theme="draft"] .nm b { font: 800 58px/1.15 var(--fd); color: var(--navy); letter-spacing: .1em; }
+[data-theme="draft"] .nm small { color: var(--sub); font-family: var(--fd); font-weight: 500; letter-spacing: .12em; }
+[data-theme="draft"] .back { background: #fff; border: 1px solid var(--line); padding-top: 60px; }
+[data-theme="draft"] .back .who { color: var(--navy); font-family: var(--fd); font-weight: 800; letter-spacing: .1em; }
+[data-theme="draft"] .back .koma { background: none; clip-path: none; width: auto; height: auto; padding: 0; font: 800 30px var(--fd); color: var(--gold); letter-spacing: .3em; }
+[data-theme="draft"] .back .koma::before { content: '指名'; }
+[data-theme="draft"] .back .koma { font-size: 0; }
+[data-theme="draft"] .back .koma::before { font-size: 34px; }
+[data-theme="draft"] .back .wait { color: var(--sub); font-family: var(--fd); font-weight: 500; letter-spacing: .3em; border-top: 1px solid var(--gold); padding-top: 12px; }
+/* 交渉権確定は朱の角印、競合は紺の枠 */
+[data-theme="draft"] .stamp { transform: none; border-radius: 2px; font: 800 24px var(--fd); letter-spacing: .1em; padding: 4px 14px; }
+[data-theme="draft"] .stamp.ok { background: #fff; color: #b3261e; box-shadow: inset 0 0 0 3px #b3261e; }
+[data-theme="draft"] .stamp.dup { background: var(--navy); color: #fff; box-shadow: none; }
+[data-theme="draft"] .stamp.pop { animation: dfStamp .5s ease both; }
+@keyframes dfStamp { from { opacity: 0; transform: scale(1.3); } }
+@keyframes dfDup { from { box-shadow: 0 8px 24px rgba(27,42,78,.14), 0 0 0 0 rgba(27,42,78,0); } to { box-shadow: 0 8px 24px rgba(27,42,78,.14), 0 0 0 6px rgba(27,42,78,.85); } }
+[data-theme="draft"] .card.dup .front { animation: dfDup 1.2s ease-in-out infinite alternate; }
+
+/* 立ち絵 */
+[data-theme="draft"] .standwrap .band { border-radius: 0; background: #fff; color: var(--navy); font: 800 66px var(--fd); letter-spacing: .2em; box-shadow: 0 10px 30px rgba(27,42,78,.15); border-top: 4px solid var(--navy); border-bottom: 2px solid var(--gold); }
+[data-theme="draft"] .standwrap .tag { border-radius: 0; background: var(--navy); color: #fff; font-family: var(--fd); letter-spacing: .2em; }
+[data-theme="draft"] .standwrap .standicon { border-width: 4px; border-color: var(--navy); }
+
+/* チーム表 */
+[data-theme="draft"] .team { border-radius: 3px; background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(27,42,78,.12); }
+[data-theme="draft"] .team .th { background: var(--navy); border-bottom: 3px solid var(--gold); }
+[data-theme="draft"] .team .th .tn { font: 800 26px var(--fd); text-shadow: none; letter-spacing: .1em; }
+[data-theme="draft"] .team li { border-bottom: 1px solid var(--line); color: var(--navy); font-family: var(--fd); font-weight: 800; }
+[data-theme="draft"] .team li .r { border-radius: 0; background: none; color: var(--gold); border: 1px solid var(--gold); font-family: var(--fd); }
+[data-theme="draft"] .team li.empty { color: #b8bfcf; }
+
+/* くじの色を選ぶ */
+[data-theme="draft"] .lotshead .pn { font: 800 66px var(--fd); color: var(--navy); text-shadow: none; letter-spacing: .1em; }
+[data-theme="draft"] .lotshead img { border-color: #fff; box-shadow: 0 6px 16px rgba(27,42,78,.2); }
+[data-theme="draft"] .lotshead .pk, [data-theme="draft"] .lotsnote { border-radius: 0; font-family: var(--fd); letter-spacing: .14em; }
+[data-theme="draft"] .lot .face { border-radius: 6px; box-shadow: 0 8px 20px rgba(27,42,78,.2); text-shadow: none; }
+[data-theme="draft"] .lot .cl { border-radius: 0; background: #fff; color: var(--navy); box-shadow: inset 0 0 0 1px var(--line); }
+[data-theme="draft"] .lot .nm { color: var(--navy); text-shadow: none; }
+[data-theme="draft"] .lot.taken .nm { border-radius: 0; background: var(--navy); color: #fff; }
+
+/* 制限時間 */
+[data-theme="draft"] .timer { font: 800 56px var(--fd); color: var(--navy); text-shadow: none; letter-spacing: .06em; }
+[data-theme="draft"] .timer.end { color: #b3261e; animation: none; }

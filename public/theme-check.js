@@ -62,7 +62,7 @@ $('sound').checked = q.has('sound');
 
 function load() {
   const p = new URLSearchParams({ theme: themeSel.value });
-  const src = `overlay.html?mock&theme=${themeSel.value}${$('sound').checked ? '&sound' : ''}`;
+  const src = `overlay.html?mock&theme=${themeSel.value}${$('sound').checked ? '&sound' : ''}${MINI ? '&lite' : ''}`;
   history.replaceState(null, '', `?${p}${MINI ? '&mini' : ''}${q.has('bare') ? '&bare' : ''}&lot=${lotSel.value}${$('sound').checked ? '&sound' : ''}`);
   steps = script(themeSel.value, lotSel.value);
   $('steps').innerHTML = steps.map(([name], i) => (i && steps[i - 1][0] === name ? '' : `<button type="button" data-i="${i}">${name}</button>`)).join('');

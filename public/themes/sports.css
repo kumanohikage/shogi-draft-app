@@ -1,0 +1,82 @@
+/* テーマ: スポーツ中継
+ * 紺のスタジアム(3D の背景)に、斜めに切った白い板と黄色の帯。数字は太く傾けて、影はぼかさずずらす(光らせない)
+ * チームカラーを枠に使う(くじの色を選ぶ画面だけは抑える) */
+[data-theme="sports"] { --fd: 'Dela Gothic One', sans-serif; --fb: 'Noto Sans JP', sans-serif; --pill-bg: #ffd400; --pill-fg: #0b1633;
+  --navy: #0b1633; --blue: #1f5bff; --cyan: #19c3ff; --yellow: #ffd400; --ink: #0b1633; --cut: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+[data-theme="sports"] .bg::before { display: none; }
+/* 3D の背景が無いとき(画像の書き出し)の背景。3D の奥の色と同じ */
+[data-theme="sports"] .bg { background: radial-gradient(ellipse 80% 70% at 50% 42%, #1b3f8f 0%, #0d1e4a 45%, #050b1f 100%); }
+
+/* 見出し: 斜めの紺の板に大会名、右に黄色の帯(場面の名前)。OBS の古いブラウザでも動く書き方だけ使う */
+[data-theme="sports"] h1 { display: flex; align-items: center; width: max-content; margin: 34px auto 18px; padding: 16px 40px; font: normal 46px/1 var(--fd); color: #fff; text-shadow: none; letter-spacing: .04em;
+  background: linear-gradient(100deg, #10245e, #1b3f9e); clip-path: var(--cut); }
+[data-theme="sports"] h1 small { align-self: stretch; display: flex; align-items: center; margin: -16px -40px -16px 28px; padding: 0 44px 0 34px; font: 900 30px var(--fb); letter-spacing: .08em; color: var(--navy); background: var(--yellow); clip-path: var(--cut); }
+[data-theme="sports"] h1 small:empty { display: none; }
+[data-theme="sports"] h1 .logo { max-height: 70px; filter: none; }
+
+/* ロゴ・大会名を大きく */
+[data-theme="sports"] .logobig b { font: normal 150px var(--fd); color: #fff; transform: skewX(-8deg); letter-spacing: .02em; text-shadow: 8px 8px 0 var(--blue), 16px 16px 0 rgba(11,22,51,.6); }
+
+/* 巡の見出し・入札完了: 大きく傾けた数字、黄色の帯 */
+[data-theme="sports"] .roundbig { gap: 30px; }
+[data-theme="sports"] .roundbig b { font: normal 240px/1 var(--fd); color: #fff; transform: skewX(-8deg); text-shadow: 10px 10px 0 var(--blue), 20px 20px 0 rgba(11,22,51,.65); }
+[data-theme="sports"] .roundbig span { padding: 14px 70px; border-radius: 0; background: var(--yellow); color: var(--navy); font: 900 60px var(--fb); letter-spacing: .14em; clip-path: polygon(24px 0, 100% 0, calc(100% - 24px) 100%, 0 100%); }
+[data-theme="sports"] .roundbig i { color: #cfe3ff; text-shadow: none; font-size: 34px; letter-spacing: .3em; }
+[data-theme="sports"] .roundbig.enter b { animation: spRoundIn .55s cubic-bezier(.2,.9,.25,1) both; }
+[data-theme="sports"] .roundbig.enter span { animation: spBandIn .45s .2s cubic-bezier(.2,.9,.25,1) both; }
+@keyframes spRoundIn { from { opacity: 0; transform: translateX(-260px) skewX(-8deg); } }
+@keyframes spBandIn { from { clip-path: polygon(24px 0, 24px 0, 0 100%, 0 100%); } }
+
+/* 資料: 白い板に青い太線 */
+[data-theme="sports"] .slidebox { border-radius: 0; background: rgba(255,255,255,.96); box-shadow: 14px 14px 0 rgba(11,22,51,.55); border-left: 22px solid var(--blue); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 40px), calc(100% - 40px) 100%, 0 100%); }
+[data-theme="sports"] .slidebox h2 { color: var(--navy); border-bottom-color: var(--yellow); }
+[data-theme="sports"] .slidebox li { color: var(--navy); }
+[data-theme="sports"] .slidebox li::before { content: ''; top: .55em; width: .5em; height: .5em; background: var(--blue); transform: skewX(-12deg); }
+[data-theme="sports"] .slidecard img, [data-theme="sports"] #wait-img { border-radius: 0; box-shadow: 14px 14px 0 rgba(11,22,51,.55); }
+
+/* 指名カード: 白い板、上にチームカラーの斜めの帯 */
+[data-theme="sports"] .face { border-radius: 0; box-shadow: 10px 10px 0 rgba(4,10,30,.55); clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 30px 100%, 0 calc(100% - 30px)); }
+[data-theme="sports"] .front { background: #fff; border: 0; }
+[data-theme="sports"] .head { background: linear-gradient(100deg, var(--c) 0 78%, transparent 78%); padding: 12px 20px 12px 18px; }
+[data-theme="sports"] .head img, [data-theme="sports"] .head .ava, [data-theme="sports"] .back .who img { border-radius: 4px; border-width: 2px; }
+[data-theme="sports"] .head .tn { font: 900 32px var(--fb); text-shadow: none; letter-spacing: .04em; }
+[data-theme="sports"] .nm b { font: 900 54px/1.15 var(--fb); color: var(--navy); letter-spacing: .02em; }
+[data-theme="sports"] .nm small { color: #4d5c80; }
+[data-theme="sports"] .nm img { border-radius: 4px; }
+[data-theme="sports"] .back { background: repeating-linear-gradient(-60deg, #0f2153 0 18px, #0b1a45 18px 36px); border: 0; box-shadow: inset 0 6px 0 var(--c); }
+[data-theme="sports"] .back .koma { background: var(--yellow); color: var(--navy); clip-path: polygon(50% 0, 88% 20%, 100% 100%, 0 100%, 12% 20%); }
+[data-theme="sports"] .back .wait { color: #9fc0ff; }
+[data-theme="sports"] .stamp { border-radius: 0; transform: skewX(-10deg); padding: 6px 22px; font-size: 26px; letter-spacing: .06em; }
+[data-theme="sports"] .stamp.ok { background: #ff2d55; box-shadow: 4px 4px 0 var(--navy); }
+[data-theme="sports"] .stamp.dup { background: var(--yellow); color: var(--navy); box-shadow: 4px 4px 0 var(--navy); }
+[data-theme="sports"] .stamp.pop { animation: spStamp .3s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes spStamp { from { transform: skewX(-10deg) translateX(80px); opacity: 0; } }
+@keyframes spDup { from { box-shadow: 10px 10px 0 rgba(4,10,30,.55), 0 0 0 0 rgba(255,212,0,0); } to { box-shadow: 10px 10px 0 rgba(4,10,30,.55), 0 0 0 10px rgba(255,212,0,.95); } }
+[data-theme="sports"] .card.dup .front { animation: spDup .5s ease-in-out infinite alternate; }
+
+/* 立ち絵: 白い斜めの帯に名前、チームカラーの差し色 */
+[data-theme="sports"] .standwrap .band { border-radius: 0; background: #fff; color: var(--navy); box-shadow: 12px 12px 0 rgba(11,22,51,.6); clip-path: polygon(40px 0, 100% 0, calc(100% - 40px) 100%, 0 100%); border-left: 40px solid var(--c); font: 900 72px var(--fb); }
+[data-theme="sports"] .standwrap .tag { border-radius: 0; background: var(--yellow); color: var(--navy); clip-path: var(--cut); padding: 10px 44px; }
+[data-theme="sports"] .standwrap .standicon { border-radius: 24px; }
+
+/* チーム表 */
+[data-theme="sports"] .team { border-radius: 0; border: 0; background: #fff; box-shadow: 10px 10px 0 rgba(4,10,30,.55); clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%); }
+[data-theme="sports"] .team .th { background: linear-gradient(160deg, rgba(0,0,0,0), rgba(0,0,0,.28)), var(--c); }
+[data-theme="sports"] .team .th img, [data-theme="sports"] .team .th .ava { border-radius: 8px; }
+[data-theme="sports"] .team .th .tn { text-shadow: none; }
+[data-theme="sports"] .team li { border-bottom: 2px solid #e3e8f4; color: var(--navy); }
+[data-theme="sports"] .team li .r { border-radius: 0; transform: skewX(-10deg); }
+[data-theme="sports"] .team li.empty { color: #b4bdd3; }
+[data-theme="sports"] .team li img { border-radius: 4px; }
+
+/* くじの色を選ぶ: チームカラーは使わない(くじの色と紛れないように) */
+[data-theme="sports"] .lotshead .pn { font: normal 64px var(--fd); color: #fff; transform: skewX(-8deg); text-shadow: 6px 6px 0 var(--blue); }
+[data-theme="sports"] .lotshead img { border-radius: 8px; border-color: #fff; }
+[data-theme="sports"] .lotshead .pk, [data-theme="sports"] .lotsnote { border-radius: 0; clip-path: var(--cut); }
+[data-theme="sports"] .lot .face { border-radius: 6px; box-shadow: 8px 8px 0 rgba(4,10,30,.55); }
+[data-theme="sports"] .lot .cl { border-radius: 0; background: var(--navy); color: #fff; clip-path: var(--cut); }
+[data-theme="sports"] .lot.taken .nm { border-radius: 0; background: #fff; color: var(--navy); clip-path: var(--cut); }
+
+/* 制限時間 */
+[data-theme="sports"] .timer { font: normal 60px var(--fd); color: #fff; text-shadow: 5px 5px 0 var(--blue); transform: skewX(-8deg); }
+[data-theme="sports"] .timer.end { color: var(--yellow); }

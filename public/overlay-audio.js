@@ -102,6 +102,8 @@
       const t = ctx.currentTime;
       tone('sine', 880, 1320, t, 0.14, 0.25);
     },
+    // 光の世界へ入るときの音(金の後光は無し。テーマで決める)
+    entry() {},
     setVolume(v) { seVol = v; if (master) master.gain.value = v; },
   };
 
