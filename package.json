@@ -9,7 +9,7 @@
     "app": "electron .",
     "css": "tailwindcss -c tailwind.config.js -i ui/control.src.css -o public/control.css --minify",
     "check:ui": "npm run css && electron scripts/check-ui.js",
-    "test": "node test/core.test.js",
+    "test": "node test/core.test.js && node test/store.test.js",
     "dist": "npm run vendor && npm run css && electron-builder --win",
     "vendor": "node scripts/vendor.js"
   },
@@ -36,6 +36,7 @@
     "files": [
       "main.js",
       "server.js",
+      "store.js",
       "public/**/*",
       "demo.js"
     ],

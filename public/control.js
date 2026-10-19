@@ -9,6 +9,7 @@ let remoteInfo = { on: false };
 // 画面の状態: いまのタブ / 進行表の見せ方(edit 編集・live 本番) / 編集で選んでいる場面 / ドラフトの場面のサブタブ / 選手の絞り込み / 選んでいるリーダー
 const ui = { tab: 'prog', view: 'edit', selId: null, draftTab: 'live', filter: 'all', search: '', leaderId: null };
 let selectNewScene = 0; // 場面を足したとき、足した場面を選ぶための目印
+let lib = null; // 大会・イベント・名簿の一覧(サーバーから)
 let S = null, canUndo = false, undoCancelsLottery = false, demo = false, ws = null, bgmList = [], overlay = { count: 0 };
 
 /* ---------- 見た目(melta UI のクラス。色はアプリの金×焦げ茶) ---------- */
@@ -60,6 +61,7 @@ function connect() {
     else if (m.type === 'remote') { remoteInfo = m; renderRemote(); }
     else if (m.type === 'presence') { overlay = m; renderOverlayStatus(); if (S) renderRun(); }
     else if (m.type === 'bgmList') { bgmList = m.list; if (S) render(); }
+    else if (m.type === 'library') { lib = m; if (S) { renderLibrary(); renderRosterDlg(); } }
     else if (m.type === 'error') toast(m.message, true);
   };
 }
@@ -115,6 +117,8 @@ function render() {
   renderLotteryLog();
   renderOptions();
   renderShow();
+  renderLibrary();
+  renderRosterDlg();
   renderTimer();
 }
 
@@ -428,6 +432,9 @@ function renderLeaderPanel(started) {
         </div></div>
       <div class="flex items-center gap-2 mt-2"><label class="text-xs text-[var(--text-muted)]" for="stand-scale">大きさ</label><input id="stand-scale" type="range" min="0.4" max="2.5" step="0.01" value="${+l.standScale || 1}" class="flex-1 h-11 accent-primary-500 cursor-pointer"><button type="button" id="stand-reset" class="${BTN_SUB} px-3 text-sm">元に戻す</button></div>` : ''}
       <div class="flex items-end gap-2 mt-2"><button type="button" data-pick="stand:${l.id}" class="${BTN_SUB}">${l.stand ? '変更' : '選ぶ'}</button>${l.stand ? `<button type="button" data-stand-clear="${l.id}" class="${BTN_SUB}">外す</button>` : ''}</div></div>
+    <div class="flex gap-3 items-end">
+      <div class="leading-normal flex-1 min-w-0"><label class="${LABEL}" for="lt-${l.id}">チーム名</label><input id="lt-${l.id}" type="text" data-lf="teamName" value="${esc(l.teamName || '')}" placeholder="${esc((C.optionsOf(S).teamPrefix || '') + C.shortName(l))}" maxlength="16" class="w-full ${INPUT}"></div>
+      <div class="leading-normal"><span class="${LABEL}">チームのロゴ</span><div class="flex items-center gap-2">${l.teamLogo ? `<img src="${img(l.teamLogo)}" alt="" class="w-11 h-11 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : ''}<button type="button" data-pick="teamLogo:${l.id}" class="${BTN_SUB} px-3">${l.teamLogo ? '変更' : '選ぶ'}</button>${l.teamLogo ? `<button type="button" data-team-logo-clear="${l.id}" class="${BTN_SUB} px-3">外す</button>` : ''}</div></div></div>
     <div class="leading-normal"><span class="${LABEL}">チーム</span><ol class="flex flex-col gap-1">${Array.from({ length: S.rounds }, (_, i) => { const p = team.find((t) => t.round === i + 1); return `<li class="flex items-center gap-2 text-sm"><span class="w-10 text-xs text-[var(--text-muted)]">${i + 1}巡</span>${p ? `<span class="text-[var(--text-heading)]">${esc(C.playerById(S, p.playerId)?.name)}</span>` : '<span class="text-[var(--text-muted)]">―</span>'}</li>`; }).join('')}</ol></div>
     <div class="flex"><button type="button" class="ml-auto ${BTN_SUB} text-red-300" data-del-leader ${started ? 'disabled aria-disabled="true" title="ドラフトの途中は削除できません"' : ''}>削除</button></div>`;
   initStand(l);
@@ -487,7 +494,7 @@ let lastSpace = 0;
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'Space' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
   if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-  if ($('tab-prog').classList.contains('hidden') || $('crop').open || $('remote-dlg').open || !$('audio-pop').classList.contains('hidden')) return;
+  if ($('tab-prog').classList.contains('hidden') || $('crop').open || $('remote-dlg').open || $('roster-dlg').open || !$('audio-pop').classList.contains('hidden')) return;
   e.preventDefault(); // フォーカスのあるほかのボタンが押されたり、画面がスクロールしたりしないように
   if (e.repeat || Date.now() - lastSpace < 500) return;
   const b = document.querySelector('#next button.h-12');
@@ -745,7 +752,7 @@ function renderShow() {
 // 画像を選ぶ: 背景・ロゴ / 立ち絵 / 画像の資料 で共通の入力
 let pickTarget = null;
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-slide-fit],[data-title-mode],[data-slide-rules],[data-look-pick],[data-look-clear],[data-pick],[data-stand-clear],[data-prog-add],[data-prog-move],[data-prog-del],[data-prog-go],#prog-reset');
+  const t = e.target.closest('[data-slide-fit],[data-title-mode],[data-slide-rules],[data-look-pick],[data-look-clear],[data-pick],[data-stand-clear],[data-team-logo-clear],[data-prog-add],[data-prog-move],[data-prog-del],[data-prog-go],#prog-reset');
   if (!t) return;
   if (t.dataset.slideFit) act({ type: 'updateSlide', id: t.closest('[data-slide-id]').dataset.slideId, patch: { fit: t.dataset.slideFit } });
   else if (t.dataset.titleMode) setOption({ titleMode: t.dataset.titleMode });
@@ -757,6 +764,7 @@ document.addEventListener('click', (e) => {
   else if (t.dataset.lookClear) setOption({ [t.dataset.lookClear]: '' });
   else if (t.dataset.pick) { const [kind, id] = t.dataset.pick.split(':'); pickTarget = { kind, id }; $('look-file').value = ''; $('look-file').click(); }
   else if (t.dataset.standClear) act({ type: 'updateLeader', id: t.dataset.standClear, patch: { stand: '' } });
+  else if (t.dataset.teamLogoClear) act({ type: 'updateLeader', id: t.dataset.teamLogoClear, patch: { teamLogo: '' } });
   else if (t.dataset.progAdd) {
     const k = t.dataset.progAdd;
     if (k === 'text' || k === 'image') act({ type: 'addSlide', kind: k, toProgram: true, at: C.programOf(S).length - 1 });
@@ -779,6 +787,7 @@ $('look-file').addEventListener('change', async (e) => {
     const name = await upload(`${tg.kind}_${tg.key || tg.id}_${Date.now()}${IMG_EXT[f.type]}`, f);
     if (tg.kind === 'look') setOption(tg.key === 'logoImage' ? { logoImage: name, titleMode: 'logo' } : { [tg.key]: name });
     else if (tg.kind === 'stand') act({ type: 'updateLeader', id: tg.id, patch: { stand: name } });
+    else if (tg.kind === 'teamLogo') act({ type: 'updateLeader', id: tg.id, patch: { teamLogo: name } });
     else if (tg.kind === 'slide') act({ type: 'updateSlide', id: tg.id, patch: { image: name } });
   } catch (err) { toast(err.message, true); }
 });
@@ -804,6 +813,80 @@ $('trans-video-file').addEventListener('change', async (e) => {
   if (!ext) return toast('WebM か MP4 の動画を選んでください', true);
   try { setOption({ transVideo: await upload(`trans_${Date.now()}${ext}`, f) }); } catch (err) { toast(err.message, true); }
 });
+
+/* ---------- 大会・イベント・名簿 ---------- */
+const sendLib = (cmd, extra) => ws.send(JSON.stringify(Object.assign({ type: 'library', cmd }, extra)));
+const fmtDate = (t) => { const d = new Date(t); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+function renderLibrary() {
+  if (!lib) return;
+  $('tours').innerHTML = lib.tournaments.map((t) => {
+    const on = t.id === lib.current;
+    return `<li class="flex items-center gap-3 min-h-14 px-3 py-2 rounded-xl border ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)]'}">
+      <span class="min-w-0 flex-1"><b class="block truncate text-base text-[var(--text-heading)]">${esc(t.title)}</b><span class="text-xs text-[var(--text-muted)]">${fmtDate(t.createdAt)} 作成・リーダー${t.leaders}人・選手${t.players}人</span></span>
+      ${t.endedAt ? badge('wait', '終了') : ''}${on ? badge('in', '開いている') : `<button type="button" class="${BTN_SUB}" data-tour-open="${t.id}">開く</button><button type="button" class="${BTN_ICON} hover:text-red-300" data-tour-del="${t.id}" aria-label="${esc(t.title)} を削除">${ICON.del}</button>`}</li>`;
+  }).join('');
+  $('events').innerHTML = lib.events.map((e) => {
+    const on = e.id === lib.currentEvent;
+    return `<li class="flex items-center gap-1 p-1 rounded-xl border ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)]'}">
+      <label class="sr-only" for="ev-${e.id}">イベントの名前</label><input id="ev-${e.id}" type="text" data-ev-name="${e.id}" value="${esc(e.name)}" maxlength="30" class="w-44 ${INPUT}">
+      ${on ? badge('in', '開いている') : `<button type="button" class="${BTN_SUB}" data-ev-open="${e.id}">開く</button>`}
+      ${lib.events.length > 1 ? `<button type="button" class="${BTN_ICON} hover:text-red-300" data-ev-del="${e.id}" aria-label="${esc(e.name)} を削除">${ICON.del}</button>` : ''}</li>`;
+  }).join('');
+  const ended = lib.ended;
+  $('tour-end').textContent = ended ? '大会を再開' : '大会を終える';
+  $('tour-end').title = ended ? '名簿の最新の名前や顔に戻ります' : 'いまの名前や顔をこの大会に写して固定します（あとで名簿を直しても、この大会は変わりません）';
+  show($('tour-ended'), ended, 'inline-flex');
+  $('tour-ended').innerHTML = ended ? badge('wait', '終了した大会') : '';
+}
+$('tour-new').addEventListener('click', () => {
+  const title = prompt('新しい大会の名前', '');
+  if (title == null) return;
+  sendLib('create', { title: title.trim() || '新しい大会' }); toast('新しい大会を作りました。リーダー・選手の「名簿から追加」で人を入れられます');
+});
+$('tour-end').addEventListener('click', () => {
+  if (lib.ended) { if (confirm('この大会を再開しますか？\n名前や顔は、名簿の最新に戻ります。')) sendLib('reopen'); }
+  else if (confirm('この大会を終えますか？\nいまの名前や顔をこの大会に写して固定します。あとで再開もできます。')) sendLib('end');
+});
+$('event-add').addEventListener('click', () => { sendLib('addEvent', { eventType: 'draft' }); toast('イベントを追加しました。進行表はイベントごとです'); });
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-tour-open],[data-tour-del],[data-ev-open],[data-ev-del],[data-roster-add],[data-roster-del]');
+  if (!t) return;
+  if (t.dataset.tourOpen) { sendLib('open', { id: t.dataset.tourOpen }); toast('大会を切り替えました'); }
+  else if (t.dataset.tourDel) { const x = lib.tournaments.find((y) => y.id === t.dataset.tourDel); if (confirm(`「${x.title}」を削除しますか？\n（データフォルダの trash に残ります）`)) sendLib('remove', { id: x.id }); }
+  else if (t.dataset.evOpen) sendLib('openEvent', { id: t.dataset.evOpen });
+  else if (t.dataset.evDel) { const x = lib.events.find((y) => y.id === t.dataset.evDel); if (confirm(`イベント「${x.name}」を削除しますか？\n（進行表とドラフトの結果も消えます）`)) sendLib('removeEvent', { id: x.id }); }
+  else if (t.dataset.rosterAdd) openRosterDlg(t.dataset.rosterAdd);
+  else if (t.dataset.rosterDel) sendLib('removePerson', { id: t.dataset.rosterDel });
+});
+document.addEventListener('change', (e) => { const t = e.target; if (t.dataset.evName) sendLib('renameEvent', { id: t.dataset.evName, name: t.value.trim() }); });
+
+// 名簿から追加: この大会にまだいない人を選ぶ
+const rosterSel = { role: 'player', ids: new Set(), q: '' };
+function openRosterDlg(role) {
+  Object.assign(rosterSel, { role, ids: new Set(), q: '' });
+  $('roster-search').value = '';
+  $('roster-title').textContent = role === 'leader' ? '名簿からリーダーを追加' : '名簿から選手を追加';
+  $('roster-dlg').showModal();
+  renderRosterDlg();
+}
+function renderRosterDlg() {
+  if (!lib || !$('roster-dlg').open) return;
+  const inT = new Set([...S.leaders, ...S.players].map((x) => x.id));
+  const roleName = { leader: 'リーダー', player: '選手' };
+  const list = lib.roster.filter((p) => !inT.has(p.id) && (!rosterSel.q || p.name.includes(rosterSel.q)));
+  $('roster-list').innerHTML = list.map((p) => {
+    const last = p.uses[p.uses.length - 1];
+    return `<li class="flex items-center gap-3 min-h-14 px-2 rounded-lg hover:bg-[var(--bg-page-alt)]">
+      <label class="flex-1 min-w-0 flex items-center gap-3 cursor-pointer"><input type="checkbox" data-roster-pick="${p.id}" ${rosterSel.ids.has(p.id) ? 'checked' : ''} class="w-5 h-5 accent-primary-500">${avatar(p.icon, null)}
+        <span class="min-w-0"><b class="block truncate text-[var(--text-heading)]">${esc(p.name)}</b><span class="block truncate text-xs text-[var(--text-muted)]">${last ? `${esc(last.title)}（${roleName[last.role]}）${p.uses.length > 1 ? ` ほか${p.uses.length - 1}大会` : ''}` : 'どの大会にも出ていません'}</span></span></label>
+      ${p.uses.length ? '' : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-roster-del="${p.id}" aria-label="${esc(p.name)} を名簿から消す" title="名簿から消す">${ICON.del}</button>`}</li>`;
+  }).join('') || `<li class="py-10 text-center text-[var(--text-muted)]">${lib.roster.length ? '追加できる人はいません' : '名簿はまだ空です'}</li>`;
+  $('roster-count').textContent = rosterSel.ids.size ? `${rosterSel.ids.size}人を選択中` : '';
+  setDisabled($('roster-ok'), !rosterSel.ids.size);
+}
+$('roster-search').addEventListener('input', (e) => { rosterSel.q = e.target.value.trim(); renderRosterDlg(); });
+$('roster-list').addEventListener('change', (e) => { const id = e.target.dataset.rosterPick; if (!id) return; if (e.target.checked) rosterSel.ids.add(id); else rosterSel.ids.delete(id); renderRosterDlg(); });
+$('roster-ok').addEventListener('click', () => { sendLib('addPeople', { role: rosterSel.role, ids: [...rosterSel.ids] }); $('roster-dlg').close(); toast(`${rosterSel.ids.size}人を追加しました`); });
 
 /* ---------- スマホ操作 ---------- */
 function renderRemote() {

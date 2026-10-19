@@ -10,6 +10,7 @@ const os = require('os');
 const QRCode = require('qrcode');
 const Core = require('./public/core.js');
 const { makeDemoState } = require('./demo.js');
+const { openStore } = require('./store.js');
 
 const PUB = path.join(__dirname, 'public');
 const MIME = {
@@ -34,35 +35,38 @@ function start(opts = {}) {
   const DATA = opts.dataDir || path.join(__dirname, 'draft-data');
   const IMG = path.join(DATA, 'images');
   const BGM = path.join(DATA, 'bgm'); // BGM は各自ダウンロードした曲をここに置く(アプリには同梱しない)
-  // 本番は draft.json、お試しモードは demo.json に分けて保存する(お試しで本番データを壊さない)
-  const FILES = { real: path.join(DATA, 'draft.json'), demo: path.join(DATA, 'demo.json') };
   fs.mkdirSync(IMG, { recursive: true });
   fs.mkdirSync(BGM, { recursive: true });
-
-  function load(file) {
-    if (fs.existsSync(file)) {
-      try { return Core.normalize(Object.assign(Core.initialState(), JSON.parse(fs.readFileSync(file, 'utf8')))); }
-      catch (e) { console.warn(path.basename(file) + ' を読めませんでした。初期状態で起動します:', e.message); }
-    }
-    return null;
-  }
+  // 本番とお試しは置き場所を分ける(お試しで本番データを壊さない)。前の版の draft.json / demo.json は最初に大会へ移す
+  const AUDIO = path.join(DATA, 'audio.json'); // 音の設定は本番/お試し・大会で共通
+  const readAudio = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')).audio || null; } catch { return null; } };
+  let audio = (() => { try { return JSON.parse(fs.readFileSync(AUDIO, 'utf8')); } catch { return readAudio(path.join(DATA, 'draft.json')); } })();
+  const stores = {};
+  const storeOf = (m) => (stores[m] ||= m === 'demo'
+    ? openStore(path.join(DATA, 'demo'), path.join(DATA, 'demo.json'), () => makeDemoState(IMG))
+    : openStore(DATA, path.join(DATA, 'draft.json')));
   let mode = 'real'; // 起動時はいつも本番
-  let FILE = FILES.real;
-  let state = load(FILE) || Core.initialState();
+  let store = storeOf(mode);
+  let state = store.state(audio);
+  if (!audio) audio = state.audio;
   let history = [];
   function switchMode(next, fresh) {
     if (next !== 'real' && next !== 'demo') return;
-    const audio = state.audio; // 音の設定は本番/お試しで共通
-    mode = next; FILE = FILES[mode]; history = [];
-    state = (!fresh && load(FILE)) || (mode === 'demo' ? makeDemoState(IMG) : Core.initialState());
-    if (audio) state.audio = audio;
+    mode = next; history = [];
+    if (fresh && mode === 'demo') { // お試しを最初から: お試しの置き場所ごと作り直す
+      fs.rmSync(path.join(DATA, 'demo'), { recursive: true, force: true });
+      delete stores.demo;
+    }
+    store = storeOf(mode);
+    state = store.state(audio);
   }
+  // 大会・イベントを切り替えたら、その状態を読み直す(「戻す」は切り替えの前には戻らない)
+  function reload() { history = []; state = store.state(audio); }
 
-  // 書き込み途中で落ちても壊れないよう、一時ファイルに書いてから置き換える
   function save() {
-    const tmp = FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(state, null, 1));
-    fs.renameSync(tmp, FILE);
+    audio = state.audio;
+    try { fs.writeFileSync(AUDIO, JSON.stringify(audio)); } catch { /* 音の設定が残らないだけ */ }
+    state = store.save(state);
   }
 
   const server = http.createServer((req, res) => {
@@ -116,6 +120,8 @@ function start(opts = {}) {
   // 「1つ戻す」で抽選が取り消されるか(管理画面で確認を出すため)
   const undoCancelsLottery = () => history.length > 0 && history[history.length - 1].lotteries.length < state.lotteries.length;
   const snapshot = () => ({ type: 'state', state, canUndo: history.length > 0, undoCancelsLottery: undoCancelsLottery(), demo: mode === 'demo' });
+  // 大会・イベント・名簿の一覧は、このPCの管理画面にだけ送る
+  const sendLibrary = () => { const lib = store.library(); wss.clients.forEach((c) => send(c, lib)); };
 
   // 配信画面(OBS)を開いていないと演出の終わりが届かず先へ進めないので、2分たったら終わったことにする
   function lotterySafety(id) {
@@ -200,7 +206,7 @@ function start(opts = {}) {
   function onConnection(ws, isRemote) {
     send(ws, snapshot());
     send(ws, presence());
-    if (!isRemote) remoteInfo().then((i) => send(ws, i));
+    if (!isRemote) { remoteInfo().then((i) => send(ws, i)); send(ws, store.library()); }
     ws.on('close', () => { if (overlays.delete(ws)) broadcast(presence()); });
     ws.on('message', (raw) => {
       let msg; try { msg = JSON.parse(raw); } catch { return; }
@@ -245,13 +251,39 @@ function start(opts = {}) {
           return;
         } else if (msg.type === 'mode') { // お試しモードの出入り / お試しのやり直し
           switchMode(msg.mode, !!msg.fresh);
+        } else if (msg.type === 'library') { // 大会・イベント・名簿(このPCの管理画面からだけ)
+          if (isRemote) return;
+          library(msg);
         } else return;
         save();
         broadcast(snapshot());
+        if (msg.type !== 'action' || /^(add|remove|update|replace)|^setTitle$/.test(msg.action.type)) sendLibrary();
       } catch (e) {
         send(ws, { type: 'error', message: e.message });
       }
     });
+  }
+
+  function library(msg) {
+    switch (msg.cmd) {
+      case 'create': save(); store.create(String(msg.title || '').slice(0, 40) || '新しい大会'); reload(); break;
+      case 'open': if (msg.id === store.tournament.id) return; save(); store.open(msg.id); reload(); break;
+      case 'end': save(); store.end(); reload(); break;
+      case 'reopen': save(); store.reopen(); reload(); break;
+      case 'remove': store.remove(msg.id); break;
+      case 'addEvent': save(); store.addEvent(msg.eventType || 'draft'); reload(); break;
+      case 'openEvent': if (msg.id === store.event.id) return; save(); store.openEvent(msg.id); reload(); break;
+      case 'renameEvent': store.renameEvent(msg.id, msg.name); break;
+      case 'removeEvent': save(); store.removeEvent(msg.id); reload(); break;
+      case 'removePerson': store.removePerson(msg.id); break;
+      case 'addPeople': { // 名簿から大会へ(「戻す」で取り消せる)
+        const people = (msg.ids || []).map(store.person).filter(Boolean);
+        const next = Core.apply(state, { type: 'addPeople', role: msg.role, people });
+        history.push(state); state = next;
+        break;
+      }
+      default: throw new Error('不明な操作');
+    }
   }
 
   return new Promise((resolve, reject) => {

@@ -35,7 +35,8 @@
       version: 1,
       title: 'ドラフト会議',
       rounds: 3,
-      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), standScale/standX/standY(立ち絵の大きさと位置), intro(紹介文), introMemo(紹介のメモ。自分用) }  ※チーム名はドラフト後に決まるので持たない
+      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), standScale/standX/standY(立ち絵の大きさと位置), intro(紹介文), introMemo(紹介のメモ。自分用), teamName(チーム名。空なら「チーム＋略称」), teamLogo(チームのロゴ画像) }
+                          // id は名簿の人の id(大会をまたいで同じ人は同じ id)
       players: [],          // { id, name, icon, note(ひとこと), absent(欠場) }
       round: 1,             // 今の巡
       // 今の巡の指名: leaderId -> { playerId, revealed }
@@ -93,7 +94,7 @@
   const slideById = (s, id) => (s.slides || []).find((x) => x.id === id);
   // 名前の帯など: 「チーム」＋略称(なければフルネーム)。リーダー紹介だけはフルネーム
   const shortName = (l) => (l ? (l.short || '').trim() || l.name : '');
-  const teamLabel = (s, l) => (optionsOf(s).teamPrefix || '') + shortName(l);
+  const teamLabel = (s, l) => (l && (l.teamName || '').trim()) || (optionsOf(s).teamPrefix || '') + shortName(l);
   // 巡のはじめの画面: 待ち時間の画像があれば待ち時間、なければ指名ボード
   const roundStartScene = (s) => (optionsOf(s).flowWait && waitImagesOf(s).length ? 'wait' : 'board');
   // 巡のはじめにタイマーを動かす(設定で止められる)
@@ -238,6 +239,19 @@
       case 'moveLeader': {
         const i = s.leaders.findIndex((l) => l.id === action.id), j = i + action.dir;
         if (i >= 0 && j >= 0 && j < s.leaders.length) [s.leaders[i], s.leaders[j]] = [s.leaders[j], s.leaders[i]];
+        break;
+      }
+      // 名簿から大会に入れる(人の id はそのまま)。role = leader | player
+      case 'addPeople': {
+        const inT = new Set([...s.leaders, ...s.players].map((x) => x.id));
+        const list = (action.people || []).filter((p) => p && p.id && !inT.has(p.id));
+        if (action.role === 'leader') {
+          if (s.leaders.length + list.length > MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです`);
+          for (const p of list) {
+            const used = new Set(s.leaders.map((l) => l.color));
+            s.leaders.push(Object.assign({}, p, { color: LEADER_COLORS.find((c) => !used.has(c)) || '#888888' }));
+          }
+        } else for (const p of list) s.players.push(Object.assign({ note: '' }, p));
         break;
       }
       case 'addPlayers': for (const p of action.players) s.players.push({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }); break;

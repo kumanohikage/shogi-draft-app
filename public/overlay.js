@@ -420,7 +420,7 @@ function renderTeams() {
       const d = isNew(key) ? k++ : -1;
       return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}${esc(pl ? pl.name : '')}</li>`;
     }).join('');
-    return `<div class="team" style="--c:${esc(lc(l))}"><div class="th">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
+    return `<div class="team" style="--c:${esc(lc(l))}"><div class="th">${l.teamLogo || l.icon ? `<img src="${img(l.teamLogo || l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
   }).join('');
   for (let i = 0; i < k; i++) setTimeout(() => SE.pop(), 300 + i * 150);
   fitArea(t);
