@@ -8,16 +8,26 @@
 <link href="vendor/fonts/noto-sans-jp/font.css" rel="stylesheet">
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
-  body { font-family: 'Noto Sans JP', sans-serif; color: #3a2408; }
+  /* テーマの値(金の後光)。ほかのテーマは themes/<id>.css で上書きする */
+  :root { --fd: 'Dela Gothic One', sans-serif; --fb: 'Noto Sans JP', sans-serif; --pill-bg: rgba(20,14,8,.82); --pill-fg: #fff3d6; }
+  body { font-family: var(--fb); color: #3a2408; }
   /* 1920×1080 の舞台を窓に合わせて拡大縮小 */
-  #stage { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #stage { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden; }
+  /* 3D の背景(テーマによる)。場面の後ろにずっと置き、場面の背景は透明にする */
+  #bgimg, #bgfx { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; pointer-events: none; }
+  #stage.bg3d #bgfx.on { display: block; }
+  #stage.bg3d.hasbg #bgimg { display: block; background: var(--bgimg) center / cover no-repeat; }
+  #stage.bg3d .bg, #stage.bg3d.hasbg .bg { background: transparent; }
+  #stage.bg3d .bg::before { display: none; }
+  /* 光の世界(3D の抽選)へ入るときの切り替え */
+  #entry { position: absolute; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
   /* 場面の切り替えは一瞬で(重ねて薄くすると、途中で両方が半透明になって OBS 側が透けて光って見える) */
   .scene { position: absolute; inset: 0; opacity: 0; pointer-events: none; display: flex; flex-direction: column; }
   .scene.on { opacity: 1; }
   .bg { background: radial-gradient(ellipse at 50% 40%, #fff3c4 0%, #e8b84a 38%, #8a5a12 75%, #3a2408 100%); }
   .bg::before { content: ''; position: absolute; inset: 0; opacity: .25;
     background: repeating-conic-gradient(from 0deg at 50% 40%, rgba(255,255,255,.9) 0 4deg, transparent 4deg 12deg); }
-  h1 { position: relative; margin: 0; padding: 40px 0 24px; text-align: center; font: normal 64px 'Dela Gothic One', sans-serif; color: #fff;
+  h1 { position: relative; margin: 0; padding: 40px 0 24px; text-align: center; font: normal 64px var(--fd); color: #fff;
     text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 8px 0 #3a1a00, 0 0 30px rgba(255,200,80,.8); letter-spacing: .06em; }
   h1 small { display: block; font-size: 30px; letter-spacing: .1em; margin-top: 4px; }
   /* 背景画像(全画面共通)。設定されていれば金の放射線の代わりに敷く */
@@ -28,14 +38,14 @@
   /* ロゴの場面(オープニング・エンディング) */
   .logobig { display: flex; align-items: center; justify-content: center; height: 100%; }
   .logobig img { max-width: 1400px; max-height: 720px; object-fit: contain; filter: drop-shadow(0 10px 30px rgba(0,0,0,.4)); }
-  .logobig b { font: normal 140px 'Dela Gothic One', sans-serif; color: #fff; text-align: center; padding: 0 80px;
+  .logobig b { font: normal 140px var(--fd); color: #fff; text-align: center; padding: 0 80px;
     text-shadow: 0 0 3px #5a2a00, 5px 5px 0 #5a2a00, -5px 5px 0 #5a2a00, 5px -5px 0 #5a2a00, -5px -5px 0 #5a2a00, 0 12px 0 #3a1a00; }
   /* 資料(文字): 白いパネルに見出し＋箇条書き */
   .slidebox { position: absolute; left: 140px; right: 140px; top: 210px; bottom: 90px; padding: 60px 90px; box-sizing: border-box; background: rgba(255,255,255,.93); border-radius: 28px; box-shadow: 0 20px 50px rgba(0,0,0,.3); overflow: hidden; }
   /* --k: 入りきらないときに文字を縮める倍率(overlay.js の fitSlide) */
-  .slidebox h2 { margin: 0 0 calc(40px * var(--k, 1)); display: inline-block; font: 900 calc(76px * var(--k, 1)) 'Noto Sans JP', sans-serif; color: #1a1a1a; border-bottom: 8px solid #1a1a1a; padding-bottom: 6px; }
+  .slidebox h2 { margin: 0 0 calc(40px * var(--k, 1)); display: inline-block; font: 900 calc(76px * var(--k, 1)) var(--fb); color: #1a1a1a; border-bottom: 8px solid #1a1a1a; padding-bottom: 6px; }
   .slidebox ul { margin: 0; padding: 0; list-style: none; }
-  .slidebox li { position: relative; padding-left: calc(60px * var(--k, 1)); margin: calc(18px * var(--k, 1)) 0; font: 700 calc(52px * var(--k, 1))/1.45 'Noto Sans JP', sans-serif; color: #1a1a1a; white-space: pre-wrap; }
+  .slidebox li { position: relative; padding-left: calc(60px * var(--k, 1)); margin: calc(18px * var(--k, 1)) 0; font: 700 calc(52px * var(--k, 1))/1.45 var(--fb); color: #1a1a1a; white-space: pre-wrap; }
   .slidebox li::before { content: '・'; position: absolute; left: 0; }
   /* 資料(画像): 画面いっぱい(縦横比はそのまま) */
   .slideimg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
@@ -44,11 +54,16 @@
   .slidecard img { max-width: 1600px; max-height: 100%; object-fit: contain; border-radius: 18px; box-shadow: 0 14px 40px rgba(0,0,0,.45); background: #fffaf0; }
   /* 巡の見出し: 大きく「第◯巡」と指名のしかた */
   .roundbig { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding-bottom: 80px; }
-  .roundbig b { font: normal 220px/1 'Dela Gothic One', sans-serif; color: #fff; letter-spacing: .04em;
+  .roundbig b { font: normal 220px/1 var(--fd); color: #fff; letter-spacing: .04em;
     text-shadow: 0 0 3px #5a2a00, 6px 6px 0 #5a2a00, -6px 6px 0 #5a2a00, 6px -6px 0 #5a2a00, -6px -6px 0 #5a2a00, 0 14px 0 #3a1a00, 0 0 40px rgba(255,200,80,.8); }
-  .roundbig span { padding: 12px 48px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 52px 'Noto Sans JP', sans-serif; letter-spacing: .1em; }
+  .roundbig span { padding: 12px 48px; border-radius: 999px; background: var(--pill-bg); color: var(--pill-fg); font: 900 52px var(--fb); letter-spacing: .1em; }
   .roundbig.enter b { animation: roundIn .7s cubic-bezier(.2,1.4,.4,1) both; }
   .roundbig.enter span { animation: bandIn2 .5s .25s cubic-bezier(.2,.9,.3,1) both; }
+  /* 巡の見出しの下の小さな文字(一斉入札 / 順番指名) */
+  .roundbig i { margin-top: -6px; font: 900 36px var(--fb); font-style: normal; color: #fff; letter-spacing: .12em;
+    text-shadow: 0 0 2px #5a2a00, 2px 2px 0 #5a2a00, -2px 2px 0 #5a2a00, 2px -2px 0 #5a2a00, -2px -2px 0 #5a2a00; }
+  .roundbig i:empty { display: none; }
+  .roundbig.enter i { animation: bandIn2 .5s .4s cubic-bezier(.2,.9,.3,1) both; }
   /* 出揃いました: 上に「第1巡 選択希望選手」の帯、下に大きく */
   @keyframes roundIn { from { opacity: 0; transform: scale(1.6); } }
   @keyframes bandIn2 { from { opacity: 0; transform: translateY(20px); } }
@@ -59,14 +74,14 @@
   .lotshead img { width: 100px !important; height: 100px !important; }
   .lotshead .pn { font-size: 64px !important; }
   .lotshead img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
-  .lotshead .pn { font: normal 76px 'Dela Gothic One', sans-serif; color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00; }
-  .lotshead .pk { padding: 8px 26px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 34px 'Noto Sans JP'; }
+  .lotshead .pn { font: normal 76px var(--fd); color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00; }
+  .lotshead .pk { padding: 8px 26px; border-radius: 999px; background: var(--pill-bg); color: var(--pill-fg); font: 900 34px var(--fb); }
   .lotsbody { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 60px 16px; }
   .lots { display: flex; gap: 36px; justify-content: center; flex-wrap: wrap; }
   .lot { width: 220px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  .lot .face { position: relative; width: 220px; height: 220px; border-radius: 28px; background: var(--lc); box-shadow: 0 14px 30px rgba(0,0,0,.4), inset 0 -10px 0 rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; color: #fff; font: normal 120px 'Dela Gothic One', sans-serif; text-shadow: 0 4px 0 rgba(0,0,0,.25); }
-  .lot .nm { font: 900 34px 'Noto Sans JP'; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); min-height: 50px; text-align: center; }
-  .lot .cl { font: 900 30px 'Noto Sans JP'; color: #fff3d6; padding: 2px 18px; border-radius: 999px; background: rgba(20,14,8,.7); }
+  .lot .face { position: relative; width: 220px; height: 220px; border-radius: 28px; background: var(--lc); box-shadow: 0 14px 30px rgba(0,0,0,.4), inset 0 -10px 0 rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; color: #fff; font: normal 120px var(--fd); text-shadow: 0 4px 0 rgba(0,0,0,.25); }
+  .lot .nm { font: 900 34px var(--fb); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); min-height: 50px; text-align: center; }
+  .lot .cl { font: 900 30px var(--fb); color: var(--pill-fg); padding: 2px 18px; border-radius: 999px; background: rgba(20,14,8,.7); }
   .lot.taken .face { filter: saturate(.9); }
   .lot.taken .nm { padding: 4px 20px; border-radius: 12px; background: #fffaf0; color: #2a1606; text-shadow: none; }
   .lot.pop .face { animation: lotPop .45s cubic-bezier(.3,1.6,.5,1) both; }
@@ -74,18 +89,18 @@
   /* 封筒 */
   .env .face { height: 160px; border-radius: 14px; font-size: 80px; overflow: hidden; }
   .env .face::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 80px; background: linear-gradient(170deg, rgba(255,255,255,.28), rgba(255,255,255,.08)); clip-path: polygon(0 0, 100% 0, 50% 100%); }
-  .env .res { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 900 40px 'Noto Sans JP'; border-radius: 14px; }
+  .env .res { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 900 40px var(--fb); border-radius: 14px; }
   .env .res.win { background: linear-gradient(160deg, #fff7d6, #ffd54a); color: #a3150f; text-shadow: none; box-shadow: inset 0 0 0 6px #c0261e; }
   .env .res.lose { background: #e9e4dc; color: #6a6258; text-shadow: none; }
   .env .res.anim { animation: envOpen .7s cubic-bezier(.3,1.4,.5,1) both; }
   .env .res.late { animation: envOpen .6s 1.8s cubic-bezier(.3,1.4,.5,1) both; }
   @keyframes envOpen { from { transform: rotateX(90deg); } }
   .lot.win .face { box-shadow: 0 0 0 8px #ffd54a, 0 0 60px 12px rgba(255,200,60,.9); }
-  .lotsnote { align-self: center; margin: 0 0 36px; padding: 12px 40px; border-radius: 999px; background: rgba(20,14,8,.85); color: #fff3d6; font: 900 40px 'Noto Sans JP'; white-space: nowrap; }
+  .lotsnote { align-self: center; margin: 0 0 36px; padding: 12px 40px; border-radius: 999px; background: rgba(20,14,8,.85); color: var(--pill-fg); font: 900 40px var(--fb); white-space: nowrap; }
   /* あみだ */
   .amida { position: relative; }
   .amida svg { display: block; overflow: visible; }
-  .amida .cover { position: absolute; left: -30px; right: -30px; top: 138px; bottom: 120px; border-radius: 22px; background: repeating-linear-gradient(45deg, #3a2410, #3a2410 22px, #2c1a0a 22px, #2c1a0a 44px); box-shadow: 0 14px 30px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; color: #f3d27a; font: normal 90px 'Dela Gothic One', sans-serif; transition: opacity .6s; }
+  .amida .cover { position: absolute; left: -30px; right: -30px; top: 138px; bottom: 120px; border-radius: 22px; background: repeating-linear-gradient(45deg, #3a2410, #3a2410 22px, #2c1a0a 22px, #2c1a0a 44px); box-shadow: 0 14px 30px rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; color: #f3d27a; font: normal 90px var(--fd); transition: opacity .6s; }
   .amida .cover.off { opacity: 0; }
   .amida .trace { fill: none; stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
   .amida .trace.anim { animation: amidaTrace 2.6s ease-in-out both; }
@@ -96,8 +111,8 @@
   .standwrap .stand { position: absolute; left: 50%; bottom: 0; transform: translateX(calc(-50% + var(--sx, 0px))) translateY(var(--sy, 0px)) scale(var(--sk, 1)); transform-origin: 50% 100%; max-width: 1400px; height: 1000px; object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
   .standwrap .standicon { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); width: 560px; height: 560px; border-radius: 50%; object-fit: cover; border: 12px solid var(--c); box-shadow: 0 20px 50px rgba(0,0,0,.35); background: #fff; }
   .standwrap .band { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); min-width: 1000px; padding: 22px 80px; box-sizing: border-box; text-align: center;
-    background: linear-gradient(90deg, #f0b400, #ffe27a 50%, #f0b400); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -8px 0 var(--c); font: 900 70px 'Noto Sans JP', sans-serif; color: #1a1205; }
-  .standwrap .tag { position: absolute; left: 50%; bottom: 236px; transform: translateX(-50%); padding: 10px 34px; border-radius: 999px; background: rgba(20,14,8,.82); color: #fff3d6; font: 900 36px 'Noto Sans JP', sans-serif; white-space: nowrap; }
+    background: linear-gradient(90deg, #f0b400, #ffe27a 50%, #f0b400); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -8px 0 var(--c); font: 900 70px var(--fb); color: #1a1205; }
+  .standwrap .tag { position: absolute; left: 50%; bottom: 236px; transform: translateX(-50%); padding: 10px 34px; border-radius: 999px; background: var(--pill-bg); color: var(--pill-fg); font: 900 36px var(--fb); white-space: nowrap; }
   .standwrap.enter .stand, .standwrap.enter .standicon { animation: standIn .6s cubic-bezier(.2,.9,.3,1) both; }
   .standwrap.enter .band { animation: bandIn .5s .15s cubic-bezier(.2,.9,.3,1) both; }
   @keyframes standIn { from { opacity: 0; transform: translateX(calc(-50% + var(--sx, 0px))) translateY(calc(var(--sy, 0px) + 40px)) scale(var(--sk, 1)); } }
@@ -133,19 +148,19 @@
   .card.anim .back { transform: rotateY(180deg); }
   .back { background: linear-gradient(160deg, #3a2410, #1a0f06); border: 6px solid var(--c); display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 70px; box-sizing: border-box; }
   .back .koma { width: 96px; height: 112px; background: linear-gradient(160deg, #f7dc9c, #c99a3c); clip-path: polygon(50% 0, 88% 20%, 100% 100%, 0 100%, 12% 20%);
-    display: flex; align-items: center; justify-content: center; padding-top: 18px; box-sizing: border-box; font: 900 48px 'Noto Sans JP', serif; color: #1a0d00; }
-  .back .wait { margin-top: 16px; color: #e8c88a; font: 900 24px 'Noto Sans JP'; letter-spacing: .2em; }
-  .back .who { position: absolute; top: 18px; left: 22px; color: #fff; font: 900 30px 'Noto Sans JP'; display: flex; align-items: center; gap: 10px; }
+    display: flex; align-items: center; justify-content: center; padding-top: 18px; box-sizing: border-box; font: 900 48px var(--fb); color: #1a0d00; }
+  .back .wait { margin-top: 16px; color: #e8c88a; font: 900 24px var(--fb); letter-spacing: .2em; }
+  .back .who { position: absolute; top: 18px; left: 22px; color: #fff; font: 900 30px var(--fb); display: flex; align-items: center; gap: 10px; }
   .head { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--c); color: #fff; }
   .head img, .head .ava, .back .who img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.3); border: 3px solid #fff; }
-  .head .tn { font: 900 34px 'Noto Sans JP'; text-shadow: 0 2px 4px rgba(0,0,0,.4); }
-  .head .ln { font: 700 18px 'Noto Sans JP'; opacity: .9; }
+  .head .tn { font: 900 34px var(--fb); text-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  .head .ln { font: 700 18px var(--fb); opacity: .9; }
   .nm { flex: 1; display: flex; align-items: center; justify-content: center; gap: 18px; padding: 0 22px 30px; } /* 下はハンコの分あける */
   .nm img { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 4px solid var(--c); flex: none; }
   .nm .nmt { display: flex; flex-direction: column; align-items: center; min-width: 0; }
-  .nm small { margin-top: 6px; font: 900 22px 'Noto Sans JP'; color: #7a5326; letter-spacing: .04em; }
-  .nm b { font: normal 52px 'Dela Gothic One', sans-serif; color: #2a1606; line-height: 1.15; text-align: center; word-break: keep-all; overflow-wrap: anywhere; }
-  .stamp { position: absolute; right: 16px; bottom: 14px; padding: 4px 16px; border-radius: 10px; font: 900 24px 'Noto Sans JP'; color: #fff; transform: rotate(-6deg); }
+  .nm small { margin-top: 6px; font: 900 22px var(--fb); color: #7a5326; letter-spacing: .04em; }
+  .nm b { font: normal 52px var(--fd); color: #2a1606; line-height: 1.15; text-align: center; word-break: keep-all; overflow-wrap: anywhere; }
+  .stamp { position: absolute; right: 16px; bottom: 14px; padding: 4px 16px; border-radius: 10px; font: 900 24px var(--fb); color: #fff; transform: rotate(-6deg); }
   .stamp.ok { background: #c0261e; box-shadow: 0 0 0 3px #fff, 0 0 0 6px #c0261e; }
   .stamp.dup { background: #111; box-shadow: 0 0 0 3px #fff, 0 0 0 6px #111; }
   .card.dup .front { animation: dupGlow 1s ease-in-out infinite alternate; }
@@ -156,13 +171,13 @@
   .team { width: 280px; background: #fffaf0; border-radius: 20px; overflow: hidden; box-shadow: 0 14px 30px rgba(0,0,0,.4); border: 5px solid var(--c); }
   .team .th { background: var(--c); color: #fff; padding: 16px 12px 12px; text-align: center; }
   .team .th img, .team .th .ava { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; border: 4px solid #fff; background: rgba(255,255,255,.3); display: inline-block; }
-  .team .th .tn { font: 900 26px 'Noto Sans JP'; margin-top: 6px; text-shadow: 0 2px 4px rgba(0,0,0,.4); }
-  .team .th .ln { font: 700 17px 'Noto Sans JP'; opacity: .95; }
+  .team .th .tn { font: 900 26px var(--fb); margin-top: 6px; text-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  .team .th .ln { font: 700 17px var(--fb); opacity: .95; }
   .team ol { list-style: none; margin: 0; padding: 10px 12px 14px; }
-  .team li { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 2px dashed #e8d4a4; font: 900 24px 'Noto Sans JP'; color: #2a1606; min-height: 58px; }
+  .team li { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 2px dashed #e8d4a4; font: 900 24px var(--fb); color: #2a1606; min-height: 58px; }
   .team li:last-child { border-bottom: 0; }
   .team li img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 3px solid var(--c); }
-  .team li .r { font: 900 15px 'Noto Sans JP'; color: #fff; background: var(--c); border-radius: 6px; padding: 2px 6px; flex: none; }
+  .team li .r { font: 900 15px var(--fb); color: #fff; background: var(--c); border-radius: 6px; padding: 2px 6px; flex: none; }
   .team li.empty { color: #c9b48a; }
   .team li.new { animation: pop .6s cubic-bezier(.3,1.6,.5,1) both; }
   @keyframes pop { from { transform: scale(1.4); opacity: 0; background: #fff3b0; } }
@@ -170,7 +185,7 @@
   @keyframes stampIn { from { transform: rotate(-6deg) scale(2.4); opacity: 0; } }
 
   /* 指名の制限時間 */
-  .timer { font: normal 64px 'Dela Gothic One', sans-serif; color: #fff; text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 6px 0 #3a1a00; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .3s; }
+  .timer { font: normal 64px var(--fd); color: #fff; text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 6px 0 #3a1a00; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .3s; }
   .timer.on { opacity: 1; }
   .timer.end { color: #ffd2cc; animation: tEnd .6s ease-in-out infinite alternate; }
   @keyframes tEnd { to { transform: scale(1.08); } }
@@ -186,23 +201,27 @@
   @keyframes tWipe { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
   #roulette { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 </style>
+<link id="theme-css" rel="stylesheet" href="data:text/css,">
 </head>
 <body>
 <div id="stage">
+  <div id="bgimg"></div><iframe id="bgfx" title="背景" tabindex="-1"></iframe>
   <section id="sc-board" class="scene bg"><h1 id="board-title"></h1><div class="area"><div id="grid" class="grid"></div><div id="spot"></div></div><div id="stand"></div><div id="board-timer" class="timer corner"></div></section>
   <section id="sc-wait" class="scene bg"><h1 id="wait-title"></h1><div class="area"><img id="wait-img" alt=""></div><div id="wait-timer" class="timer corner"></div></section>
   <section id="sc-lots" class="scene bg"><h1 id="lots-title"></h1><div id="lots-head" class="lotshead"></div><div id="lots-body" class="lotsbody"></div><div id="lots-note" class="lotsnote"></div><iframe id="lots3d" title="くじ 3D" style="position:absolute;inset:0;width:100%;height:100%;border:0;display:none"></iframe></section>
   <section id="sc-allin" class="scene bg"><h1 id="allin-head"></h1><div id="allin-big" class="roundbig"><b id="allin-no"></b><span id="allin-sub"></span></div></section>
-  <section id="sc-round" class="scene bg"><h1 id="round-head"></h1><div id="round-big" class="roundbig"><b id="round-no"></b><span id="round-mode"></span></div></section>
+  <section id="sc-round" class="scene bg"><h1 id="round-head"></h1><div id="round-big" class="roundbig"><b id="round-no"></b><span id="round-mode"></span><i id="round-sub"></i></div></section>
   <section id="sc-logo" class="scene bg"><div id="logo-big" class="logobig"></div></section>
   <section id="sc-slide" class="scene bg"><h1 id="slide-title"></h1><div id="slide-body"></div></section>
   <section id="sc-intro" class="scene bg"><div id="intro-body"></div></section>
   <section id="sc-teams" class="scene bg"><h1 id="teams-title"></h1><div class="area"><div id="teams" class="teams"></div></div></section>
   <section id="sc-roulette" class="scene"><iframe id="roulette" src="roulette.html?layout=horizontal"></iframe></section>
   <div id="trans"></div>
+  <div id="entry"></div>
   <video id="trans-video" playsinline preload="auto"></video>
 </div>
 <script src="core.js"></script>
+<script src="themes.js"></script>
 <script src="flow.js"></script>
 <script src="overlay-audio.js"></script>
 <script src="overlay.js"></script>

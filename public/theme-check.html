@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>テーマの確認</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #14100c; color: #eee3cf; font: 15px/1.6 'Noto Sans JP', sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; padding: 12px 20px; border-bottom: 1px solid #3a2f22; }
+  header h1 { margin: 0; font-size: 18px; }
+  label { display: inline-flex; align-items: center; gap: 6px; }
+  select, button { height: 40px; padding: 0 12px; font: inherit; color: inherit; background: #221a12; border: 1px solid #5a4632; border-radius: 8px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #f0a020; color: #1a1205; border-color: #f0a020; font-weight: 700; }
+  #steps { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 20px; }
+  #steps button { height: 34px; font-size: 13px; }
+  #view { position: relative; margin: 0 20px 20px; aspect-ratio: 16 / 9; max-height: calc(100vh - 150px); background: #000 repeating-conic-gradient(#222 0 25%, #2a2a2a 0 50%) 0 0 / 40px 40px; overflow: hidden; }
+  #view iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; }
+  /* 管理画面のテーマ選びに小さく出すとき */
+  body.mini header, body.mini #steps { display: none; }
+  body.mini #view { margin: 0; max-height: none; height: 100%; aspect-ratio: auto; background: #000; }
+</style>
+</head>
+<body>
+<header>
+  <h1>テーマの確認</h1>
+  <label>テーマ <select id="theme"></select></label>
+  <label>抽選 <select id="lot"><option value="envelope">封筒</option><option value="amida">あみだくじ</option><option value="wheel">ルーレット</option></select></label>
+  <label><input type="checkbox" id="sound"> 音を出す</label>
+  <button type="button" id="play" aria-pressed="true">自動で進める</button>
+</header>
+<div id="steps"></div>
+<div id="view"><iframe id="ov" title="配信画面"></iframe></div>
+<script src="core.js"></script>
+<script src="flow.js"></script>
+<script src="themes.js"></script>
+<script src="theme-check.js"></script>
+</body>
+</html>

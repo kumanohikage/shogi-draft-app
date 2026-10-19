@@ -478,6 +478,7 @@ function selectTab(name) {
     x.classList.toggle('text-[var(--text-muted)]', !on); x.classList.toggle('border-transparent', !on); x.classList.toggle('hover:text-[var(--text-default)]', !on);
   });
   document.querySelectorAll('.tab-body').forEach((x) => x.classList.toggle('hidden', x.id !== 'tab-' + name));
+  if (typeof syncThemePreviews === 'function' && $('themes').dataset.key) syncThemePreviews();
   if (S) render();
 }
 document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
@@ -745,6 +746,7 @@ function renderShow() {
   if (document.activeElement !== $('opt-transcut')) $('opt-transcut').value = o.transCut || '';
   if (document.activeElement !== $('opt-fade')) $('opt-fade').value = o.fadeSec;
   $('opt-leadercolors').checked = !!o.leaderColors;
+  renderThemes(o);
   $('trans-video-name').textContent = o.transVideo || 'まだありません';
   if (document.activeElement !== $('in-rounds')) $('in-rounds').value = S.rounds;
   for (const k of ['flowRound', 'flowWait', 'flowAllIn', 'flowStand', 'flowTeams']) $('opt-' + k).checked = !!o[k];
@@ -795,6 +797,7 @@ document.addEventListener('change', (e) => {
   const t = e.target;
   if (t.id === 'opt-prefix') setOption({ teamPrefix: t.value });
   else if (t.id === 'opt-trans') setOption({ transition: t.value });
+  else if (t.id === 'opt-bgmotion') setOption({ bgMotion: t.checked });
   else if (t.id === 'opt-transsec') setOption({ transSec: Math.max(0.2, Math.min(3, +t.value || 0.6)) });
   else if (t.id === 'opt-transcut') setOption({ transCut: Math.max(0, +t.value || 0) });
   else if (t.id === 'opt-fade') setOption({ fadeSec: Math.max(0, Math.min(2, +t.value || 0)) });
@@ -813,6 +816,34 @@ $('trans-video-file').addEventListener('change', async (e) => {
   if (!ext) return toast('WebM か MP4 の動画を選んでください', true);
   try { setOption({ transVideo: await upload(`trans_${Date.now()}${ext}`, f) }); } catch (err) { toast(err.message, true); }
 });
+
+/* ---------- テーマ ---------- */
+// 選べるテーマ(と、いま使っているテーマ)を、動く小さな画面つきで並べる。小さな画面は大会のタブを開いているときだけ動かす
+const TH = window.DraftThemes;
+function renderThemes(o) {
+  const cur = TH.idOf(o.theme), ids = Object.keys(TH.THEMES).filter((id) => TH.THEMES[id].ready || id === cur);
+  const box = $('themes'), key = ids.join(',');
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    box.innerHTML = ids.map((id) => { const t = TH.THEMES[id]; return `<button type="button" role="radio" data-theme="${id}" class="w-72 flex flex-col text-left rounded-xl border-2 overflow-hidden cursor-pointer ${FOCUS}">
+      <span class="block w-full aspect-video bg-black"><iframe data-src="/theme-check.html?theme=${id}&mini" title="${esc(t.name)} の見本" tabindex="-1" class="block w-full h-full pointer-events-none border-0"></iframe></span>
+      <span class="block px-3 py-2"><b class="block text-sm text-[var(--text-heading)]">${esc(t.name)}</b><span class="block text-xs text-[var(--text-muted)]">${esc(t.desc || '')}</span></span></button>`; }).join('');
+  }
+  box.querySelectorAll('[data-theme]').forEach((b) => {
+    const on = b.dataset.theme === cur;
+    b.setAttribute('aria-checked', on);
+    b.classList.toggle('border-primary-500', on); b.classList.toggle('border-[var(--border-default)]', !on);
+  });
+  syncThemePreviews();
+  $('theme-check').href = `/theme-check.html?theme=${cur}`;
+  // 背景の上の動き: 3D の背景があるテーマで、自分の背景画像を入れているときだけ
+  show($('bgmotion-f'), !!TH.themeOf(cur).bg && !!o.bgImage, 'flex');
+  $('opt-bgmotion').checked = o.bgMotion !== false;
+}
+function syncThemePreviews() {
+  $('themes').querySelectorAll('iframe').forEach((f) => { const want = ui.tab === 'show' ? f.dataset.src : ''; if ((f.getAttribute('src') || '') !== want) { if (want) f.src = want; else f.removeAttribute('src'); } });
+}
+$('themes').addEventListener('click', (e) => { const b = e.target.closest('[data-theme]'); if (b) setOption({ theme: b.dataset.theme }); });
 
 /* ---------- 大会・イベント・名簿 ---------- */
 const sendLib = (cmd, extra) => ws.send(JSON.stringify(Object.assign({ type: 'library', cmd }, extra)));

@@ -17,6 +17,14 @@ const EXPORT = new URLSearchParams(location.search).get('export'); // 画像の�
 // 管理画面の本番ビューに小さく出すプレビュー: 音を出さない・配信画面として数えない・抽選の完了を送らない
 const PREVIEW = new URLSearchParams(location.search).has('preview');
 const PREVIEW_NEXT = new URLSearchParams(location.search).get('preview') === 'next';
+// テーマの確認ページ・管理画面のテーマ選び: サーバーにつながず、親の画面から送られた状態を出す(sound が無ければ音なし)
+const MOCK = new URLSearchParams(location.search).has('mock');
+const MUTE = PREVIEW || (MOCK && !new URLSearchParams(location.search).has('sound'));
+const FORCE_THEME = new URLSearchParams(location.search).get('theme');
+const T = window.DraftThemes;
+const themeId = () => T.idOf(FORCE_THEME || C.optionsOf(S).theme);
+const theme = () => T.themeOf(themeId());
+const W = (key, n) => T.word(themeId(), key, n); // テーマの文言
 // 次のプレビュー: オレンジのボタンを押したあとの画面(押せないときは進行表の次の場面)
 function nextView(s) {
   try {
@@ -33,9 +41,9 @@ function nextView(s) {
 }
 const obs = window.obsstudio;
 const presence = { obs: !!obs, visible: null, active: null };
-const sendPresence = () => { if (!EXPORT && !PREVIEW && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
+const sendPresence = () => { if (!EXPORT && !PREVIEW && !MOCK && ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'hello', role: 'overlay', ...presence })); };
 if (obs) {
-  addEventListener('obsSourceVisibleChanged', (e) => { presence.visible = !!e.detail.visible; sendPresence(); });
+  addEventListener('obsSourceVisibleChanged', (e) => { presence.visible = !!e.detail.visible; sendPresence(); updateBg(); });
   addEventListener('obsSourceActiveChanged', (e) => { presence.active = !!e.detail.active; sendPresence(); });
 }
 function connect() {
@@ -69,12 +77,13 @@ function render() {
   sceneSwitch(scene);
   if (EXPORT) { document.querySelectorAll('.scene').forEach((e) => { e.style.transition = 'none'; }); renderBoard(); renderTeams(); return; }
   const audio = Object.assign({}, C.DEFAULT_AUDIO, S.audio);
-  SE.setVolume(PREVIEW ? 0 : audio.seVol / 100);
+  SE.setVolume(MUTE ? 0 : audio.seVol / 100);
+  if (SE.setTheme) SE.setTheme(themeId());
   const drawing = S.scene === 'roulette' || (S.scene === 'lots' && S.lottery && S.lottery.phase === 'reveal');
-  BGM.update(PREVIEW ? { ...audio, bgmOn: false } : { ...audio, bgm: C.sceneBgm(S) }, drawing);
+  BGM.update(MUTE ? { ...audio, bgmOn: false } : { ...audio, bgm: C.sceneBgm(S) }, drawing);
   const f = $('roulette').contentWindow;
   if (f) {
-    f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
+    f.postMessage({ type: 'volume', v: MUTE ? 0 : audio.rlVol / 70 }, '*'); // 70 で以前の 100 と同じ大きさ
     f.postMessage({ type: 'silence', on: S.scene !== 'roulette' }, '*');
   }
   lots3dVolume(audio);
@@ -86,7 +95,7 @@ function render() {
  * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
 const SCENES = ['board', 'teams', 'roulette', 'wait', 'logo', 'slide', 'intro', 'round', 'allin', 'lots'];
 let shown = null, prevProg = null, transBusy = false;
-function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); }
+function showScene(scene) { shown = scene; for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k); updateBg(); }
 function sceneSwitch(scene) {
   const prog = C.progIdxOf(S), progChanged = prevProg !== null && prog !== prevProg;
   prevProg = prog;
@@ -96,6 +105,8 @@ function sceneSwitch(scene) {
   const v = $('trans-video');
   if (o.transition === 'video' && o.transVideo && !v.src.endsWith(encodeURIComponent(o.transVideo))) v.src = img(o.transVideo);
   if (EXPORT || PREVIEW || first || scene === shown) return showScene(scene);
+  // くじの色を選んだあと、ルーレット(光の世界)へ: テーマの入り方で
+  if (shown === 'lots' && scene === 'roulette' && theme().entry !== 'none') { transBusy = true; return playEntry(() => showScene(cur())).finally(() => { transBusy = false; if (shown !== cur()) showScene(cur()); }); }
   // 進行表の場面が変わったら設定のトランジション、それ以外(ボード ⇔ チーム表 など)は短いフェード
   if (progChanged && o.transition !== 'none') return runTransition(o);
   if (o.fadeSec > 0) return runTransition({ ...o, transition: 'fade', transSec: o.fadeSec });
@@ -149,7 +160,7 @@ async function runTransition(o) {
       if (!(v.duration > 0)) await new Promise((r) => { v.onloadedmetadata = r; v.onerror = r; setTimeout(r, 3000); });
       if (!(v.duration > 0)) return swap(); // 読めない動画は切り替えだけ
       const cut = o.transCut > 0 ? Math.min(o.transCut, v.duration) : v.duration / 2;
-      v.currentTime = 0; v.volume = PREVIEW ? 0 : Math.min(1, Object.assign({}, C.DEFAULT_AUDIO, S.audio).seVol / 100); v.muted = PREVIEW;
+      v.currentTime = 0; v.volume = MUTE ? 0 : Math.min(1, Object.assign({}, C.DEFAULT_AUDIO, S.audio).seVol / 100); v.muted = MUTE;
       v.style.display = 'block';
       await v.play().catch(() => {});
       await later(cut * 1000);
@@ -169,13 +180,13 @@ let prevOpen = new Set(), prevStamp = new Set(), prevDup = new Set();
 // 指名カード1枚(指名ボードとピックアップで共通)
 // wait: 裏面の下の文字(指名待ち / 選択希望選手 など)
 const NEUTRAL = '#5b4632';
-const lc = (l) => (C.optionsOf(S).leaderColors ? l.color : NEUTRAL);
-function cardHtml(l, playerId, stamp, dup, pop, wait = '指名待ち') {
+const lc = (l) => (C.optionsOf(S).leaderColors || theme().teamColors ? l.color : NEUTRAL);
+function cardHtml(l, playerId, stamp, dup, pop, wait = W('cardWait')) {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(lc(l))}"><div class="in">
       <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div>
         <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && p.note ? `<small>${esc(p.note)}</small>` : ''}</div></div>
-        ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? '交渉権確定' : '競合'}</div>` : ''}</div>
+        ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? W('stampOk') : W('stampDup')}</div>` : ''}</div>
       <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(C.teamLabel(S, l))}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
     </div></div>`;
 }
@@ -187,7 +198,7 @@ function flipIn(c, delay, sound) {
 
 let prevSpot = null, prevSpotOpen = false;
 function renderBoard() {
-  $('board-title').innerHTML = titleHtml(`第${S.round}巡 指名選手`);
+  $('board-title').innerHTML = titleHtml(W('board', S.round));
   const g = $('grid');
   g.style.gridTemplateColumns = `repeat(${cols(S.leaders.length)}, 520px)`;
   const dupIds = new Set(C.conflicts(S).flatMap((c) => c.leaders));
@@ -264,7 +275,7 @@ function renderSpot(onBoard) {
   const sk = showStand ? S.spot : '';
   if (sk !== prevStandKey) {
     const l = showStand && C.leaderById(S, S.spot);
-    stand.innerHTML = l ? standHtml(l, `第${S.round}巡 選択希望選手`) : '';
+    stand.innerHTML = l ? standHtml(l, W('spotWait', S.round)) : '';
     // 指名発表の前の立ち絵は動きなしで出す
     prevStandKey = sk;
   }
@@ -280,7 +291,7 @@ function renderSpot(onBoard) {
     spotCardFor = S.spot;
     // 次の人: 裏のカードを出す(もうめくってあれば表で)
     // ピックアップは指名が済んでいるので、裏はプロ野球の読み上げと同じ「第◯巡 選択希望選手」
-    sp.innerHTML = `<div class="spotcard">${cardHtml(l, isOpen ? n.playerId : null, '', false, false, `第${S.round}巡 選択希望選手`)}</div>`;
+    sp.innerHTML = `<div class="spotcard">${cardHtml(l, isOpen ? n.playerId : null, '', false, false, W('spotWait', S.round))}</div>`;
     sp.querySelector('.spotcard').classList.add('enter');
   } else if (isOpen && !prevSpotOpen) {
     // めくる
@@ -297,9 +308,34 @@ function titleHtml(small) {
   return `${C.useLogo(S) ? `<img class="logo" src="${img(o.logoImage)}" alt="${esc(S.title)}">` : esc(S.title)}${small ? `<small>${esc(small)}</small>` : ''}`;
 }
 function renderLook() {
-  const o = C.optionsOf(S), st = $('stage');
+  const o = C.optionsOf(S), st = $('stage'), id = themeId(), th = theme();
   st.classList.toggle('hasbg', !!o.bgImage);
   st.style.setProperty('--bgimg', o.bgImage ? `url("${img(o.bgImage)}")` : 'none');
+  // テーマ: 見た目(CSS)と 3D の背景
+  if (st.dataset.theme !== id) {
+    st.dataset.theme = id;
+    $('theme-css').href = th.css ? `themes/${id}.css` : 'data:text/css,';
+    $('bgfx').removeAttribute('src');
+  }
+  st.classList.toggle('bg3d', !!th.bg);
+  const motion = !!th.bg && (!o.bgImage || o.bgMotion !== false); // 自分の背景画像の上にも動きを重ねる(なしも選べる)
+  const src = motion && !EXPORT ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}` : '';
+  if (($('bgfx').getAttribute('src') || '') !== src) { if (src) $('bgfx').setAttribute('src', src); else $('bgfx').removeAttribute('src'); }
+  updateBg();
+}
+// 3D の背景は、映している場面に背景があるときだけ描く(光の世界・何も出さない・OBS で映っていないときは止める)
+function updateBg() {
+  const f = $('bgfx'), on = !!f.getAttribute('src') && !!shown && $('sc-' + shown)?.classList.contains('bg') && $('lots3d').style.display !== 'block' && presence.visible !== false;
+  f.classList.toggle('on', on);
+  if (f.contentWindow) f.contentWindow.postMessage({ type: 'bg-run', on }, '*');
+}
+addEventListener('message', (e) => { if ((e.data || {}).type === 'bg-ready') updateBg(); });
+// 光の世界(3D の抽選)へ入るときの切り替え。swap() で後ろを入れ替える(覆っている間に)
+async function playEntry(swap) {
+  const kind = theme().entry, E = window.DraftEntry;
+  if (!E || !E[kind] || PREVIEW) { swap(); return; }
+  const L = S.lottery, colors = L ? L.leaders.map((id) => C.leaderById(S, id)?.color).filter(Boolean) : [];
+  await E[kind]($('entry'), swap, { colors });
 }
 function renderLogo() {
   const o = C.optionsOf(S);
@@ -345,8 +381,8 @@ let prevAllInKey = '';
 function renderAllIn() {
   const renom = S.picks.some((p) => p.round === S.round) || S.lotteries.some((x) => x.round === S.round);
   $('allin-head').innerHTML = titleHtml('');
-  $('allin-no').textContent = `第${S.round}巡`;
-  $('allin-sub').textContent = renom ? '再指名 入札完了' : '入札完了';
+  $('allin-no').textContent = W('round', S.round);
+  $('allin-sub').textContent = renom ? W('allinRenom') : W('allin');
   const key = S.scene === 'allin' ? `${S.round}:${S.confirmedKey}` : '';
   if (key && key !== prevAllInKey && !first) { const b = $('allin-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); }
   prevAllInKey = key;
@@ -356,8 +392,10 @@ let prevRoundKey = '';
 function renderRound() {
   const o = C.optionsOf(S), order = C.roundMode(S) === 'order';
   $('round-head').innerHTML = titleHtml('');
-  $('round-no').textContent = `第${S.round}巡`;
-  $('round-mode').textContent = order ? `順番指名（${o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク'}）` : '一斉入札';
+  $('round-no').textContent = W('round', S.round);
+  // 大きく「指名開始」。指名のしかたは下に小さく
+  $('round-mode').textContent = W('roundBand');
+  $('round-sub').textContent = order ? `順番指名（${o.orderStyle === 'waiver' ? 'ウェーバー' : 'スネーク'}）` : '一斉入札';
   const key = S.scene === 'round' ? `${S.round}` : '';
   if (key && key !== prevRoundKey && !first) { const b = $('round-big'); b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter'); }
   prevRoundKey = key;
@@ -378,7 +416,7 @@ function renderIntro() {
 /* ---------- 待ち時間・制限時間 ---------- */
 function renderWait() {
   const o = C.optionsOf(S);
-  $('wait-title').innerHTML = titleHtml(`第${S.round}巡 指名中`);
+  $('wait-title').innerHTML = titleHtml(W('wait', S.round));
   const list = C.waitImagesOf(S), f = list[Math.min(S.waitIdx || 0, list.length - 1)];
   $('wait-img').setAttribute('src', f ? img(f) : '');
 }
@@ -402,7 +440,7 @@ setInterval(renderTimer, 250);
 /* ---------- チーム表 ---------- */
 let prevPicks = new Set();
 function renderTeams() {
-  $('teams-title').innerHTML = titleHtml(C.draftComplete(S) ? '全チーム決定' : `チーム編成（第${S.round}巡まで）`);
+  $('teams-title').innerHTML = titleHtml(C.draftComplete(S) ? W('teamsDone') : W('teams', S.round));
   const t = $('teams');
   const n = S.leaders.length;
   t.style.gridTemplateColumns = `repeat(${n <= 6 ? n : Math.ceil(n / 2)}, 280px)`;
@@ -430,6 +468,7 @@ function renderTeams() {
 /* ---------- くじ: 選ぶ → 封筒を開ける / あみだをたどる ----------
  * くじは番号順に並べる。選んだリーダーの名前をくじの下に出す。開けるのは選んだ順(リーダーの並び順) */
 let lotsPrev = { id: null, picked: 0, opened: 0, phase: '' };
+let entered = null, entering = false; // 光の世界への切り替えを済ませた抽選 / 切り替え中
 function renderLots() {
   const L = S.lottery;
   if (!L || !L.lots) { if (lotsPrev.id) { $('lots-body').innerHTML = ''; lotsPrev = { id: null, picked: 0, opened: 0, phase: '' }; } return; }
@@ -437,7 +476,7 @@ function renderLots() {
   const owner = (i) => L.leaders.find((id) => L.picks[id] === i);
   const picked = Object.keys(L.picks).length, fresh = lotsPrev.id !== L.id;
   const live = S.scene === 'lots' && !first;
-  $('lots-title').innerHTML = titleHtml('交渉権の抽選');
+  $('lots-title').innerHTML = titleHtml(W('lots'));
   $('lots-head').innerHTML = `${p && p.icon ? `<img src="${img(p.icon)}" alt="">` : ''}<span class="pn">${esc(p ? p.name : '')}</span><span class="pk">${L.leaders.length}チームが競合</span>`;
   // 下の帯: いま選ぶ人 / 開ける人 / 結果
   const who = L.leaders.find((id) => L.picks[id] == null);
@@ -449,10 +488,16 @@ function renderLots() {
     : L.done && L.mode !== 'wheel' ? `${team(L.winner)} が交渉権を獲得`
     : L.phase === 'ready' ? (L.mode === 'wheel' ? 'ルーレットを回します' : fx3 ? (L.mode === 'amida' ? 'あみだくじで抽選します' : '封筒で抽選します') : `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`)
     : L.mode === 'amida' ? `${team(L.leaders[L.opened - 1])} のくじをたどっています` : `${team(L.leaders[L.opened - 1])} の封筒`;
-  const use3d = fx3 && L.phase === 'reveal';
+  let use3d = fx3 && L.phase === 'reveal';
+  // 「抽選する」で光の世界へ: テーマの入り方で覆ってから 3D に切り替える(覆うまでは、くじを選ぶ画面のまま)
+  if (use3d && entered !== L.id) {
+    if (live && theme().entry !== 'none' && !L.done) { if (!entering) { entering = true; playEntry(() => { entered = L.id; entering = false; renderLots(); }); } use3d = false; }
+    else entered = L.id;
+  }
   if (!use3d && lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots-reset' }, '*');
   for (const id of ['lots-title', 'lots-head', 'lots-body', 'lots-note']) $(id).style.display = use3d ? 'none' : '';
   $('lots3d').style.display = use3d ? 'block' : 'none';
+  updateBg();
   if (use3d) {
     if (!$('lots3d').getAttribute('src')) $('lots3d').setAttribute('src', 'lots3d.html');
     lots3dSend({ id: L.id, mode: L.mode, lots: L.lots, owners: L.lots.map((_, i) => (owner(i) ? C.teamLabel(S, C.leaderById(S, owner(i))) : null)),
@@ -506,14 +551,14 @@ function renderAmida(L, owner, live, fresh) {
 let lots3dReady = false, lots3dPending = null;
 function lots3dSend(data) { if (lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots', data }, '*'); else lots3dPending = data; }
 // 3D の画面の音量(ルーレットと同じ音量の設定)。抽選の画面以外では消す
-function lots3dVolume(audio) { if (!lots3dReady) return; const f = $('lots3d').contentWindow; f.postMessage({ type: 'volume', v: PREVIEW ? 0 : audio.rlVol / 70 }, '*'); f.postMessage({ type: 'silence', on: S.scene !== 'lots' }, '*'); }
+function lots3dVolume(audio) { if (!lots3dReady) return; const f = $('lots3d').contentWindow; f.postMessage({ type: 'volume', v: MUTE ? 0 : audio.rlVol / 70 }, '*'); f.postMessage({ type: 'silence', on: S.scene !== 'lots' }, '*'); }
 addEventListener('message', (e) => {
   const m = e.data || {};
   if (m.type === 'lots3d-ready') { lots3dReady = true; if (S) lots3dVolume(Object.assign({}, C.DEFAULT_AUDIO, S.audio)); if (lots3dPending) { lots3dSend(lots3dPending); lots3dPending = null; } }
   // 3D の演出が終わった: 決着(ルーレットの roulette-done と同じ)
-  else if (m.type === 'lots3d-done' && !PREVIEW && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
+  else if (m.type === 'lots3d-done' && !PREVIEW && !MOCK && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
   // 3D の画面からの効果音(音量・プレビューの無音はこちらで)
-  else if (m.type === 'lots-sfx' && !PREVIEW && S && S.scene === 'lots' && SE[m.name]) SE[m.name]();
+  else if (m.type === 'lots-sfx' && !MUTE && S && S.scene === 'lots' && SE[m.name]) SE[m.name]();
 });
 
 /* ---------- 抽選ルーレット ---------- */
@@ -535,7 +580,9 @@ function playLottery(force) {
 addEventListener('message', (e) => {
   const m = e.data || {};
   if (m.type === 'roulette-ready') { rouletteReady = true; if (S) playLottery(false); }
-  else if (m.type === 'roulette-done' && !PREVIEW && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
+  else if (m.type === 'roulette-done' && !PREVIEW && !MOCK && S && S.lottery && m.id === S.lottery.id && !S.lottery.done) ws.send(JSON.stringify({ type: 'action', action: { type: 'lotteryDone', id: m.id } }));
 });
 
-connect();
+// 確認ページ・テーマ選び: 親の画面から状態をもらう
+if (MOCK) addEventListener('message', (e) => { const m = e.data || {}; if (m.type === 'mock-state') { S = m.state; render(); } });
+else connect();

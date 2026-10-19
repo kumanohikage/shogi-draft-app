@@ -143,5 +143,18 @@
     get state() { return { cur, vol, paused: el.paused, time: el.currentTime }; },
   };
 
+  /* ---------- テーマの効果音 ----------
+   * テーマごとに、めくる・ハンコ・競合・ポンなどを差し替える(無いものは金の後光の音)。
+   * 部品(tone / hiss / ctx)を渡して、テーマ側で音を組み立てる */
+  const THEME_SE = {};
+  let themeId = 'gold';
+  const base = Object.assign({}, SE);
+  for (const k of Object.keys(base)) {
+    if (k === 'setVolume') continue;
+    SE[k] = function () { const t = THEME_SE[themeId]; if (t && t[k]) { if (!init()) return; return t[k]({ ctx, tone, hiss, t: ctx.currentTime }); } return base[k](); };
+  }
+  SE.setTheme = (id) => { themeId = id; };
+  SE.defineTheme = (id, sounds) => { THEME_SE[id] = sounds; };
+
   window.OverlayAudio = { SE, BGM };
 })();

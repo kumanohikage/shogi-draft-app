@@ -248,8 +248,12 @@
     </div>
     <h3 class="mt-10 mb-4 text-xl font-bold text-[var(--text-heading)]">見た目</h3>
     <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+      <!-- テーマ: 配信画面の見た目。小さな画面で動きを見て選ぶ -->
+      <div class="basis-full leading-normal"><div class="flex items-center gap-4 mb-2"><span class="text-xs text-[var(--text-muted)]" id="theme-label">テーマ（配信画面の見た目）</span><a id="theme-check" href="/theme-check.html" target="_blank" class="ml-auto text-xs text-primary-300 underline underline-offset-2 hover:text-primary-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">全部の場面を確認する</a></div>
+        <div id="themes" role="radiogroup" aria-labelledby="theme-label" class="flex flex-wrap gap-4"></div></div>
       <div class="leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">背景</span><div class="flex items-end gap-2"><img id="bg-thumb" alt="" class="hidden w-40 h-[90px] object-cover rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><button type="button" data-look-pick="bgImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">画像を選ぶ</button><button type="button" data-look-clear="bgImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">外す</button></div></div>
       <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-prefix">名前の前につける文字</label><input id="opt-prefix" type="text" maxlength="10" class="w-40 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+      <label id="bgmotion-f" class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-bgmotion" type="checkbox" class="w-5 h-5 accent-primary-500"> 背景の上の動き</label>
       <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-leadercolors" type="checkbox" class="w-5 h-5 accent-primary-500"> リーダーの色を枠に使う</label>
       <input id="look-file" type="file" accept="image/*" hidden aria-label="画像ファイル">
       <div class="basis-full flex flex-wrap items-end gap-6">
@@ -319,6 +323,7 @@
   </div>
 </dialog>
 <script src="core.js"></script>
+<script src="themes.js"></script>
 <script src="flow.js"></script>
 <script src="control.js"></script>
 </body>
