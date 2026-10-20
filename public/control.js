@@ -95,7 +95,7 @@ function render() {
   $('title').textContent = S.title || 'ドラフト会議';
   document.title = `${S.title || 'ドラフト会議'} - ドラフト会議アプリ`;
   setDisabled($('undo'), !canUndo);
-  $('undo').classList.toggle('hidden', ui.tab === 'prog'); // 進行表では、下のバーのオレンジの左にある
+  $('undo').classList.add('hidden'); // 取り消しは Ctrl+Z だけ(ボタンは出さない)
   document.querySelectorAll('[data-scene]').forEach((b) => {
     const on = b.dataset.scene === S.scene || (b.dataset.scene === 'roulette' && S.scene === 'lots');
     b.setAttribute('aria-pressed', on);
@@ -306,7 +306,7 @@ function renderRun() {
   $('next').innerHTML = `<div class="min-w-0 flex-1 leading-normal">${ui.view === 'live' ? warn : `<p class="text-xs text-[var(--text-muted)]">次にやること</p>
     <div class="mt-1 text-lg text-[var(--text-heading)] [&_b]:text-primary-300">${n.text}</div>${warn}`}</div>
     <div class="flex flex-wrap items-center gap-2">${(n.choices || []).map((b) => `<button type="button" data-next="${b.key}" data-arg="${b.arg}" class="${BTN_SUB} gap-2 pl-3 min-w-[96px]" ${b.off ? 'disabled aria-disabled="true"' : ''} aria-label="${b.label}を選ぶ"><span class="w-5 h-5 rounded-md bg-[var(--lc)] ring-1 ring-white/30" style="--lc:${b.color}" aria-hidden="true"></span>${b.label}</button>`).join('')}${(n.sub || []).map((b) => btn(b, BTN_SUB)).join('')}
-      <button type="button" data-undo class="${BTN_SUB} gap-2 pl-3" ${canUndo ? '' : 'disabled aria-disabled="true"'} title="直前の操作を取り消す (Ctrl+Z)"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>1つ戻す</button>
+      <button type="button" data-next="progPrev" class="${BTN_SUB} gap-2 pl-3" ${C.progIdxOf(S) > 0 ? '' : 'disabled aria-disabled="true"'} title="進行表の1つ前の場面に戻ります(操作の取り消しは Ctrl+Z)"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>前の場面へ</button>
       ${n.main ? btn({ ...n.main, label: n.main.busy ? '演出中…' : n.main.label, keys: true }, BTN_PRIMARY.replace('h-11 px-4', 'h-12 min-w-[184px] px-6')) : ''}</div>`;
 
   // 重複の一覧(抽選は「次にやること」から順番に)

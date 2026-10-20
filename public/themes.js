@@ -21,11 +21,11 @@
   };
   const THEMES = {
     gold: { name: '金の後光', desc: '金色の放射線。にぎやかで明るい', ready: true, entry: 'none', teamColors: false, neutral: '#5b4632' },
-    sports: { name: 'スポーツ中継', desc: '紺のスタジアムに斜めの帯。チームカラーで熱く', ready: false, css: true, bg: true, entry: 'band', teamColors: true, neutral: '#1f3c88' },
-    draft: { name: 'ドラフト会議', desc: '白と紺の会見場。明朝の指名カードで厳かに', ready: false, css: true, bg: true, entry: 'blackout', teamColors: false, neutral: '#1b2a4e',
+    sports: { name: 'スポーツ中継', desc: '紺のスタジアムに斜めの帯。チームカラーで熱く', ready: true, css: true, bg: true, entry: 'band', teamColors: true, neutral: '#1f3c88' },
+    draft: { name: 'ドラフト会議', desc: '白と紺の会見場。明朝の指名カードで厳かに', ready: true, css: true, bg: true, entry: 'blackout', teamColors: false, neutral: '#1b2a4e',
       words: { board: '第{n}巡 選択希望選手' } },
-    sakura: { name: '桜', desc: '舞い散る花びら。やわらかい桜色', ready: false, css: true, bg: true, entry: 'petals', teamColors: false, neutral: '#d9577f' },
-    title: { name: 'タイトル戦', desc: '夜の対局室に金の粉。筆と明朝の和の装い', ready: false, css: true, bg: true, entry: 'shoji', teamColors: false, neutral: '#8a2b1f',
+    sakura: { name: '桜', desc: '舞い散る花びら。やわらかい桜色', ready: true, css: true, bg: true, entry: 'petals', teamColors: false, neutral: '#d9577f' },
+    title: { name: 'タイトル戦', desc: '夜の対局室に金の粉。筆と明朝の和の装い', ready: true, css: true, bg: true, entry: 'shoji', teamColors: false, neutral: '#8a2b1f',
       words: { round: '第{kn}巡', board: '第{kn}巡 指名', wait: '第{kn}巡 指名中', spotWait: '第{kn}巡 選択希望選手', teams: '陣容（第{kn}巡まで）', teamsDone: '全陣容決定' } },
   };
   const DEFAULT = 'gold';
