@@ -190,11 +190,11 @@ function renderFirstRun() {
   if (!empty || demo) return;
   const step = (n, text, done, btn) => `<div class="flex items-center gap-3 min-h-11 px-3 py-2 rounded-lg border border-[var(--border-default)]"><span class="w-7 h-7 flex-none inline-flex items-center justify-center rounded-full text-sm font-bold ${done ? 'bg-emerald-500/[.12] text-emerald-300' : 'border border-[var(--border-strong)] text-[var(--text-muted)]'}">${done ? '✓' : n}</span><span class="flex-1 text-sm ${done ? 'text-[var(--text-muted)]' : 'text-[var(--text-heading)]'}">${text}</span>${btn}</div>`;
   el.innerHTML = `<h2 class="text-base font-bold text-[var(--text-heading)]">はじめに</h2>
-    ${step(1, 'チームを作る（リーダーを決める）', S.leaders.length > 0, `<button type="button" data-goto="leaders" class="${BTN_SUB}">チームへ</button>`)}
-    ${step(2, 'エントリー選手を登録する', S.players.length > 0, `<button type="button" data-goto="players" class="${BTN_SUB}">選手へ</button>`)}
-    ${step(3, 'ドラフト名と見た目・進め方を決める', false, `<button type="button" data-goto="draft" class="${BTN_SUB}">ドラフトへ</button>`)}
-    ${step(4, 'OBS に配信画面を追加する', overlay.count > 0, `<button type="button" data-copy-url class="${BTN_SUB}">URL をコピー</button>`)}
-    ${step(5, 'お試しで一通り動かしてみる', false, `<button type="button" data-demo class="${BTN_SUB}">お試しを始める</button>`)}`;
+    ${step(1, 'お試しで一通り動かしてみる', false, `<button type="button" data-demo class="${BTN_SUB}">お試しを始める</button>`)}
+    ${step(2, 'チームを作る（リーダーを決める）', S.leaders.length > 0, `<button type="button" data-goto="leaders" class="${BTN_SUB}">チームへ</button>`)}
+    ${step(3, 'エントリー選手を登録する', S.players.length > 0, `<button type="button" data-goto="players" class="${BTN_SUB}">選手へ</button>`)}
+    ${step(4, 'ドラフト名と見た目・進め方を決める', false, `<button type="button" data-goto="draft" class="${BTN_SUB}">ドラフトへ</button>`)}
+    ${step(5, 'OBS に配信画面を追加する', overlay.count > 0, `<button type="button" data-copy-url class="${BTN_SUB}">URL をコピー</button>`)}`;
 }
 // 選んだ場面の見出し: 種類・名前・外す・映す(並べ替えは左の一覧をドラッグ)
 function renderSceneHead(g) {
