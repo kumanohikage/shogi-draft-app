@@ -11,6 +11,7 @@
     "check:ui": "npm run css && electron scripts/check-ui.js",
     "test": "node test/core.test.js && node test/store.test.js",
     "dist": "npm run vendor && npm run css && electron-builder --win",
+    "dist:mac": "npm run vendor && npm run css && electron-builder --mac",
     "vendor": "node scripts/vendor.js"
   },
   "dependencies": {
@@ -50,6 +51,14 @@
     },
     "portable": {
       "artifactName": "DraftApp-${version}.exe"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "category": "public.app-category.utilities",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "notarize": false,
+      "artifactName": "DraftApp-${version}-mac-${arch}.${ext}"
     }
   },
   "author": "熊乃ヒカゲ (kumanohikage)",

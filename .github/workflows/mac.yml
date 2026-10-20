@@ -1,0 +1,27 @@
+# mac版(dmg)を作って、リリースに足す。GitHub の Actions のページから手で動かす
+# 署名は ad-hoc(Apple の開発者登録なし)。初回は「開発元を検証できません」と出るので、開き方をリリースに書く
+name: mac版を作る
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'mac版を足すリリースのタグ(例 v0.2.0)'
+        required: true
+permissions:
+  contents: write
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - run: gh release upload "${{ inputs.tag }}" dist/*.dmg --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

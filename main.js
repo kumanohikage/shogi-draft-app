@@ -17,13 +17,16 @@ function resolveDataDir() {
 }
 
 function buildMenu(dataDir) {
+  const mac = process.platform === 'darwin';
   Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(mac ? [{ role: 'appMenu' }] : []),
     { label: 'ファイル', submenu: [
       { label: 'データフォルダを開く', click: () => shell.openPath(dataDir) },
       { label: 'BGMフォルダを開く', click: () => { fs.mkdirSync(path.join(dataDir, 'bgm'), { recursive: true }); shell.openPath(path.join(dataDir, 'bgm')); } },
       { type: 'separator' },
       { role: 'quit', label: '終了' },
     ] },
+    ...(mac ? [{ label: '編集', submenu: [{ role: 'cut', label: '切り取り' }, { role: 'copy', label: 'コピー' }, { role: 'paste', label: '貼り付け' }, { role: 'selectAll', label: 'すべてを選択' }] }] : []),
     { label: 'OBS設定', submenu: [
       { label: `配信画面のURLをコピー (${OVERLAY_URL})`, click: () => clipboard.writeText(OVERLAY_URL) },
       { label: '配信画面をブラウザで確認', click: () => shell.openExternal(OVERLAY_URL) },
