@@ -7,13 +7,19 @@
 <link rel="stylesheet" href="control.css">
 </head>
 <body class="min-h-screen bg-[var(--bg-page)] text-[var(--text-default)] font-sans">
-<!-- ヘッダー: 大会名・メインオブジェクトのタブ(進行表 / リーダー / 選手 / 大会)・どこからでも使う道具 -->
+<!-- ヘッダー: 大会の切り替え・メインオブジェクトのタブ(配信 / チーム / 選手 / ドラフト / 大会)・どこからでも使う道具 -->
 <header class="sticky top-0 z-30 flex items-center gap-4 px-6 h-16 bg-[var(--bg-page)] border-b border-[var(--border-default)]">
-  <h1 id="title" class="sr-only">ドラフト会議</h1><!-- 大会名はウィンドウのタイトルに出す(ヘッダーには出さない) -->
+  <h1 id="title" class="sr-only">ドラフト会議</h1>
+  <!-- 大会の切り替え: 最近の大会・新しい大会・すべての大会と名簿 -->
+  <div class="relative flex-none">
+    <button type="button" id="tour-switch" aria-expanded="false" aria-controls="tour-menu" class="inline-flex items-center gap-2 h-11 max-w-[260px] pl-3 pr-2 text-sm font-bold whitespace-nowrap bg-[var(--bg-surface)] text-[var(--text-heading)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><span id="tour-switch-label" class="truncate">大会</span><svg class="w-4 h-4 flex-none text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div id="tour-menu" class="hidden absolute left-0 top-[52px] z-40 w-[360px] p-3 flex flex-col gap-2 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-xl shadow-xl"></div>
+  </div>
   <nav id="tabs" aria-label="画面の切り替え" class="flex items-end h-16 gap-2" role="tablist">
-    <button type="button" role="tab" data-tab="prog" aria-selected="true" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">進行表</button>
-    <button type="button" role="tab" data-tab="leaders" aria-selected="false" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リーダー</button>
+    <button type="button" role="tab" data-tab="prog" aria-selected="true" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">配信</button>
+    <button type="button" role="tab" data-tab="leaders" aria-selected="false" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">チーム</button>
     <button type="button" role="tab" data-tab="players" aria-selected="false" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">選手</button>
+    <button type="button" role="tab" data-tab="draft" aria-selected="false" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ドラフト</button>
     <button type="button" role="tab" data-tab="show" aria-selected="false" class="tab h-16 px-3 whitespace-nowrap text-sm font-semibold border-b-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">大会</button>
   </nav>
   <!-- 本番モードのときはタブの代わりに「本番モード」(録画中の印に見えないよう、赤や●は使わない) -->
@@ -28,7 +34,7 @@
   </div>
   <div class="ml-auto flex items-center gap-2">
     <span id="overlay-st" class="whitespace-nowrap text-xs text-[var(--text-muted)]" aria-live="polite">配信画面</span>
-    <button type="button" id="copy-url" title="OBS のブラウザソースに入れる URL をコピーします" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium whitespace-nowrap bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>配信画面URLをコピー</button>
+    <button type="button" id="copy-url" aria-label="配信画面の URL をコピー" title="OBS のブラウザソースに入れる配信画面の URL をコピーします" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium whitespace-nowrap bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>URL</button>
     <div class="relative">
       <button type="button" id="audio-open" aria-expanded="false" aria-controls="audio-pop" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-sm font-medium whitespace-nowrap bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>音</button>
       <!-- 音(BGM・音量): どの画面からでも開ける小さな窓 -->
@@ -64,10 +70,11 @@
   </div>
 
   <!-- ===== 進行表(編集 / 本番) ===== -->
-  <section id="tab-prog" class="tab-body" role="tabpanel" aria-label="進行表">
+  <section id="tab-prog" class="tab-body" role="tabpanel" aria-label="配信">
     <!-- 編集: 左に場面の一覧、右に選んだ場面 -->
     <div id="prog-edit" class="grid grid-cols-[260px_minmax(0,1fr)] gap-6">
       <aside class="flex flex-col gap-2">
+        <div id="event-switch" class="flex flex-col gap-1 pb-2 mb-1 border-b border-[var(--border-default)]"></div>
         <div class="flex items-center justify-between"><h2 class="text-base font-bold text-[var(--text-heading)]">進行表</h2><button type="button" id="prog-reset" class="h-11 px-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-default)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ひな形に戻す</button></div>
         <ol id="prog-rail" class="flex flex-col gap-2"></ol>
         <p class="mt-2 text-xs text-[var(--text-muted)]">場面を足す</p>
@@ -117,31 +124,6 @@
               <div id="teams" class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"></div>
             </div>
           </details>
-          <details class="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-            <summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">抽選の記録 <span id="lottery-log-count" class="text-sm font-normal text-[var(--text-muted)]"></span></summary>
-            <ul id="lottery-log" class="px-4 pb-3 divide-y divide-[var(--border-default)]"></ul>
-          </details>
-        </div>
-        <!-- ドラフトの場面: ⚙ 進め方(巡の数・巡ごとの設定・順番・抽選・時間・流れ) -->
-        <div id="draft-setup" class="flex flex-col gap-6">
-          <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="in-rounds">巡の数</label><input id="in-rounds" type="number" min="1" max="5" class="w-24 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
-            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-order">順番指名の順番</label><div class="relative"><select id="opt-order" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="snake">スネーク</option><option value="waiver">ウェーバー</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
-            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-lottery">抽選の演出</label><div class="relative"><select id="opt-lottery" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="full">通常</option><option value="short">短い</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
-          </div>
-          <div class="flex flex-col gap-2">
-            <h3 class="text-base font-bold text-[var(--text-heading)]">巡</h3>
-            <div id="round-rows" class="flex flex-col gap-2"></div>
-            <input id="wait-file" type="file" accept="image/*" multiple hidden aria-label="待ち時間の画像">
-          </div>
-          <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
-            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-timer">制限時間（秒）</label><input id="opt-timer" type="number" min="10" max="3600" step="10" class="w-28 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
-            <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timerauto" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡のはじめに自動でスタート</label>
-            <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timershow" type="checkbox" class="w-5 h-5 accent-primary-500"> 配信画面に出す</label>
-          </div>
-          <div class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">各巡の流れ</span>
-            <div class="flex flex-wrap gap-x-6"><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowRound" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡のはじめの見出し</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowWait" type="checkbox" class="w-5 h-5 accent-primary-500"> 待ち時間の画面</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowAllIn" type="checkbox" class="w-5 h-5 accent-primary-500"> 指名が出揃った画面</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowStand" type="checkbox" class="w-5 h-5 accent-primary-500"> ピックアップ前の立ち絵</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowTeams" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡の終わりのチーム表</label></div></div>
-          <div class="flex"><button type="button" data-reset class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-red-300 border border-red-500/50 rounded-lg hover:bg-red-500/[.12] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="名簿はそのままで、指名と抽選の結果だけを消します">ドラフトを最初から</button></div>
         </div>
       </div>
     </div>
@@ -174,13 +156,52 @@
     </div>
   </section>
 
-  <!-- ===== リーダー: 一覧と、選んだ1人のパネル ===== -->
-  <section id="tab-leaders" class="tab-body hidden" role="tabpanel" aria-label="リーダー">
+
+  <!-- ===== ドラフト(大会のもの): ⚙ 進め方 / 記録 ===== -->
+  <section id="tab-draft" class="tab-body hidden" role="tabpanel" aria-label="ドラフト">
     <div class="flex flex-wrap items-center gap-4 mb-4">
-      <h2 class="text-xl font-bold text-[var(--text-heading)]">リーダー</h2>
+      <h2 class="text-xl font-bold text-[var(--text-heading)]">ドラフト</h2>
+      <div class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-page)] border border-[var(--border-strong)]" role="group"><button type="button" data-draft-view="setup" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">⚙ 進め方</button><button type="button" data-draft-view="log" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">記録</button></div>
+      <span id="draft-state" class="text-sm text-[var(--text-muted)]"></span>
+    </div>
+        <!-- ⚙ 進め方(巡の数・巡ごとの設定・順番・抽選・時間・流れ) -->
+        <div id="draft-setup" class="flex flex-col gap-6">
+          <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="in-rounds">巡の数</label><input id="in-rounds" type="number" min="1" max="5" class="w-24 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-order">順番指名の順番</label><div class="relative"><select id="opt-order" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="snake">スネーク</option><option value="waiver">ウェーバー</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-lottery">抽選の演出</label><div class="relative"><select id="opt-lottery" class="appearance-none w-44 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400 cursor-pointer"><option value="full">通常</option><option value="short">短い</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <h3 class="text-base font-bold text-[var(--text-heading)]">巡</h3>
+            <div id="round-rows" class="flex flex-col gap-2"></div>
+            <input id="wait-file" type="file" accept="image/*" multiple hidden aria-label="待ち時間の画像">
+          </div>
+          <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-timer">制限時間（秒）</label><input id="opt-timer" type="number" min="10" max="3600" step="10" class="w-28 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+            <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timerauto" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡のはじめに自動でスタート</label>
+            <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-timershow" type="checkbox" class="w-5 h-5 accent-primary-500"> 配信画面に出す</label>
+          </div>
+          <div class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">各巡の流れ</span>
+            <div class="flex flex-wrap gap-x-6"><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowRound" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡のはじめの見出し</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowWait" type="checkbox" class="w-5 h-5 accent-primary-500"> 待ち時間の画面</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowAllIn" type="checkbox" class="w-5 h-5 accent-primary-500"> 指名が出揃った画面</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowStand" type="checkbox" class="w-5 h-5 accent-primary-500"> ピックアップ前の立ち絵</label><label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-flowTeams" type="checkbox" class="w-5 h-5 accent-primary-500"> 巡の終わりのチーム表</label></div></div>
+          <div class="flex"><button type="button" data-reset class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-red-300 border border-red-500/50 rounded-lg hover:bg-red-500/[.12] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="名簿はそのままで、指名と抽選の結果だけを消します">ドラフトを最初から</button></div>
+        </div>
+
+    <div id="draft-log" class="hidden flex flex-col gap-4">
+      <div class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl"><h3 class="mb-3 text-base font-bold text-[var(--text-heading)]">指名</h3><div id="draft-picks" class="flex flex-col gap-1"></div></div>
+          <details open class="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+            <summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">抽選の記録 <span id="lottery-log-count" class="text-sm font-normal text-[var(--text-muted)]"></span></summary>
+            <ul id="lottery-log" class="px-4 pb-3 divide-y divide-[var(--border-default)]"></ul>
+          </details>
+    </div>
+  </section>
+
+  <!-- ===== チーム: 一覧と、選んだ1チームのパネル ===== -->
+  <section id="tab-leaders" class="tab-body hidden" role="tabpanel" aria-label="チーム">
+    <div class="flex flex-wrap items-center gap-4 mb-4">
+      <h2 class="text-xl font-bold text-[var(--text-heading)]">チーム</h2>
       <span id="leader-count" class="text-sm text-[var(--text-muted)]"></span>
-      <button type="button" id="add-leader" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>追加</button>
-      <button type="button" data-roster-add="leader" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">名簿から追加</button>
+      <button type="button" id="add-leader" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>チームを足す</button>
+      <button type="button" data-roster-add="leader" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">リーダーを名簿から選んで足す</button>
       <div class="ml-auto flex gap-2">
         <button type="button" data-csv-in class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50" title="列: 種類（リーダー / 選手）, 名前, 略称, 色, 画像ファイル, ひとこと, 立ち絵, 紹介文, 紹介のメモ">名簿の CSV 読み込み</button>
         <button type="button" data-csv-out class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">名簿の CSV 書き出し</button>
@@ -210,27 +231,16 @@
       <button type="button" id="add-players" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">まとめて追加</button>
       <button type="button" data-roster-add="player" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">名簿から追加</button>
     </div>
-    <div id="players" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2 mt-4"></div>
+    <div class="grid grid-cols-[minmax(0,1fr)_380px] gap-6 mt-4">
+      <div id="players" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-2 content-start"></div>
+      <aside id="player-panel" class="sticky top-24 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl flex flex-col gap-4 self-start"></aside>
+    </div>
   </section>
 
   <!-- ===== 大会: 顔と見た目 ===== -->
   <section id="tab-show" class="tab-body hidden" role="tabpanel" aria-label="大会">
-    <!-- 大会の切り替えと、大会の中のイベント(1回の配信) -->
     <div class="flex flex-wrap items-center gap-4 mb-4">
-      <h2 class="text-xl font-bold text-[var(--text-heading)]">大会の切り替え</h2>
-      <div class="ml-auto flex gap-2">
-        <button type="button" id="tour-new" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">新しい大会</button>
-      </div>
-    </div>
-    <ul id="tours" class="flex flex-col gap-2 mb-6"></ul>
-    <div class="flex flex-wrap items-center gap-4 mb-4">
-      <h3 class="text-base font-bold text-[var(--text-heading)]">イベント</h3>
-      <span class="text-xs text-[var(--text-muted)]">1回の配信ごと。名簿・チーム・見た目は大会で共通、進行表はイベントごと</span>
-      <div class="ml-auto flex gap-2"><button type="button" id="event-add" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">ドラフト会議を追加</button></div>
-    </div>
-    <ul id="events" class="flex flex-wrap gap-2 mb-10"></ul>
-    <div class="flex flex-wrap items-center gap-4 mb-4">
-      <h2 class="text-xl font-bold text-[var(--text-heading)]">いまの大会</h2>
+      <h2 class="text-xl font-bold text-[var(--text-heading)]">大会</h2>
       <span id="tour-ended" class="hidden"></span>
       <div class="ml-auto flex gap-2">
         <button type="button" id="tour-end" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"></button>
@@ -254,6 +264,7 @@
       <div class="leading-normal"><span class="block mb-2 text-xs text-[var(--text-muted)]">背景</span><div class="flex items-end gap-2"><img id="bg-thumb" alt="" class="hidden w-40 h-[90px] object-cover rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]"><button type="button" data-look-pick="bgImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">画像を選ぶ</button><button type="button" data-look-clear="bgImage" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">外す</button></div></div>
       <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-prefix">名前の前につける文字</label><input id="opt-prefix" type="text" maxlength="10" class="w-40 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
       <label id="bgmotion-f" class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-bgmotion" type="checkbox" class="w-5 h-5 accent-primary-500"> 背景の上の動き</label>
+      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-classlabel">人の欄</label><div class="relative"><select id="opt-classlabel" class="appearance-none w-36 pl-3 pr-10 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 cursor-pointer"><option value="クラス">クラス</option><option value="段位">段位</option></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
       <label class="flex items-center gap-2 h-11 text-sm cursor-pointer"><input id="opt-leadercolors" type="checkbox" class="w-5 h-5 accent-primary-500"> リーダーの色を枠に使う</label>
       <input id="look-file" type="file" accept="image/*" hidden aria-label="画像ファイル">
       <div class="basis-full flex flex-wrap items-end gap-6">
@@ -271,6 +282,34 @@
 
 <div id="toast" class="fixed left-1/2 bottom-28 -translate-x-1/2 z-40 hidden px-4 py-3 rounded-lg shadow-xl text-sm" role="status" aria-live="polite"></div>
 <input id="img-file" type="file" accept="image/*" hidden aria-label="画像ファイル">
+
+<!-- すべての大会と名簿(大会の外のもの) -->
+<dialog id="lib-dlg" aria-labelledby="lib-title" class="p-0 w-[min(1200px,calc(100vw-48px))] max-h-[calc(100vh-48px)] rounded-xl border border-[var(--border-strong)] bg-[var(--bg-page)] text-[var(--text-default)] shadow-xl backdrop:bg-black/60">
+  <div class="flex flex-col h-[min(820px,calc(100vh-48px))]">
+    <div class="flex flex-wrap items-center gap-4 px-6 h-16 border-b border-[var(--border-default)]">
+      <h2 id="lib-title" class="text-lg font-bold text-[var(--text-heading)]">すべての大会と名簿</h2>
+      <div class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-page)] border border-[var(--border-strong)]" role="group"><button type="button" data-lib-view="tours" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">大会の一覧</button><button type="button" data-lib-view="people" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">名簿</button></div>
+      <button type="button" id="lib-close" class="ml-auto inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">開いている大会に戻る</button>
+    </div>
+    <div id="lib-tours" class="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_360px] gap-6 p-6 overflow-auto">
+      <div class="flex flex-col gap-2"><div id="tours" class="flex flex-col gap-2"></div></div>
+      <aside class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl flex flex-col gap-4 self-start leading-normal">
+        <h3 class="text-base font-bold text-[var(--text-heading)]">新しい大会</h3>
+        <div><label class="block mb-2 text-xs text-[var(--text-muted)]" for="new-tour-title">大会名</label><input id="new-tour-title" type="text" maxlength="40" class="w-full h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+        <div><span class="block mb-2 text-xs text-[var(--text-muted)]">ひな形</span><div class="px-3 py-2 rounded-lg border border-primary-500 bg-primary-500/[.12] text-sm font-bold text-[var(--text-heading)]">ドラフトで作るチーム戦</div></div>
+        <p class="text-xs text-[var(--text-muted)]">進行表のひな形と、いまのテーマが入った状態で始まります。</p>
+        <button type="button" id="tour-new" class="inline-flex items-center justify-center h-11 px-4 text-[1rem] font-medium bg-primary-500 text-slate-900 rounded-lg hover:bg-primary-600 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50">作って開く</button>
+      </aside>
+    </div>
+    <div id="lib-people" class="hidden flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_400px] gap-6 p-6 overflow-auto">
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center gap-3"><span id="people-count" class="text-sm text-[var(--text-muted)]"></span><label class="sr-only" for="people-search">名簿を探す</label><input id="people-search" type="search" placeholder="名前で探す" class="w-56 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
+        <div id="people" class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2 content-start"></div>
+      </div>
+      <aside id="person-panel" class="p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl flex flex-col gap-4 self-start leading-normal"></aside>
+    </div>
+  </div>
+</dialog>
 
 <!-- 名簿から大会に入れる -->
 <dialog id="roster-dlg" aria-labelledby="roster-title" class="p-0 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-default)] shadow-xl backdrop:bg-black/60">

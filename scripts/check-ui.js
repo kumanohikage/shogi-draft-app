@@ -124,13 +124,14 @@ app.whenReady().then(async () => {
   await check('13-run-round2');
   // 6. 画像の登録: ドロップ → 調整画面 → 位置と大きさを変えて保存 → 開き直すと調整が残っている
   await tab('players');
+  await js("ui.playerId = S.players[0].id; render(); 0"); await wait(300); // 選手を選ぶと右のパネルに顔の欄
   const before = S.players[0].icon;
   await js(`(async () => {
     const c = document.createElement('canvas'); c.width = 200; c.height = 100;
     const g = c.getContext('2d'); g.fillStyle = '#c0261e'; g.fillRect(0, 0, 100, 100); g.fillStyle = '#1f63d6'; g.fillRect(100, 0, 100, 100);
     const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
     const dt = new DataTransfer(); dt.items.add(new File([blob], 'test.png', { type: 'image/png' }));
-    document.querySelector('#players [data-icon]').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    document.querySelector('#player-panel [data-icon]').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
   })()`);
   await wait(600);
   if (!(await js("document.getElementById('crop').open"))) { console.log('✗ 調整画面が開かない'); errors++; }
@@ -141,7 +142,7 @@ app.whenReady().then(async () => {
   const p0 = S.players[0];
   if (!p0.icon || p0.icon === before || !fs.existsSync(path.join(dataDir, 'images', p0.icon)) || !p0.iconSrc || !p0.iconCrop || p0.iconCrop.zoom !== 2) { console.log(`✗ 画像の保存に失敗 ${JSON.stringify(p0)}`); errors++; }
   else console.log(`✓ 画像を調整して保存: ${p0.icon}（元画像 ${p0.iconSrc}、調整 ${JSON.stringify(p0.iconCrop)}）`);
-  await js("document.querySelector('#players [data-icon]').click()"); await wait(800);
+  await js("document.querySelector('#player-panel [data-icon]').click()"); await wait(800);
   const re = await js("({ open: document.getElementById('crop').open, zoom: crop.zoom, x: Math.round(crop.x) })");
   if (!re.open || re.zoom !== 2 || re.x !== 40) { console.log(`✗ 開き直したときに調整が残っていない ${JSON.stringify(re)}`); errors++; }
   else console.log('✓ 開き直すと前の調整のまま');
@@ -149,8 +150,13 @@ app.whenReady().then(async () => {
   await check('15-roster-image');
   await tab('show'); await check('16-show');
   await tab('leaders'); await check('17-leaders');
-  await tab('prog'); await js("ui.draftTab = 'setup'; render(); 0"); await check('18-draft-setup');
-  await js("ui.draftTab = 'live'; ui.selId = C.programOf(S)[1].id; render(); 0"); await check('19-scene-slide');
+  await tab('draft'); await js("ui.draftView = 'setup'; render(); 0"); await check('18-draft-setup');
+  await js("ui.draftView = 'log'; render(); 0"); await check('18b-draft-log');
+  await tab('players'); await check('18c-player-panel');
+  await js("openLib('tours'); 0"); await wait(300); await check('18d-lib-tours');
+  await js("ui.libView = 'people'; ui.personId = lib.roster[0].id; renderLibView(); renderPeople(); 0"); await wait(500); await check('18e-lib-people');
+  await js("document.getElementById('lib-dlg').close(); 0");
+  await tab('prog'); await js("ui.selId = C.programOf(S)[1].id; render(); 0"); await check('19-scene-slide');
   await js("setView('live'); 0"); await wait(600); await check('20-live');
   await js("setView('edit'); ui.selId = null; render(); 0");
   await send({ type: 'mode', mode: 'real' });

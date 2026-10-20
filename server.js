@@ -253,7 +253,7 @@ function start(opts = {}) {
           switchMode(msg.mode, !!msg.fresh);
         } else if (msg.type === 'library') { // 大会・イベント・名簿(このPCの管理画面からだけ)
           if (isRemote) return;
-          library(msg);
+          if (library(msg, ws) === false) return; // 一覧を返すだけの操作は保存も配信もしない
         } else return;
         save();
         broadcast(snapshot());
@@ -264,18 +264,30 @@ function start(opts = {}) {
     });
   }
 
-  function library(msg) {
+  function library(msg, ws) {
     switch (msg.cmd) {
       case 'create': save(); store.create(String(msg.title || '').slice(0, 40) || '新しい大会'); reload(); break;
       case 'open': if (msg.id === store.tournament.id) return; save(); store.open(msg.id); reload(); break;
       case 'end': save(); store.end(); reload(); break;
       case 'reopen': save(); store.reopen(); reload(); break;
       case 'remove': store.remove(msg.id); break;
-      case 'addEvent': save(); store.addEvent(msg.eventType || 'draft'); reload(); break;
+      case 'addEvent': save(); store.addEvent(); reload(); break;
       case 'openEvent': if (msg.id === store.event.id) return; save(); store.openEvent(msg.id); reload(); break;
       case 'renameEvent': store.renameEvent(msg.id, msg.name); break;
       case 'removeEvent': save(); store.removeEvent(msg.id); reload(); break;
       case 'removePerson': store.removePerson(msg.id); break;
+      // 名簿の人を直す(名簿の画面から)。いまの大会にも出ている人なら、表示も直す(「戻す」の記録は残す)
+      case 'updatePerson': save(); store.updatePerson(msg.id, msg.patch); state = store.state(audio); break;
+      // 人の、大会ごとの履歴(名簿の画面)。この画面にだけ返す
+      case 'history': send(ws, { type: 'history', id: msg.id, rows: store.history(msg.id) }); return false;
+      // チームのリーダーを、名簿の人に替える(「戻す」で取り消せる)
+      case 'setLeader': {
+        const person = store.person(msg.personId);
+        if (!person) throw new Error('名簿にいない人です');
+        const next = Core.apply(state, { type: 'setLeader', id: msg.id, person });
+        history.push(state); state = next;
+        break;
+      }
       case 'addPeople': { // 名簿から大会へ(「戻す」で取り消せる)
         const people = (msg.ids || []).map(store.person).filter(Boolean);
         const next = Core.apply(state, { type: 'addPeople', role: msg.role, people });

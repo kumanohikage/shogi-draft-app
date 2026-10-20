@@ -64,7 +64,7 @@ function makeDemoState(imgDir) {
     const n = players.length + 1;
     const icon = `demo_player_${String(n).padStart(2, '0')}.svg`;
     fs.writeFileSync(path.join(imgDir, icon), silhouette(TONES[(i + j) % TONES.length]));
-    players.push({ name: `${f} ${g}`, icon, note: NOTES[(i * 6 + j) % NOTES.length] });
+    players.push({ name: `${f} ${g}`, icon, note: NOTES[(i * 6 + j) % NOTES.length], klass: 'ABBCCD'[(i * 5 + j * 3) % 6] });
   }));
   let s = Core.initialState();
   s = Core.apply(s, { type: 'setTitle', title: 'お試しドラフト会議' });

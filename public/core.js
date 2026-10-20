@@ -37,9 +37,10 @@
       version: 1,
       title: 'ドラフト会議',
       rounds: 3,
-      leaders: [],          // { id, name(フルネーム), short(略称), color, icon, stand(立ち絵), standScale/standX/standY(立ち絵の大きさと位置), intro(紹介文), introMemo(紹介のメモ。自分用), teamName(チーム名。空なら「チーム＋略称」), teamLogo(チームのロゴ画像) }
+      // チーム(リーダーの人の情報を合わせて持つ)。id はチームの id、personId はリーダーの人(名簿)の id
+      leaders: [],          // { id, personId, name(フルネーム), short(略称), color, icon, stand(立ち絵), standScale/standX/standY(立ち絵の大きさと位置), intro(紹介文), introMemo(紹介のメモ。自分用), teamName(チーム名。空なら「チーム＋略称」), teamLogo(チームのロゴ画像) }
                           // id は名簿の人の id(大会をまたいで同じ人は同じ id)
-      players: [],          // { id, name, icon, note(ひとこと), absent(欠場) }
+      players: [],          // { id(名簿の人), name, icon, stand…, note(ひとこと), intro(紹介文), introMemo, absent(欠場), klass(クラスか段位) }
       round: 1,             // 今の巡
       // 今の巡の指名: leaderId -> { playerId, revealed }
       noms: {},
@@ -164,7 +165,7 @@
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d', theme: 'gold', bgMotion: true, lotEntry: '' };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d', theme: 'gold', bgMotion: true, lotEntry: '', classLabel: 'クラス' };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
@@ -232,7 +233,7 @@
       case 'addLeader': {
         if (s.leaders.length >= MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです`);
         const used = new Set(s.leaders.map((l) => l.color));
-        s.leaders.push({ id: uid('L'), name: action.name || `リーダー${s.leaders.length + 1}`, short: '', color: action.color || LEADER_COLORS.find((c) => !used.has(c)) || '#888888', icon: action.icon || '' });
+        s.leaders.push({ id: uid('L'), personId: uid('P'), name: action.name || `リーダー${s.leaders.length + 1}`, short: '', color: action.color || LEADER_COLORS.find((c) => !used.has(c)) || '#888888', icon: action.icon || '' });
         break;
       }
       case 'updateLeader': { const l = leaderById(s, action.id); if (l) Object.assign(l, action.patch); break; }
@@ -245,27 +246,36 @@
         break;
       }
       // 名簿から大会に入れる(人の id はそのまま)。role = leader | player
+      // チームのリーダーを替える(名簿の人を選ぶ)。人の情報は差し替え、チームの情報(名前・ロゴ・色)はそのまま
+      case 'setLeader': {
+        const l = leaderById(s, action.id), p = action.person;
+        if (!l || !p || !p.id) break;
+        if (s.leaders.some((x) => x !== l && x.personId === p.id) || s.players.some((x) => x.id === p.id)) throw new Error('その人はもうこの大会に出ています');
+        for (const k of ['name', 'short', 'icon', 'iconSrc', 'iconCrop', 'stand', 'standSrc', 'standCrop', 'standScale', 'standX', 'standY', 'note', 'intro', 'introMemo', 'klass']) delete l[k];
+        Object.assign(l, p, { id: l.id, personId: p.id });
+        break;
+      }
       case 'addPeople': {
-        const inT = new Set([...s.leaders, ...s.players].map((x) => x.id));
+        const inT = new Set([...s.leaders.map((l) => l.personId), ...s.players.map((p) => p.id)]);
         const list = (action.people || []).filter((p) => p && p.id && !inT.has(p.id));
         if (action.role === 'leader') {
           if (s.leaders.length + list.length > MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです`);
           for (const p of list) {
             const used = new Set(s.leaders.map((l) => l.color));
-            s.leaders.push(Object.assign({}, p, { color: LEADER_COLORS.find((c) => !used.has(c)) || '#888888' }));
+            s.leaders.push(Object.assign({}, p, { id: uid('L'), personId: p.id, color: LEADER_COLORS.find((c) => !used.has(c)) || '#888888' }));
           }
         } else for (const p of list) s.players.push(Object.assign({ note: '' }, p));
         break;
       }
-      case 'addPlayers': for (const p of action.players) s.players.push({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }); break;
+      case 'addPlayers': for (const p of action.players) s.players.push({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '', klass: p.klass || '' }); break;
       case 'updatePlayer': { const p = playerById(s, action.id); if (p) Object.assign(p, action.patch); break; }
       case 'removePlayer':
         if (draftStarted(s)) throw new Error('ドラフトの途中は選手を削除できません（欠場にしてください）');
         s.players = s.players.filter((p) => p.id !== action.id); break;
       case 'replaceRoster': // CSV 読み込み
         if (action.leaders && action.leaders.length > MAX_LEADERS) throw new Error(`リーダーは${MAX_LEADERS}人までです（CSVに${action.leaders.length}人います）`);
-        if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), name: l.name, short: l.short || '', color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '', stand: l.stand || '', intro: l.intro || '', introMemo: l.introMemo || '' }));
-        if (action.players) s.players = action.players.map((p) => ({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '' }));
+        if (action.leaders) s.leaders = action.leaders.map((l, i) => ({ id: uid('L'), personId: uid('P'), name: l.name, short: l.short || '', color: l.color || LEADER_COLORS[i % LEADER_COLORS.length], icon: l.icon || '', stand: l.stand || '', intro: l.intro || '', introMemo: l.introMemo || '' }));
+        if (action.players) s.players = action.players.map((p) => ({ id: uid('P'), name: p.name, icon: p.icon || '', note: p.note || '', klass: p.klass || '', intro: p.intro || '', stand: p.stand || '' }));
         break;
 
       case 'nominate': { // 公開前の指名を入れる/変える(空で取り消し)
@@ -604,6 +614,8 @@
   }
   // 保存データの読み込み時: 範囲外の値を直す(前の版のデータなど)
   function normalize(s) {
+    // 前の形(リーダーの id = 人の id)のチームは、personId を補う
+    for (const l of s.leaders || []) if (!l.personId) l.personId = l.id;
     if (!(s.rounds >= 1 && s.rounds <= MAX_ROUNDS)) s.rounds = 3;
     // 廃止した「くじを選ばないルーレット」は、色を選ぶルーレットに
     const o = s.options || {};

@@ -6,8 +6,8 @@ const img = (f) => (f ? `/images/${encodeURIComponent(f)}` : '');
 const OVERLAY_URL = `${location.origin}/overlay`;
 
 let remoteInfo = { on: false };
-// 画面の状態: いまのタブ / 進行表の見せ方(edit 編集・live 本番) / 編集で選んでいる場面 / ドラフトの場面のサブタブ / 選手の絞り込み / 選んでいるリーダー
-const ui = { tab: 'prog', view: 'edit', selId: null, draftTab: 'live', filter: 'all', search: '', leaderId: null };
+// 画面の状態: いまのタブ / 進行表の見せ方(edit 編集・live 本番) / 編集で選んでいる場面 / ドラフトのタブの見せ方(setup 進め方・log 記録) / 選手の絞り込み / 選んでいるチーム・選手 / すべての大会と名簿の見せ方と、選んでいる人
+const ui = { tab: 'prog', view: 'edit', selId: null, draftView: 'setup', filter: 'all', search: '', leaderId: null, playerId: null, libView: 'tours', personId: null, peopleQ: '' };
 let selectNewScene = 0; // 場面を足したとき、足した場面を選ぶための目印
 let lib = null; // 大会・イベント・名簿の一覧(サーバーから)
 let S = null, canUndo = false, undoCancelsLottery = false, demo = false, ws = null, bgmList = [], overlay = { count: 0 };
@@ -62,6 +62,7 @@ function connect() {
     else if (m.type === 'presence') { overlay = m; renderOverlayStatus(); if (S) renderRun(); }
     else if (m.type === 'bgmList') { bgmList = m.list; if (S) render(); }
     else if (m.type === 'library') { lib = m; if (S) { renderLibrary(); renderRosterDlg(); } }
+    else if (m.type === 'history') { personHistory = { id: m.id, rows: m.rows }; renderPeople(); }
     else if (m.type === 'error') toast(m.message, true);
   };
 }
@@ -76,7 +77,7 @@ function toast(t, err) {
 /* ---------- 配信画面(OBS / ブラウザ)が開いているか ---------- */
 function renderOverlayStatus() {
   const o = overlay, el = $('overlay-st');
-  const [text, cls, tip] = !o.count ? ['× 配信画面が開いていません', 'text-red-300', 'OBS のブラウザソース（またはブラウザ）で配信画面を開いてください']
+  const [text, cls, tip] = !o.count ? ['× 配信画面なし', 'text-red-300', 'OBS のブラウザソース（またはブラウザ）で配信画面を開いてください']
     : o.obs && o.hidden ? ['● 映っていません', 'text-amber-300', 'OBS の今のシーンには、配信画面が映っていません']
     : o.obs ? ['● 表示中', 'text-emerald-300', 'OBS で配信画面を表示しています']
     : ['● 表示中', 'text-emerald-300', 'ブラウザで配信画面を表示しています'];
@@ -117,6 +118,7 @@ function render() {
   renderLotteryLog();
   renderOptions();
   renderShow();
+  renderDraftTab();
   renderLibrary();
   renderRosterDlg();
   renderTimer();
@@ -140,7 +142,7 @@ function renderSteps(cur) {
 }
 
 /* ---------- 進行表 ----------
- * 編集: 左に場面の一覧、右に選んだ場面(ドラフトは「本番 | ⚙ 進め方」)
+ * 編集: 左に場面の一覧、右に選んだ場面(ドラフトは本番の操作。進め方はドラフトのタブ)
  * 本番: 左に映している場面、右に「次にやること」と「メモ」、その下に次の場面。番組の中身と設定は触れない */
 const TYPE_LABEL = C.PROGRAM_TYPES;
 const typeLabel = (g) => { const sl = g.type === 'slide' ? C.slideById(S, g.slideId) : null; return sl ? (sl.kind === 'image' ? '画像の資料' : '文字の資料') : TYPE_LABEL[g.type]; };
@@ -154,10 +156,10 @@ function renderProg() {
   const dl = $('draft-live'), tr = $('timer-row');
   if (live) {
     if (cur && cur.type === 'draft') { if (dl.parentElement !== $('live-main')) $('live-main').appendChild(dl); dl.classList.remove('hidden'); }
-    else if (dl.parentElement !== $('scene-pane')) $('scene-pane').insertBefore(dl, $('draft-setup'));
+    else if (dl.parentElement !== $('scene-pane')) $('scene-pane').appendChild(dl);
     if (tr.parentElement !== $('live-timer')) $('live-timer').appendChild(tr);
   } else {
-    if (dl.parentElement !== $('scene-pane')) $('scene-pane').insertBefore(dl, $('draft-setup'));
+    if (dl.nextElementSibling !== $('scene-edit')) $('scene-pane').insertBefore(dl, $('scene-edit'));
     if (tr.parentElement !== $('round-summary').parentElement) $('round-summary').parentElement.appendChild(tr);
   }
   renderRun();
@@ -167,8 +169,7 @@ function renderProg() {
     renderFirstRun();
     renderSceneHead(sel);
     renderSceneEdit(sel);
-    dl.classList.toggle('hidden', !isDraft || ui.draftTab !== 'live');
-    $('draft-setup').classList.toggle('hidden', !isDraft || ui.draftTab !== 'setup');
+    dl.classList.toggle('hidden', !isDraft);
     $('round-edit').classList.remove('hidden');
   }
 }
@@ -188,11 +189,12 @@ function renderFirstRun() {
   if (!empty || demo) return;
   const step = (n, text, done, btn) => `<div class="flex items-center gap-3 min-h-11 px-3 py-2 rounded-lg border border-[var(--border-default)]"><span class="w-7 h-7 flex-none inline-flex items-center justify-center rounded-full text-sm font-bold ${done ? 'bg-emerald-500/[.12] text-emerald-300' : 'border border-[var(--border-strong)] text-[var(--text-muted)]'}">${done ? '✓' : n}</span><span class="flex-1 text-sm ${done ? 'text-[var(--text-muted)]' : 'text-[var(--text-heading)]'}">${text}</span>${btn}</div>`;
   el.innerHTML = `<h2 class="text-base font-bold text-[var(--text-heading)]">はじめに</h2>
-    ${step(1, 'リーダーを登録する', S.leaders.length > 0, `<button type="button" data-goto="leaders" class="${BTN_SUB}">リーダーへ</button>`)}
+    ${step(1, 'チームを作る（リーダーを決める）', S.leaders.length > 0, `<button type="button" data-goto="leaders" class="${BTN_SUB}">チームへ</button>`)}
     ${step(2, 'エントリー選手を登録する', S.players.length > 0, `<button type="button" data-goto="players" class="${BTN_SUB}">選手へ</button>`)}
-    ${step(3, '大会名と見た目を決める', false, `<button type="button" data-goto="show" class="${BTN_SUB}">大会へ</button>`)}
-    ${step(4, 'OBS に配信画面を追加する', overlay.count > 0, `<button type="button" data-copy-url class="${BTN_SUB}">URL をコピー</button>`)}
-    ${step(5, 'お試しで一通り動かしてみる', false, `<button type="button" data-demo class="${BTN_SUB}">お試しを始める</button>`)}`;
+    ${step(3, 'ドラフトの進め方を決める', false, `<button type="button" data-goto="draft" class="${BTN_SUB}">ドラフトへ</button>`)}
+    ${step(4, '大会名とテーマを決める', false, `<button type="button" data-goto="show" class="${BTN_SUB}">大会へ</button>`)}
+    ${step(5, 'OBS に配信画面を追加する', overlay.count > 0, `<button type="button" data-copy-url class="${BTN_SUB}">URL をコピー</button>`)}
+    ${step(6, 'お試しで一通り動かしてみる', false, `<button type="button" data-demo class="${BTN_SUB}">お試しを始める</button>`)}`;
 }
 // 選んだ場面の見出し: 種類・名前・(ドラフトはサブタブ)・並べ替え・外す・映す
 function renderSceneHead(g) {
@@ -200,10 +202,8 @@ function renderSceneHead(g) {
   if (el.contains(document.activeElement) && document.activeElement.matches('input')) return;
   const prog = C.programOf(S), i = prog.indexOf(g), cur = C.progIdxOf(S);
   el.dataset.progId = g.id;
-  const tabBtn = (k, t) => `<button type="button" data-draft-tab="${k}" aria-pressed="${ui.draftTab === k}" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer ${FOCUS} ${ui.draftTab === k ? 'bg-[var(--bg-page-alt)] text-[var(--text-heading)]' : 'text-[var(--text-muted)]'}">${t}</button>`;
   el.innerHTML = `${badge(g.type === 'draft' ? 'in' : 'wait', esc(typeLabel(g)))}
     <label class="sr-only" for="pl-${g.id}">場面の名前</label><input id="pl-${g.id}" type="text" data-prog-label="${g.id}" value="${esc(g.label)}" maxlength="20" class="w-56 ${INPUT}">
-    ${g.type === 'draft' ? `<div class="inline-flex p-1 gap-1 rounded-lg bg-[var(--bg-page)] border border-[var(--border-strong)]" role="group" aria-label="ドラフトの場面">${tabBtn('live', '本番')}${tabBtn('setup', '⚙ 進め方')}</div>` : ''}
     <div class="ml-auto flex items-center gap-1">
       <button type="button" class="${BTN_ICON}" data-prog-move="-1" aria-label="上へ" ${i ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
       <button type="button" class="${BTN_ICON}" data-prog-move="1" aria-label="下へ" ${i < prog.length - 1 ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button>
@@ -240,8 +240,8 @@ function renderSceneEdit(g) {
       <option value="" ${!g.bgm ? 'selected' : ''}>設定なし</option><option value="-" ${g.bgm === '-' ? 'selected' : ''}>BGM なし</option>
       ${names.map((nm) => `<option value="${esc(nm)}" ${nm === g.bgm ? 'selected' : ''}>♪ ${esc(nm.replace(/\.[^.]+$/, ''))}${bgmList.includes(nm) ? '' : '（見つかりません）'}</option>`).join('')}</select>${ICON.chevron}</div></div>`;
   const memo = `<div class="leading-normal"><label class="${LABEL}" for="pm-${g.id}">メモ（自分用。配信には出ません）</label><textarea id="pm-${g.id}" rows="6" data-prog-memo="${g.id}" placeholder="話すこと・台本など" class="${TEXTAREA} resize-y">${esc(g.memo || '')}</textarea></div>`;
-  // ドラフトの場面は「⚙ 進め方」のときだけメモを出す(本番の画面は指名に集中)
-  el.innerHTML = g.type === 'draft' ? (ui.draftTab === 'setup' ? bgmSel + memo : '') : body + bgmSel + memo;
+  // ドラフトの場面は、本番の操作の下に BGM とメモを折りたたんで(本番の画面は指名に集中)
+  el.innerHTML = g.type === 'draft' ? `<details class="bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl"><summary class="px-4 py-3 text-base font-bold text-[var(--text-heading)] cursor-pointer">BGM とメモ</summary><div class="px-4 pb-4 flex flex-col gap-4">${bgmSel + memo}</div></details>` : body + bgmSel + memo;
 }
 // 本番ビュー: 映している場面・次にやること・メモ・次の場面
 let previewOn = false;
@@ -287,7 +287,7 @@ document.addEventListener('click', (e) => {
 addEventListener('resize', () => { if (ui.view === 'live') fitPreview(); });
 function setView(v) {
   ui.view = v;
-  if (v === 'live') { selectTab('prog'); ui.draftTab = 'live'; }
+  if (v === 'live') selectTab('prog');
   else { $('preview-frame').src = 'about:blank'; $('next-frame').src = 'about:blank'; previewOn = false; }
   render();
   if (v === 'live') requestAnimationFrame(fitPreview);
@@ -338,11 +338,11 @@ function renderRun() {
     else if (blocked) { body = '<p class="flex items-center h-11 text-sm text-[var(--text-muted)]">ほかの重複の抽選が終わったら再指名します</p>'; st = badge('wait', '再指名待ち'); }
     else {
       const canReveal = n.playerId && pendAll && !turnNow;
-      body = `<div class="flex gap-2"><div class="relative flex-1 min-w-0"><select data-nom="${l.id}" aria-label="${esc(l.name)} の指名" class="appearance-none w-full pl-3 pr-10 ${INPUT} cursor-pointer"><option value="">― 指名を選ぶ ―</option>${options.map((p) => `<option value="${p.id}" ${p.id === n.playerId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>${ICON.chevron}</div>${canReveal ? `<button type="button" class="${BTN_SUB} flex-none" data-next="revealOne" data-arg="${l.id}" aria-label="${esc(l.name)} の指名を公開">公開</button>` : ''}</div>`;
+      body = `<div class="flex gap-2"><div class="relative flex-1 min-w-0"><select data-nom="${l.id}" aria-label="${esc(l.name)} の指名" class="appearance-none w-full pl-3 pr-10 ${INPUT} cursor-pointer"><option value="">― 指名を選ぶ ―</option>${options.map((p) => `<option value="${p.id}" ${p.id === n.playerId ? 'selected' : ''}>${esc(p.name)}${p.klass ? `（${esc(p.klass)}）` : ''}</option>`).join('')}</select>${ICON.chevron}</div>${canReveal ? `<button type="button" class="${BTN_SUB} flex-none" data-next="revealOne" data-arg="${l.id}" aria-label="${esc(l.name)} の指名を公開">公開</button>` : ''}</div>`;
       st = n.playerId ? badge('in', '入力済み') : badge('wait', '未入力');
     }
     return `<div class="${CARD} p-4"><div class="flex items-center gap-3 mb-3">${avatar(l.icon, l.color)}
-      <p class="min-w-0 text-base font-bold text-[var(--text-heading)] truncate">${esc(l.name)}</p>
+      <p class="min-w-0 leading-tight"><b class="block text-base text-[var(--text-heading)] truncate">${esc(C.teamLabel(S, l))}</b><span class="block text-xs text-[var(--text-muted)] truncate">${esc(l.name)}</span></p>
       <div class="ml-auto">${st}</div></div>${body}</div>`;
   }).join('');
 
@@ -353,7 +353,7 @@ function renderRun() {
       const p = team.find((t) => t.round === i + 1);
       return `<li class="flex items-center gap-2"><span class="w-10 flex-none text-xs text-[var(--text-muted)]">${i + 1}巡</span>${p ? `<span class="text-sm text-[var(--text-heading)] truncate">${esc(C.playerById(S, p.playerId)?.name)}</span>` : '<span class="text-sm text-[var(--text-muted)]">―</span>'}</li>`;
     }).join('');
-    return `<div class="${CARD} p-4"><div class="flex items-center gap-3 mb-2">${avatar(l.icon, l.color, 'w-8 h-8')}<p class="min-w-0 text-sm font-bold text-[var(--text-heading)] truncate">${esc(l.name)}</p></div><ol class="flex flex-col">${rows}</ol></div>`;
+    return `<div class="${CARD} p-4"><div class="flex items-center gap-3 mb-2">${avatar(l.icon, l.color, 'w-8 h-8')}<p class="min-w-0 text-sm font-bold text-[var(--text-heading)] truncate">${esc(C.teamLabel(S, l))}</p></div><ol class="flex flex-col">${rows}</ol></div>`;
   }).join('');
 }
 
@@ -372,20 +372,24 @@ function renderLotteryLog() {
     : '<li class="py-2 text-sm text-[var(--text-muted)]">まだ抽選はありません</li>';
 }
 
-/* ---------- リーダー: 一覧と、選んだ1人のパネル ---------- */
+/* ---------- チーム: 一覧と、選んだ1チームのパネル ----------
+ * パネル = チーム(名前・ロゴ・色) / リーダー(名簿の人。全大会で共通) / リーダーの、この大会での情報 / メンバー(リーダー＋ドラフトの結果) */
+const SHARED = '<span class="text-[11px] text-primary-300" title="名簿の情報です。ほかの大会の表示も変わります">⟲ ほかの大会にも反映</span>';
+const klassLabel = () => C.optionsOf(S).classLabel || 'クラス';
+const klassTag = (x) => (x && x.klass ? `<span class="inline-flex px-2 rounded-full text-[11px] font-bold border border-[var(--border-strong)] text-[var(--text-muted)]" title="${esc(klassLabel())}">${esc(x.klass)}</span>` : '');
 function renderLeaders() {
   const started = C.draftStarted(S);
-  $('leader-count').textContent = `${S.leaders.length} / ${C.MAX_LEADERS}人`;
+  $('leader-count').textContent = `${S.leaders.length} / ${C.MAX_LEADERS}チーム`;
   setDisabled($('add-leader'), S.leaders.length >= C.MAX_LEADERS);
   if (!S.leaders.some((l) => l.id === ui.leaderId)) ui.leaderId = S.leaders[0]?.id || null;
   $('leaders').innerHTML = S.leaders.map((l, i) => {
     const on = l.id === ui.leaderId;
     return `<li class="item flex items-center gap-2" data-id="${l.id}"><button type="button" data-leader-sel="${l.id}" ${on ? 'aria-current="true"' : ''} class="flex-1 min-w-0 min-h-14 flex items-center gap-3 px-3 py-2 rounded-xl border text-left cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-page-alt)]'}">
-      ${avatar(l.icon, l.color)}<span class="min-w-0 flex-1"><b class="block truncate text-base text-[var(--text-heading)]">${esc(l.name)}</b><span class="block truncate text-xs text-[var(--text-muted)]">${esc(C.teamLabel(S, l))}</span></span>
+      ${l.teamLogo ? `<img src="${img(l.teamLogo)}" alt="" class="w-10 h-10 flex-none rounded-lg object-contain bg-[var(--bg-page)]">` : avatar(l.icon, l.color)}<span class="min-w-0 flex-1"><b class="block truncate text-base text-[var(--text-heading)]">${esc(C.teamLabel(S, l))}</b><span class="block truncate text-xs text-[var(--text-muted)]">リーダー ${esc(l.name || '未定')}</span></span>
       ${badge(l.stand ? 'ok' : 'wait', l.stand ? '立ち絵あり' : '立ち絵なし')}</button>
-      <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="${esc(l.name)} を上へ" ${i && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
-      <button type="button" class="${BTN_ICON}" data-move="1" aria-label="${esc(l.name)} を下へ" ${i < S.leaders.length - 1 && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button></li>`;
-  }).join('') || '<li class="text-base text-[var(--text-muted)] text-center py-16">まだいません。「追加」で登録してください</li>';
+      <button type="button" class="${BTN_ICON}" data-move="-1" aria-label="${esc(C.teamLabel(S, l))} を上へ" ${i && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.up}</button>
+      <button type="button" class="${BTN_ICON}" data-move="1" aria-label="${esc(C.teamLabel(S, l))} を下へ" ${i < S.leaders.length - 1 && !started ? '' : 'disabled aria-disabled="true"'}>${ICON.down}</button></li>`;
+  }).join('') || '<li class="text-base text-[var(--text-muted)] text-center py-16">まだありません。「チームを足す」か「リーダーを名簿から選んで足す」で作ってください</li>';
   renderLeaderPanel(started);
 }
 // 立ち絵の位置と大きさ: 配信画面と同じ見え方(帯の位置の目安つき)。ドラッグで位置、つまみで大きさ
@@ -395,17 +399,46 @@ function drawStand() {
   $('stand-stage').style.transform = `scale(${box.clientWidth / 1920})`;
   $('stand-img').style.transform = `translateX(calc(-50% + ${stand.x}px)) translateY(${stand.y}px) scale(${stand.k})`;
 }
-function initStand(l) {
-  Object.assign(stand, { x: +l.standX || 0, y: +l.standY || 0, k: +l.standScale || 1, drag: null });
+// kind: L(チームのリーダー) / P(選手)。updateLeader / updatePlayer で保存する
+function initStand(x, kind) {
+  Object.assign(stand, { x: +x.standX || 0, y: +x.standY || 0, k: +x.standScale || 1, drag: null });
   const box = $('stand-box'); if (!box) return;
   drawStand(); requestAnimationFrame(drawStand);
-  const save = () => act({ type: 'updateLeader', id: l.id, patch: { standX: Math.round(stand.x), standY: Math.round(stand.y), standScale: Math.round(stand.k * 100) / 100 } });
+  const save = () => act({ type: kind === 'P' ? 'updatePlayer' : 'updateLeader', id: x.id, patch: { standX: Math.round(stand.x), standY: Math.round(stand.y), standScale: Math.round(stand.k * 100) / 100 } });
   box.addEventListener('pointerdown', (e) => { stand.drag = { x: e.clientX, y: e.clientY, sx: stand.x, sy: stand.y }; box.setPointerCapture(e.pointerId); });
   box.addEventListener('pointermove', (e) => { const d = stand.drag; if (!d) return; const k = 1920 / box.clientWidth; stand.x = d.sx + (e.clientX - d.x) * k; stand.y = d.sy + (e.clientY - d.y) * k; drawStand(); });
   box.addEventListener('pointerup', () => { if (stand.drag) save(); stand.drag = null; });
   $('stand-scale').addEventListener('input', (e) => { stand.k = +e.target.value; drawStand(); });
   $('stand-scale').addEventListener('change', save);
   $('stand-reset').addEventListener('click', () => { Object.assign(stand, { x: 0, y: 0, k: 1 }); $('stand-scale').value = 1; drawStand(); save(); });
+}
+// 名簿の人の欄(名前・略称・立ち絵)と、この大会での欄(ひとこと・クラス・紹介文・紹介のメモ)。リーダーと選手で同じ
+// f = 入力の data 属性(lf: リーダー / pf: 選手)、pick = 立ち絵を選ぶときの種類
+function personFields(x, f, kind) {
+  const id = x.id;
+  return `<div class="flex flex-col gap-3 pl-3 border-l-2 border-primary-500/60">
+      <div class="flex items-center gap-2"><span class="text-xs font-bold text-[var(--text-muted)]">${kind === 'L' ? 'リーダー（名簿・全大会で共通）' : 'この人（名簿・全大会で共通）'}</span>${SHARED}</div>
+      <div class="flex items-center gap-3">
+        <button type="button" data-icon="${kind}" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(x.name)} の顔の画像を${x.icon ? '変更' : '設定'}" title="クリック or 画像をドロップ">${avatar(x.icon, kind === 'L' ? x.color : null, 'w-14 h-14')}${CAM}</button>
+        <div class="flex-1 min-w-0 flex gap-2">
+          <div class="flex-1 min-w-0"><label class="${LABEL}" for="n-${id}">名前</label><input id="n-${id}" type="text" data-${f}="name" value="${esc(x.name)}" class="w-full ${INPUT}"></div>
+          <div class="w-28"><label class="${LABEL}" for="s-${id}">略称</label><input id="s-${id}" type="text" data-${f}="short" value="${esc(x.short || '')}" placeholder="${esc(x.name)}" maxlength="12" class="w-full ${INPUT}"></div></div></div>
+      <div class="leading-normal"><span class="${LABEL}">立ち絵</span>
+        ${x.stand ? `<div id="stand-box" class="relative w-full aspect-video overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-page-alt)] cursor-move touch-none" title="ドラッグで位置を動かす">
+          <div id="stand-stage" class="absolute left-0 top-0 w-[1920px] h-[1080px] origin-top-left pointer-events-none">
+            <img id="stand-img" src="${img(x.stand)}" alt="" class="absolute left-1/2 bottom-0 h-[1000px] max-w-[1400px] object-contain object-bottom origin-bottom">
+            <span class="absolute left-1/2 bottom-[70px] -translate-x-1/2 w-[1000px] h-[130px] rounded-md bg-amber-400/80" aria-hidden="true"></span>
+          </div></div>
+        <div class="flex items-center gap-2 mt-2"><label class="text-xs text-[var(--text-muted)]" for="stand-scale">大きさ</label><input id="stand-scale" type="range" min="0.4" max="2.5" step="0.01" value="${+x.standScale || 1}" class="flex-1 h-11 accent-primary-500 cursor-pointer"><button type="button" id="stand-reset" class="${BTN_SUB} px-3 text-sm">元に戻す</button></div>` : ''}
+        <div class="flex items-end gap-2 mt-2"><button type="button" data-pick="${kind === 'L' ? 'stand' : 'pstand'}:${id}" class="${BTN_SUB}">${x.stand ? '変更' : '選ぶ'}</button>${x.stand ? `<button type="button" data-stand-clear="${kind}:${id}" class="${BTN_SUB}">外す</button>` : ''}</div></div>
+    </div>
+    <div class="flex flex-col gap-3">
+      <span class="text-xs font-bold text-[var(--text-muted)]">${kind === 'L' ? 'リーダーの、この大会での情報' : 'この大会での情報'}</span>
+      <div class="flex gap-2"><div class="flex-1 min-w-0"><label class="${LABEL}" for="o-${id}">ひとこと</label><input id="o-${id}" type="text" data-${f}="note" value="${esc(x.note || '')}" placeholder="段位・得意戦法など" maxlength="30" class="w-full ${INPUT}"></div>
+        <div class="w-28"><label class="${LABEL}" for="k-${id}">${esc(klassLabel())}</label><input id="k-${id}" type="text" data-${f}="klass" value="${esc(x.klass || '')}" maxlength="8" class="w-full ${INPUT}"></div></div>
+      <div><label class="${LABEL}" for="i-${id}">紹介文</label><input id="i-${id}" type="text" data-${f}="intro" value="${esc(x.intro || '')}" placeholder="立ち絵の帯に出ます" maxlength="30" class="w-full ${INPUT}"></div>
+      <div><label class="${LABEL}" for="m-${id}">紹介のメモ（自分用）</label><input id="m-${id}" type="text" data-${f}="introMemo" value="${esc(x.introMemo || '')}" class="w-full ${INPUT}"></div>
+    </div>`;
 }
 function renderLeaderPanel(started) {
   const el = $('leader-panel'), l = C.leaderById(S, ui.leaderId);
@@ -415,34 +448,25 @@ function renderLeaderPanel(started) {
   el.className = el.className.replace(/\bitem\b/, '').trim() + ' item';
   el.dataset.id = l.id;
   const team = C.teamOf(S, l.id).filter((p) => !hiddenPick(p));
-  el.innerHTML = `<div class="flex items-center gap-3">
-      <button type="button" data-icon="L" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(l.name)} の顔の画像を${l.icon ? '変更' : '設定'}" title="クリック or 画像をドロップ">${avatar(l.icon, l.color, 'w-16 h-16')}${CAM}</button>
-      <div class="min-w-0"><b class="block truncate text-lg text-[var(--text-heading)]">${esc(l.name)}</b><span class="text-xs text-[var(--text-muted)]">顔をクリック / ドロップで変更</span></div></div>
-    <div class="leading-normal"><label class="${LABEL}" for="ln-${l.id}">名前</label><input id="ln-${l.id}" type="text" data-lf="name" value="${esc(l.name)}" class="w-full ${INPUT}"></div>
-    <div class="flex gap-3">
-      <div class="leading-normal flex-1"><label class="${LABEL}" for="ls-${l.id}">略称</label><input id="ls-${l.id}" type="text" data-lf="short" value="${esc(l.short || '')}" placeholder="${esc(l.name)}" maxlength="12" class="w-full ${INPUT}"></div>
-      <div class="leading-normal"><label class="${LABEL}" for="lc-${l.id}">色</label><input id="lc-${l.id}" type="color" data-lf="color" value="${esc(l.color)}" class="block w-14 h-11 p-1 bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}"></div></div>
-    <div class="leading-normal"><label class="${LABEL}" for="li-${l.id}">紹介文</label><input id="li-${l.id}" type="text" data-lf="intro" value="${esc(l.intro || '')}" maxlength="30" class="w-full ${INPUT}"></div>
-    <div class="leading-normal"><label class="${LABEL}" for="lm-${l.id}">紹介のメモ（自分用）</label><input id="lm-${l.id}" type="text" data-lf="introMemo" value="${esc(l.introMemo || '')}" class="w-full ${INPUT}"></div>
-    <div class="leading-normal"><span class="${LABEL}">立ち絵</span>
-      ${l.stand ? `<div id="stand-box" class="relative w-full aspect-video overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-page-alt)] cursor-move touch-none" title="ドラッグで位置を動かす">
-        <div id="stand-stage" class="absolute left-0 top-0 w-[1920px] h-[1080px] origin-top-left pointer-events-none">
-          <img id="stand-img" src="${img(l.stand)}" alt="" class="absolute left-1/2 bottom-0 h-[1000px] max-w-[1400px] object-contain object-bottom origin-bottom">
-          <span class="absolute left-1/2 bottom-[70px] -translate-x-1/2 w-[1000px] h-[130px] rounded-md bg-amber-400/80" aria-hidden="true"></span>
-        </div></div>
-      <div class="flex items-center gap-2 mt-2"><label class="text-xs text-[var(--text-muted)]" for="stand-scale">大きさ</label><input id="stand-scale" type="range" min="0.4" max="2.5" step="0.01" value="${+l.standScale || 1}" class="flex-1 h-11 accent-primary-500 cursor-pointer"><button type="button" id="stand-reset" class="${BTN_SUB} px-3 text-sm">元に戻す</button></div>` : ''}
-      <div class="flex items-end gap-2 mt-2"><button type="button" data-pick="stand:${l.id}" class="${BTN_SUB}">${l.stand ? '変更' : '選ぶ'}</button>${l.stand ? `<button type="button" data-stand-clear="${l.id}" class="${BTN_SUB}">外す</button>` : ''}</div></div>
-    <div class="flex gap-3 items-end">
-      <div class="leading-normal flex-1 min-w-0"><label class="${LABEL}" for="lt-${l.id}">チーム名</label><input id="lt-${l.id}" type="text" data-lf="teamName" value="${esc(l.teamName || '')}" placeholder="${esc((C.optionsOf(S).teamPrefix || '') + C.shortName(l))}" maxlength="16" class="w-full ${INPUT}"></div>
-      <div class="leading-normal"><span class="${LABEL}">チームのロゴ</span><div class="flex items-center gap-2">${l.teamLogo ? `<img src="${img(l.teamLogo)}" alt="" class="w-11 h-11 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : ''}<button type="button" data-pick="teamLogo:${l.id}" class="${BTN_SUB} px-3">${l.teamLogo ? '変更' : '選ぶ'}</button>${l.teamLogo ? `<button type="button" data-team-logo-clear="${l.id}" class="${BTN_SUB} px-3">外す</button>` : ''}</div></div></div>
-    <div class="leading-normal"><span class="${LABEL}">チーム</span><ol class="flex flex-col gap-1">${Array.from({ length: S.rounds }, (_, i) => { const p = team.find((t) => t.round === i + 1); return `<li class="flex items-center gap-2 text-sm"><span class="w-10 text-xs text-[var(--text-muted)]">${i + 1}巡</span>${p ? `<span class="text-[var(--text-heading)]">${esc(C.playerById(S, p.playerId)?.name)}</span>` : '<span class="text-[var(--text-muted)]">―</span>'}</li>`; }).join('')}</ol></div>
-    <div class="flex"><button type="button" class="ml-auto ${BTN_SUB} text-red-300" data-del-leader ${started ? 'disabled aria-disabled="true" title="ドラフトの途中は削除できません"' : ''}>削除</button></div>`;
-  initStand(l);
+  el.innerHTML = `<div class="flex flex-col gap-3">
+      <span class="text-xs font-bold text-[var(--text-muted)]">チーム</span>
+      <div class="flex items-end gap-2">
+        <div class="flex-1 min-w-0"><label class="${LABEL}" for="lt-${l.id}">チーム名</label><input id="lt-${l.id}" type="text" data-lf="teamName" value="${esc(l.teamName || '')}" placeholder="${esc((C.optionsOf(S).teamPrefix || '') + C.shortName(l))}" maxlength="16" class="w-full ${INPUT}"></div>
+        <div><label class="${LABEL}" for="lc-${l.id}">色</label><input id="lc-${l.id}" type="color" data-lf="color" value="${esc(l.color)}" class="block w-14 h-11 p-1 bg-[var(--bg-page)] border border-[var(--border-strong)] rounded-lg cursor-pointer ${FOCUS}"></div></div>
+      <div class="flex items-center gap-2"><span class="text-xs text-[var(--text-muted)]">ロゴ</span>${l.teamLogo ? `<img src="${img(l.teamLogo)}" alt="" class="w-11 h-11 object-contain rounded-lg bg-[var(--bg-page)] border border-[var(--border-default)]">` : ''}<button type="button" data-pick="teamLogo:${l.id}" class="${BTN_SUB} px-3">${l.teamLogo ? '変更' : '選ぶ'}</button>${l.teamLogo ? `<button type="button" data-team-logo-clear="${l.id}" class="${BTN_SUB} px-3">外す</button>` : ''}</div>
+    </div>
+    <div class="flex justify-end -mb-2"><button type="button" data-set-leader="${l.id}" class="h-11 px-2 text-sm font-medium text-primary-300 hover:underline cursor-pointer ${FOCUS}">リーダーを名簿から選び直す</button></div>
+    ${personFields(l, 'lf', 'L')}
+    <div class="leading-normal"><span class="text-xs font-bold text-[var(--text-muted)]">メンバー</span><ol class="flex flex-col gap-1 mt-2">
+      <li class="flex items-center gap-2 text-sm">${badge('in', 'リーダー')}<span class="text-[var(--text-heading)]">${esc(l.name)}</span>${klassTag(l)}</li>
+      ${Array.from({ length: S.rounds }, (_, i) => { const p = team.find((t) => t.round === i + 1), pl = p && C.playerById(S, p.playerId); return `<li class="flex items-center gap-2 text-sm"><span class="w-10 text-xs text-[var(--text-muted)]">${i + 1}巡</span>${pl ? `<span class="text-[var(--text-heading)]">${esc(pl.name)}</span>${klassTag(pl)}` : '<span class="text-[var(--text-muted)]">―</span>'}</li>`; }).join('')}</ol></div>
+    <div class="flex"><button type="button" class="ml-auto ${BTN_SUB} text-red-300" data-del-leader ${started ? 'disabled aria-disabled="true" title="ドラフトの途中は外せません"' : ''}>チームを外す</button></div>`;
+  initStand(l, 'L');
 }
 
-/* ---------- 選手: 状態で絞り込む一覧 ---------- */
+/* ---------- 選手: 状態で絞り込む一覧と、選んだ1人のパネル(リーダーと同じ項目) ---------- */
 function renderPlayers() {
-  if (document.activeElement && document.activeElement.closest('#players') && document.activeElement.matches('input')) return; // 入力中は描き直さない
+  if (document.activeElement && document.activeElement.closest('#players, #player-panel') && document.activeElement.matches('input')) return; // 入力中は描き直さない
   const started = C.draftStarted(S), taken = C.pickedIds(S);
   const teamOfPlayer = (id) => { const p = S.picks.find((x) => x.playerId === id && !hiddenPick(x)); return p ? C.leaderById(S, p.leaderId) : null; };
   const stateOf = (p) => (p.absent ? 'absent' : taken.has(p.id) ? 'picked' : 'free');
@@ -453,20 +477,45 @@ function renderPlayers() {
   $('player-filter').innerHTML = FILTERS.map(([k, t]) => `<button type="button" data-filter="${k}" aria-pressed="${ui.filter === k}" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-3 rounded-md text-sm font-medium cursor-pointer ${FOCUS} ${ui.filter === k ? 'bg-[var(--bg-page-alt)] text-[var(--text-heading)]' : 'text-[var(--text-muted)]'}">${t} ${count[k]}</button>`).join('');
   const q = ui.search.trim();
   const list = S.players.filter((p) => (ui.filter === 'all' || stateOf(p) === ui.filter) && (!q || p.name.includes(q)));
+  if (!S.players.some((p) => p.id === ui.playerId)) ui.playerId = null;
   $('players').innerHTML = list.map((p) => {
-    const tl = teamOfPlayer(p.id);
-    return `<div class="item ${CARD} flex items-start gap-2 p-2" data-id="${p.id}">
-    <button type="button" data-icon="P" class="relative flex-none rounded-full cursor-pointer ${FOCUS}" aria-label="${esc(p.name)} の画像を${p.icon ? '変更' : '設定'}" title="クリック or 画像をドロップで${p.icon ? '変更' : '設定'}">${avatar(p.icon, null, 'w-11 h-11')}${CAM}</button>
-    <div class="min-w-0 flex-1 flex flex-col gap-1">
-      <input type="text" data-pf="name" value="${esc(p.name)}" aria-label="選手名" class="w-full ${INPUT}">
-      <input type="text" data-pf="note" value="${esc(p.note || '')}" aria-label="${esc(p.name)} のひとこと" placeholder="ひとこと（段位など）" maxlength="30" class="w-full ${INPUT}">
-      ${p.absent ? `<span>${badge('dup', '欠場')}</span>` : tl ? `<span>${badge('ok', esc(C.teamLabel(S, tl)))}</span>` : ''}
-    </div>
-    ${taken.has(p.id) ? '' : started
-      ? `<button type="button" class="${BTN_ICON} ${p.absent ? 'hover:text-primary-300' : 'hover:text-red-300'}" data-absent aria-pressed="${!!p.absent}" aria-label="${esc(p.name)} を${p.absent ? '欠場から戻す' : '欠場にする'}" title="${p.absent ? '欠場から戻す' : '欠場にする'}">${p.absent ? ICON.undo : ICON.x}</button>`
-      : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-del-player aria-label="${esc(p.name)} を削除">${ICON.del}</button>`}</div>`;
+    const tl = teamOfPlayer(p.id), on = p.id === ui.playerId;
+    return `<button type="button" data-player-sel="${p.id}" ${on ? 'aria-current="true"' : ''} class="min-h-14 flex items-center gap-3 p-2 rounded-xl border text-left cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-page-alt)]'}">
+      ${avatar(p.icon, null, 'w-11 h-11')}<span class="min-w-0 flex-1"><span class="flex items-center gap-2"><b class="truncate text-[var(--text-heading)]">${esc(p.name)}</b>${klassTag(p)}</span><span class="block truncate text-xs text-[var(--text-muted)]">${esc(p.note || '')}</span>
+      ${p.absent ? `<span>${badge('dup', '欠場')}</span>` : tl ? `<span>${badge('ok', esc(C.teamLabel(S, tl)))}</span>` : ''}</span></button>`;
   }).join('') || `<p class="col-span-full text-base text-[var(--text-muted)] text-center py-16">${S.players.length ? '当てはまる選手はいません' : 'まだいません。上の欄に名前を入れて「まとめて追加」'}</p>`;
+  renderPlayerPanel(started, taken);
 }
+function renderPlayerPanel(started, taken) {
+  const el = $('player-panel'), p = C.playerById(S, ui.playerId);
+  if (stand.drag) return;
+  show(el, !!p, 'flex');
+  if (!p) return;
+  el.className = el.className.replace(/\bitem\b/, '').trim() + ' item';
+  el.dataset.id = p.id;
+  el.innerHTML = `${personFields(p, 'pf', 'P')}
+    <div class="flex items-center gap-2">${taken.has(p.id) ? '' : started
+      ? `<button type="button" class="${BTN_SUB}" data-absent aria-pressed="${!!p.absent}">${p.absent ? '欠場から戻す' : '欠場にする'}</button>`
+      : `<button type="button" class="${BTN_SUB} text-red-300" data-del-player>この大会から外す</button>`}</div>`;
+  initStand(p, 'P');
+}
+
+/* ---------- ドラフト(大会のもの): ⚙ 進め方 / 記録 ---------- */
+function renderDraftTab() {
+  document.querySelectorAll('[data-draft-view]').forEach((b) => { const on = b.dataset.draftView === ui.draftView; b.setAttribute('aria-pressed', on); b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on); b.classList.toggle('text-[var(--text-muted)]', !on); });
+  $('draft-setup').classList.toggle('hidden', ui.draftView !== 'setup');
+  $('draft-log').classList.toggle('hidden', ui.draftView !== 'log');
+  $('draft-state').textContent = C.draftComplete(S) ? '終わった' : C.draftStarted(S) ? `進行中・第${S.round}巡` : 'これから';
+  const picks = S.picks.filter((p) => !hiddenPick(p)).slice().sort((a, b) => a.round - b.round || S.leaders.findIndex((l) => l.id === a.leaderId) - S.leaders.findIndex((l) => l.id === b.leaderId));
+  $('draft-picks').innerHTML = picks.map((p) => { const l = C.leaderById(S, p.leaderId), pl = C.playerById(S, p.playerId); return `<div class="flex items-center gap-3 min-h-11 text-sm"><span class="w-10 text-xs text-[var(--text-muted)]">${p.round}巡</span><span class="w-40 truncate">${esc(l ? C.teamLabel(S, l) : '')}</span><span class="text-[var(--text-heading)]">${esc(pl ? pl.name : '')}</span>${klassTag(pl)}${badge(p.by === 'lottery' ? 'lot' : 'ok', p.by === 'lottery' ? '抽選' : p.by === 'order' ? '順番' : '単独')}</div>`; }).join('') || '<p class="text-sm text-[var(--text-muted)]">まだ指名はありません</p>';
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-draft-view],[data-player-sel],[data-set-leader]');
+  if (!t) return;
+  if (t.dataset.draftView) { ui.draftView = t.dataset.draftView; renderDraftTab(); }
+  else if (t.dataset.playerSel) { ui.playerId = t.dataset.playerSel; renderPlayers(); }
+  else if (t.dataset.setLeader) openRosterDlg('setLeader', t.dataset.setLeader);
+});
 
 /* ---------- 操作 ---------- */
 function selectTab(name) {
@@ -529,16 +578,15 @@ document.addEventListener('click', (e) => {
 $('add-leader').addEventListener('click', () => act({ type: 'addLeader' }));
 // 進行表・リーダー・選手の画面の操作
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-sel],[data-draft-tab],[data-leader-sel],[data-filter],[data-goto],[data-copy-url],[data-demo],[data-mode],#round-edit');
+  const t = e.target.closest('[data-sel],[data-leader-sel],[data-filter],[data-goto],[data-copy-url],[data-demo],[data-mode],#round-edit');
   if (!t) return;
   if (t.dataset.sel) { ui.selId = t.dataset.sel; render(); }
-  else if (t.dataset.draftTab) { ui.draftTab = t.dataset.draftTab; render(); }
   else if (t.dataset.leaderSel) { ui.leaderId = t.dataset.leaderSel; render(); }
   else if (t.dataset.filter) { ui.filter = t.dataset.filter; render(); }
   else if (t.dataset.goto) selectTab(t.dataset.goto);
   else if (t.dataset.copyUrl !== undefined) $('copy-url').click();
   else if (t.dataset.demo !== undefined) $('demo-enter').click();
-  else if (t.id === 'round-edit') { ui.draftTab = 'setup'; render(); document.querySelector(`[data-round-row="${S.round}"]`)?.scrollIntoView({ block: 'center' }); }
+  else if (t.id === 'round-edit') { ui.draftView = 'setup'; selectTab('draft'); document.querySelector(`[data-round-row="${S.round}"]`)?.scrollIntoView({ block: 'center' }); } // 進め方はドラフトのタブ
   else if (t.dataset.mode) { if (t.dataset.mode !== ui.view) setView(t.dataset.mode); }
 });
 $('player-search').addEventListener('input', (e) => { ui.search = e.target.value; renderPlayers(); });
@@ -751,6 +799,7 @@ function renderShow() {
   if (document.activeElement !== $('opt-transcut')) $('opt-transcut').value = o.transCut || '';
   if (document.activeElement !== $('opt-fade')) $('opt-fade').value = o.fadeSec;
   $('opt-leadercolors').checked = !!o.leaderColors;
+  $('opt-classlabel').value = o.classLabel || 'クラス';
   renderThemes(o);
   $('trans-video-name').textContent = o.transVideo || 'まだありません';
   if (document.activeElement !== $('in-rounds')) $('in-rounds').value = S.rounds;
@@ -770,7 +819,7 @@ document.addEventListener('click', (e) => {
   } else if (t.dataset.lookPick) { pickTarget = { kind: 'look', key: t.dataset.lookPick }; $('look-file').value = ''; $('look-file').click(); }
   else if (t.dataset.lookClear) setOption({ [t.dataset.lookClear]: '' });
   else if (t.dataset.pick) { const [kind, id] = t.dataset.pick.split(':'); pickTarget = { kind, id }; $('look-file').value = ''; $('look-file').click(); }
-  else if (t.dataset.standClear) act({ type: 'updateLeader', id: t.dataset.standClear, patch: { stand: '' } });
+  else if (t.dataset.standClear) { const [k, id] = t.dataset.standClear.split(':'); act({ type: k === 'P' ? 'updatePlayer' : 'updateLeader', id, patch: { stand: '' } }); }
   else if (t.dataset.teamLogoClear) act({ type: 'updateLeader', id: t.dataset.teamLogoClear, patch: { teamLogo: '' } });
   else if (t.dataset.progAdd) {
     const k = t.dataset.progAdd;
@@ -794,6 +843,7 @@ $('look-file').addEventListener('change', async (e) => {
     const name = await upload(`${tg.kind}_${tg.key || tg.id}_${Date.now()}${IMG_EXT[f.type]}`, f);
     if (tg.kind === 'look') setOption(tg.key === 'logoImage' ? { logoImage: name, titleMode: 'logo' } : { [tg.key]: name });
     else if (tg.kind === 'stand') act({ type: 'updateLeader', id: tg.id, patch: { stand: name } });
+    else if (tg.kind === 'pstand') act({ type: 'updatePlayer', id: tg.id, patch: { stand: name } });
     else if (tg.kind === 'teamLogo') act({ type: 'updateLeader', id: tg.id, patch: { teamLogo: name } });
     else if (tg.kind === 'slide') act({ type: 'updateSlide', id: tg.id, patch: { image: name } });
   } catch (err) { toast(err.message, true); }
@@ -803,6 +853,7 @@ document.addEventListener('change', (e) => {
   if (t.id === 'opt-prefix') setOption({ teamPrefix: t.value });
   else if (t.id === 'opt-trans') setOption({ transition: t.value });
   else if (t.id === 'opt-bgmotion') setOption({ bgMotion: t.checked });
+  else if (t.id === 'opt-classlabel') setOption({ classLabel: t.value });
   else if (t.id === 'opt-lotentry') setOption({ lotEntry: t.value });
   else if (t.id === 'opt-transsec') setOption({ transSec: Math.max(0.2, Math.min(3, +t.value || 0.6)) });
   else if (t.id === 'opt-transcut') setOption({ transCut: Math.max(0, +t.value || 0) });
@@ -852,79 +903,149 @@ function syncThemePreviews() {
 }
 $('themes').addEventListener('click', (e) => { const b = e.target.closest('[data-theme]'); if (b) setOption({ theme: b.dataset.theme }); });
 
-/* ---------- 大会・イベント・名簿 ---------- */
+/* ---------- 大会・配信・名簿 ----------
+ * 大会の切り替えは左上(最近の大会・新しい大会・すべての大会と名簿)。大会の外の画面 = 大会の一覧 / 名簿
+ * 配信(1回の配信)の切り替えは、配信のタブの進行表の上 */
 const sendLib = (cmd, extra) => ws.send(JSON.stringify(Object.assign({ type: 'library', cmd }, extra)));
 const fmtDate = (t) => { const d = new Date(t); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+const ROLE = { leader: 'リーダー', player: '選手', staff: '運営' };
+const SEG_BTN = (attr, k, t, on) => `<button type="button" ${attr}="${k}" aria-pressed="${on}" class="relative after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 h-9 px-4 rounded-md text-sm font-medium cursor-pointer ${FOCUS} ${on ? 'bg-[var(--bg-page-alt)] text-[var(--text-heading)]' : 'text-[var(--text-muted)]'}">${t}</button>`;
 function renderLibrary() {
   if (!lib) return;
+  const curT = lib.tournaments.find((t) => t.id === lib.current);
+  $('tour-switch-label').textContent = `大会: ${curT ? curT.title : S.title}`;
+  setDisabled($('tour-switch'), ui.view === 'live'); // 本番の間は大会を切り替えない
+  // 左上の小さな一覧: 最近の大会(5つまで)
+  $('tour-menu').innerHTML = `<p class="px-1 text-xs text-[var(--text-muted)]">最近の大会</p>
+    ${lib.tournaments.slice(0, 5).map((t) => { const on = t.id === lib.current; return `<button type="button" ${on ? 'disabled aria-disabled="true" aria-current="true"' : `data-tour-open="${t.id}"`} class="w-full min-h-11 flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm border cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12] font-bold text-[var(--text-heading)]' : 'border-[var(--border-default)] hover:bg-[var(--bg-page-alt)]'}"><span class="min-w-0 flex-1 truncate">${esc(t.title)}</span>${on ? badge('in', '開いている') : t.endedAt ? badge('wait', '終了') : ''}</button>`; }).join('')}
+    <div class="flex gap-2 pt-1"><button type="button" data-lib-open="tours" data-lib-new class="${BTN_SUB} flex-1 px-2 text-sm">＋ 新しい大会</button><button type="button" data-lib-open="tours" class="${BTN_SUB} flex-1 px-2 text-sm">すべての大会と名簿</button></div>`;
+  renderEventSwitch();
+  // 大会の一覧(すべての大会と名簿)
   $('tours').innerHTML = lib.tournaments.map((t) => {
     const on = t.id === lib.current;
-    return `<li class="flex items-center gap-3 min-h-14 px-3 py-2 rounded-xl border ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)]'}">
-      <span class="min-w-0 flex-1"><b class="block truncate text-base text-[var(--text-heading)]">${esc(t.title)}</b><span class="text-xs text-[var(--text-muted)]">${fmtDate(t.createdAt)} 作成・リーダー${t.leaders}人・選手${t.players}人</span></span>
-      ${t.endedAt ? badge('wait', '終了') : ''}${on ? badge('in', '開いている') : `<button type="button" class="${BTN_SUB}" data-tour-open="${t.id}">開く</button><button type="button" class="${BTN_ICON} hover:text-red-300" data-tour-del="${t.id}" aria-label="${esc(t.title)} を削除">${ICON.del}</button>`}</li>`;
+    return `<div class="flex items-center gap-3 min-h-14 px-3 py-2 rounded-xl border ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)]'}">
+      <span class="min-w-0 flex-1"><b class="block truncate text-base text-[var(--text-heading)]">${esc(t.title)}</b><span class="text-xs text-[var(--text-muted)]">${fmtDate(t.createdAt)}〜${t.endedAt ? fmtDate(t.endedAt) : ''}・チーム${t.teams}・選手${t.players}・配信${t.events}</span></span>
+      ${t.endedAt ? badge('wait', '終了') : ''}${on ? badge('in', '開いている') : `<button type="button" class="${BTN_SUB}" data-tour-open="${t.id}">開く</button><button type="button" class="${BTN_ICON} hover:text-red-300" data-tour-del="${t.id}" aria-label="${esc(t.title)} を削除">${ICON.del}</button>`}</div>`;
   }).join('');
-  $('events').innerHTML = lib.events.map((e) => {
-    const on = e.id === lib.currentEvent;
-    return `<li class="flex items-center gap-1 p-1 rounded-xl border ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)]'}">
-      <label class="sr-only" for="ev-${e.id}">イベントの名前</label><input id="ev-${e.id}" type="text" data-ev-name="${e.id}" value="${esc(e.name)}" maxlength="30" class="w-44 ${INPUT}">
-      ${on ? badge('in', '開いている') : `<button type="button" class="${BTN_SUB}" data-ev-open="${e.id}">開く</button>`}
-      ${lib.events.length > 1 ? `<button type="button" class="${BTN_ICON} hover:text-red-300" data-ev-del="${e.id}" aria-label="${esc(e.name)} を削除">${ICON.del}</button>` : ''}</li>`;
-  }).join('');
+  // 大会のタブ: 大会を終える / 再開
   const ended = lib.ended;
   $('tour-end').textContent = ended ? '大会を再開' : '大会を終える';
   $('tour-end').title = ended ? '名簿の最新の名前や顔に戻ります' : 'いまの名前や顔をこの大会に写して固定します（あとで名簿を直しても、この大会は変わりません）';
   show($('tour-ended'), ended, 'inline-flex');
   $('tour-ended').innerHTML = ended ? badge('wait', '終了した大会') : '';
+  renderPeople();
 }
+// 配信の切り替え(進行表の上)。配信が1つなら名前だけ
+function renderEventSwitch() {
+  const el = $('event-switch');
+  if (el.contains(document.activeElement)) return;
+  const evs = lib.events, cur = evs.find((e) => e.id === lib.currentEvent) || evs[0];
+  el.innerHTML = `<span class="text-xs text-[var(--text-muted)]">配信</span>
+    <div class="flex items-center gap-1">${evs.length > 1
+      ? `<div class="relative flex-1 min-w-0"><label class="sr-only" for="ev-sel">配信を切り替える</label><select id="ev-sel" class="appearance-none w-full pl-3 pr-10 ${INPUT} cursor-pointer font-bold">${evs.map((e) => `<option value="${e.id}" ${e.id === cur.id ? 'selected' : ''}>${esc(e.name)}</option>`).join('')}</select>${ICON.chevron}</div>`
+      : `<b class="flex-1 min-w-0 truncate text-base text-[var(--text-heading)]">${esc(cur ? cur.name : '')}</b>`}
+      <button type="button" class="${BTN_ICON}" id="ev-rename" aria-label="配信の名前を変える" title="名前を変える">${svg('<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>')}</button>
+      <button type="button" class="${BTN_ICON}" id="ev-add" aria-label="配信を足す" title="配信を足す（進行表は配信ごと、ドラフトは続きから）">${svg('<path d="M12 5v14M5 12h14"/>')}</button>
+      ${evs.length > 1 ? `<button type="button" class="${BTN_ICON} hover:text-red-300" id="ev-del" aria-label="${esc(cur.name)} を削除">${ICON.del}</button>` : ''}</div>`;
+}
+const openLib = (view) => { ui.libView = view || ui.libView; renderLibView(); if (!$('lib-dlg').open) $('lib-dlg').showModal(); };
+function renderLibView() {
+  document.querySelectorAll('[data-lib-view]').forEach((b) => { const on = b.dataset.libView === ui.libView; b.setAttribute('aria-pressed', on); b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on); b.classList.toggle('text-[var(--text-muted)]', !on); });
+  $('lib-tours').classList.toggle('hidden', ui.libView !== 'tours');
+  $('lib-people').classList.toggle('hidden', ui.libView !== 'people');
+  if (ui.libView === 'people' && ui.personId) sendLib('history', { id: ui.personId });
+}
+// 名簿: 人の一覧と、選んだ1人(名簿の情報と、大会ごとの履歴)
+let personHistory = { id: null, rows: [] };
+function renderPeople() {
+  if (!lib) return;
+  const q = (ui.peopleQ || '').trim();
+  const list = lib.roster.filter((p) => !q || p.name.includes(q));
+  $('people-count').textContent = `${lib.roster.length}人`;
+  if (!lib.roster.some((p) => p.id === ui.personId)) ui.personId = null;
+  $('people').innerHTML = list.map((p) => { const on = p.id === ui.personId; return `<button type="button" data-person="${p.id}" ${on ? 'aria-current="true"' : ''} class="min-h-14 flex items-center gap-3 px-3 py-2 rounded-xl border text-left cursor-pointer ${FOCUS} ${on ? 'border-primary-500 bg-primary-500/[.12]' : 'border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-page-alt)]'}">${avatar(p.icon, null)}<span class="min-w-0 flex-1"><b class="block truncate text-[var(--text-heading)]">${esc(p.name)}</b><span class="text-xs text-[var(--text-muted)]">${p.uses.length ? `${p.uses.length}大会` : 'どの大会にも出ていない'}</span></span></button>`; }).join('') || '<p class="col-span-full py-16 text-center text-[var(--text-muted)]">名簿はまだ空です</p>';
+  const el = $('person-panel'), p = lib.roster.find((x) => x.id === ui.personId);
+  if (el.contains(document.activeElement) && document.activeElement.matches('input')) return;
+  show(el, !!p, 'flex');
+  if (!p) return;
+  const rows = personHistory.id === p.id ? personHistory.rows : [];
+  el.innerHTML = `<div class="flex items-center gap-3">${avatar(p.icon, null, 'w-16 h-16')}<div class="min-w-0"><b class="block truncate text-lg text-[var(--text-heading)]">${esc(p.name)}</b><span class="text-xs text-[var(--text-muted)]">全大会で共通の情報</span></div></div>
+    <div class="flex gap-3"><div class="flex-1"><label class="${LABEL}" for="pp-name">名前</label><input id="pp-name" type="text" data-person-f="name" value="${esc(p.name)}" class="w-full ${INPUT}"></div>
+      <div class="w-32"><label class="${LABEL}" for="pp-short">略称</label><input id="pp-short" type="text" data-person-f="short" value="${esc(p.short)}" maxlength="12" class="w-full ${INPUT}"></div></div>
+    <div><span class="${LABEL}">大会ごとの履歴</span><div class="flex flex-col gap-2">${rows.map((r) => `<div class="p-3 rounded-lg border border-[var(--border-default)] ${r.endedAt ? 'opacity-80' : ''}">
+        <div class="flex items-center gap-2"><b class="flex-1 min-w-0 truncate text-sm text-[var(--text-heading)]">${esc(r.title)}</b><span class="text-xs text-[var(--text-muted)]">${fmtDate(r.createdAt)}〜${r.endedAt ? fmtDate(r.endedAt) : ''}</span></div>
+        <div class="flex flex-wrap items-center gap-2 mt-1 text-sm">${badge(r.role === 'leader' ? 'in' : 'wait', ROLE[r.role] || r.role)}${r.team ? `<span>${esc(r.team)}</span>` : ''}${r.klass ? `<span class="text-xs text-[var(--text-muted)]">${esc(r.classLabel)} ${esc(r.klass)}</span>` : ''}${r.round ? `<span class="text-xs text-[var(--text-muted)]">ドラフト ${r.round}巡目${r.by === 'lottery' ? '（抽選）' : ''}</span>` : ''}</div></div>`).join('') || '<p class="text-sm text-[var(--text-muted)]">どの大会にも出ていません</p>'}</div></div>
+    ${p.uses.length ? '' : `<div class="flex"><button type="button" class="ml-auto ${BTN_SUB} text-red-300" data-roster-del="${p.id}">名簿から消す</button></div>`}`;
+}
+$('tour-switch').addEventListener('click', (e) => { e.stopPropagation(); const m = $('tour-menu'), open = m.classList.contains('hidden'); m.classList.toggle('hidden', !open); $('tour-switch').setAttribute('aria-expanded', open); });
+document.addEventListener('click', (e) => { if (!e.target.closest('#tour-menu') && !e.target.closest('#tour-switch')) { $('tour-menu').classList.add('hidden'); $('tour-switch').setAttribute('aria-expanded', 'false'); } });
+$('lib-close').addEventListener('click', () => $('lib-dlg').close());
 $('tour-new').addEventListener('click', () => {
-  const title = prompt('新しい大会の名前', '');
-  if (title == null) return;
-  sendLib('create', { title: title.trim() || '新しい大会' }); toast('新しい大会を作りました。リーダー・選手の「名簿から追加」で人を入れられます');
+  sendLib('create', { title: $('new-tour-title').value.trim() || '新しい大会' });
+  $('new-tour-title').value = ''; $('lib-dlg').close(); selectTab('leaders');
+  toast('新しい大会を作りました。チームと選手は「名簿から」で前の大会の人を入れられます');
 });
 $('tour-end').addEventListener('click', () => {
   if (lib.ended) { if (confirm('この大会を再開しますか？\n名前や顔は、名簿の最新に戻ります。')) sendLib('reopen'); }
   else if (confirm('この大会を終えますか？\nいまの名前や顔をこの大会に写して固定します。あとで再開もできます。')) sendLib('end');
 });
-$('event-add').addEventListener('click', () => { sendLib('addEvent', { eventType: 'draft' }); toast('イベントを追加しました。進行表はイベントごとです'); });
+$('people-search').addEventListener('input', (e) => { ui.peopleQ = e.target.value; renderPeople(); });
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('[data-tour-open],[data-tour-del],[data-ev-open],[data-ev-del],[data-roster-add],[data-roster-del]');
+  const t = e.target.closest('[data-tour-open],[data-tour-del],[data-lib-open],[data-lib-view],[data-person],[data-roster-add],[data-roster-del],#ev-add,#ev-del,#ev-rename');
   if (!t) return;
-  if (t.dataset.tourOpen) { sendLib('open', { id: t.dataset.tourOpen }); toast('大会を切り替えました'); }
+  if (t.dataset.tourOpen) { sendLib('open', { id: t.dataset.tourOpen }); $('tour-menu').classList.add('hidden'); if ($('lib-dlg').open) $('lib-dlg').close(); toast('大会を切り替えました'); }
   else if (t.dataset.tourDel) { const x = lib.tournaments.find((y) => y.id === t.dataset.tourDel); if (confirm(`「${x.title}」を削除しますか？\n（データフォルダの trash に残ります）`)) sendLib('remove', { id: x.id }); }
-  else if (t.dataset.evOpen) sendLib('openEvent', { id: t.dataset.evOpen });
-  else if (t.dataset.evDel) { const x = lib.events.find((y) => y.id === t.dataset.evDel); if (confirm(`イベント「${x.name}」を削除しますか？\n（進行表とドラフトの結果も消えます）`)) sendLib('removeEvent', { id: x.id }); }
+  else if (t.dataset.libOpen) { $('tour-menu').classList.add('hidden'); openLib(t.dataset.libOpen); if (t.dataset.libNew !== undefined) $('new-tour-title').focus(); }
+  else if (t.dataset.libView) { ui.libView = t.dataset.libView; renderLibView(); }
+  else if (t.dataset.person) { ui.personId = t.dataset.person; renderPeople(); sendLib('history', { id: ui.personId }); }
   else if (t.dataset.rosterAdd) openRosterDlg(t.dataset.rosterAdd);
-  else if (t.dataset.rosterDel) sendLib('removePerson', { id: t.dataset.rosterDel });
+  else if (t.dataset.rosterDel) { if (confirm('この人を名簿から消しますか？')) sendLib('removePerson', { id: t.dataset.rosterDel }); }
+  else if (t.id === 'ev-add') { sendLib('addEvent'); toast('配信を足しました。進行表は配信ごと、ドラフトは続きから進みます'); }
+  else if (t.id === 'ev-del') { const x = lib.events.find((y) => y.id === lib.currentEvent); if (confirm(`配信「${x.name}」を削除しますか？\n（進行表とメモが消えます。ドラフトの結果は残ります）`)) sendLib('removeEvent', { id: x.id }); }
+  else if (t.id === 'ev-rename') { const x = lib.events.find((y) => y.id === lib.currentEvent) || lib.events[0]; const name = prompt('配信の名前', x.name); if (name != null && name.trim()) sendLib('renameEvent', { id: x.id, name: name.trim() }); }
 });
-document.addEventListener('change', (e) => { const t = e.target; if (t.dataset.evName) sendLib('renameEvent', { id: t.dataset.evName, name: t.value.trim() }); });
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.id === 'ev-sel') sendLib('openEvent', { id: t.value });
+  else if (t.dataset.personF) sendLib('updatePerson', { id: ui.personId, patch: { [t.dataset.personF]: t.value.trim() } });
+});
 
-// 名簿から追加: この大会にまだいない人を選ぶ
-const rosterSel = { role: 'player', ids: new Set(), q: '' };
-function openRosterDlg(role) {
-  Object.assign(rosterSel, { role, ids: new Set(), q: '' });
+// 名簿から追加: この大会にまだいない人を選ぶ。mode = player(選手を足す) / leader(リーダーを選んでチームを足す) / setLeader(このチームのリーダーを替える)
+const rosterSel = { role: 'player', ids: new Set(), q: '', teamId: null };
+function openRosterDlg(role, teamId) {
+  Object.assign(rosterSel, { role, ids: new Set(), q: '', teamId: teamId || null });
   $('roster-search').value = '';
-  $('roster-title').textContent = role === 'leader' ? '名簿からリーダーを追加' : '名簿から選手を追加';
+  $('roster-title').textContent = role === 'setLeader' ? 'リーダーを名簿から選ぶ' : role === 'leader' ? '名簿からリーダーを選んで、チームを足す' : '名簿から選手を追加';
   $('roster-dlg').showModal();
   renderRosterDlg();
 }
 function renderRosterDlg() {
   if (!lib || !$('roster-dlg').open) return;
-  const inT = new Set([...S.leaders, ...S.players].map((x) => x.id));
-  const roleName = { leader: 'リーダー', player: '選手' };
+  const inT = new Set([...S.leaders.map((l) => l.personId), ...S.players.map((p) => p.id)]);
+  const single = rosterSel.role === 'setLeader';
   const list = lib.roster.filter((p) => !inT.has(p.id) && (!rosterSel.q || p.name.includes(rosterSel.q)));
   $('roster-list').innerHTML = list.map((p) => {
     const last = p.uses[p.uses.length - 1];
     return `<li class="flex items-center gap-3 min-h-14 px-2 rounded-lg hover:bg-[var(--bg-page-alt)]">
-      <label class="flex-1 min-w-0 flex items-center gap-3 cursor-pointer"><input type="checkbox" data-roster-pick="${p.id}" ${rosterSel.ids.has(p.id) ? 'checked' : ''} class="w-5 h-5 accent-primary-500">${avatar(p.icon, null)}
-        <span class="min-w-0"><b class="block truncate text-[var(--text-heading)]">${esc(p.name)}</b><span class="block truncate text-xs text-[var(--text-muted)]">${last ? `${esc(last.title)}（${roleName[last.role]}）${p.uses.length > 1 ? ` ほか${p.uses.length - 1}大会` : ''}` : 'どの大会にも出ていません'}</span></span></label>
-      ${p.uses.length ? '' : `<button type="button" class="${BTN_ICON} hover:text-red-300" data-roster-del="${p.id}" aria-label="${esc(p.name)} を名簿から消す" title="名簿から消す">${ICON.del}</button>`}</li>`;
+      <label class="flex-1 min-w-0 flex items-center gap-3 cursor-pointer"><input type="${single ? 'radio' : 'checkbox'}" name="roster-pick" data-roster-pick="${p.id}" ${rosterSel.ids.has(p.id) ? 'checked' : ''} class="w-5 h-5 accent-primary-500">${avatar(p.icon, null)}
+        <span class="min-w-0"><b class="block truncate text-[var(--text-heading)]">${esc(p.name)}</b><span class="block truncate text-xs text-[var(--text-muted)]">${last ? `${esc(last.title)}（${ROLE[last.role] || ''}）${p.uses.length > 1 ? ` ほか${p.uses.length - 1}大会` : ''}` : 'どの大会にも出ていません'}</span></span></label></li>`;
   }).join('') || `<li class="py-10 text-center text-[var(--text-muted)]">${lib.roster.length ? '追加できる人はいません' : '名簿はまだ空です'}</li>`;
-  $('roster-count').textContent = rosterSel.ids.size ? `${rosterSel.ids.size}人を選択中` : '';
+  $('roster-count').textContent = rosterSel.ids.size && !single ? `${rosterSel.ids.size}人を選択中` : '';
+  $('roster-ok').textContent = single ? 'リーダーにする' : '追加';
   setDisabled($('roster-ok'), !rosterSel.ids.size);
 }
 $('roster-search').addEventListener('input', (e) => { rosterSel.q = e.target.value.trim(); renderRosterDlg(); });
-$('roster-list').addEventListener('change', (e) => { const id = e.target.dataset.rosterPick; if (!id) return; if (e.target.checked) rosterSel.ids.add(id); else rosterSel.ids.delete(id); renderRosterDlg(); });
-$('roster-ok').addEventListener('click', () => { sendLib('addPeople', { role: rosterSel.role, ids: [...rosterSel.ids] }); $('roster-dlg').close(); toast(`${rosterSel.ids.size}人を追加しました`); });
+$('roster-list').addEventListener('change', (e) => {
+  const id = e.target.dataset.rosterPick; if (!id) return;
+  if (rosterSel.role === 'setLeader') rosterSel.ids = new Set([id]);
+  else if (e.target.checked) rosterSel.ids.add(id); else rosterSel.ids.delete(id);
+  renderRosterDlg();
+});
+$('roster-ok').addEventListener('click', () => {
+  if (rosterSel.role === 'setLeader') { sendLib('setLeader', { id: rosterSel.teamId, personId: [...rosterSel.ids][0] }); toast('リーダーを替えました'); }
+  else { sendLib('addPeople', { role: rosterSel.role, ids: [...rosterSel.ids] }); toast(`${rosterSel.ids.size}${rosterSel.role === 'leader' ? 'チーム' : '人'}を足しました`); }
+  $('roster-dlg').close();
+});
 
 /* ---------- スマホ操作 ---------- */
 function renderRemote() {

@@ -239,7 +239,7 @@ function cardHtml(l, playerId, stamp, dup, pop, wait = W('cardWait')) {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(lc(l))}"><div class="in">
       <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div>
-        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && p.note ? `<small>${esc(p.note)}</small>` : ''}</div></div>
+        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && (p.note || p.klass) ? `<small>${p.klass ? `<em class="kl">${esc(p.klass)}</em>` : ''}${esc(p.note || '')}</small>` : ''}</div></div>
         ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? W('stampOk') : W('stampDup')}</div>` : ''}</div>
       <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(C.teamLabel(S, l))}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
     </div></div>`;
@@ -536,7 +536,7 @@ function renderTeams() {
       const key = `${l.id}:${p.playerId}`; now.add(key);
       const pl = C.playerById(S, p.playerId);
       const d = isNew(key) ? k++ : -1;
-      return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}${esc(pl ? pl.name : '')}</li>`;
+      return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}${esc(pl ? pl.name : '')}${pl && pl.klass ? `<em class="kl">${esc(pl.klass)}</em>` : ''}</li>`;
     }).join('');
     return `<div class="team" style="--c:${esc(lc(l))}"><div class="th">${l.teamLogo || l.icon ? `<img src="${img(l.teamLogo || l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
   }).join('');
