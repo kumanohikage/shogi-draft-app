@@ -11,7 +11,7 @@
     "check:ui": "npm run css && electron scripts/check-ui.js",
     "test": "node test/core.test.js && node test/store.test.js",
     "dist": "npm run vendor && npm run css && electron-builder --win",
-    "dist:mac": "npm run vendor && npm run css && electron-builder --mac",
+    "dist:mac": "npm run vendor && npm run css && electron-builder --mac --publish never",
     "vendor": "node scripts/vendor.js"
   },
   "dependencies": {
