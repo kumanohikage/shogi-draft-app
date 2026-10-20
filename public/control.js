@@ -516,7 +516,6 @@ function renderDraftTab() {
   document.querySelectorAll('[data-draft-view]').forEach((b) => { const on = b.dataset.draftView === ui.draftView; b.setAttribute('aria-pressed', on); b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on); b.classList.toggle('text-[var(--text-muted)]', !on); });
   $('draft-look').classList.toggle('hidden', ui.draftView !== 'look');
   $('draft-setup').classList.toggle('hidden', ui.draftView !== 'setup');
-  $('draft-state').textContent = C.draftComplete(S) ? '終わった' : C.draftStarted(S) ? `進行中・第${S.round}巡` : 'これから';
 }
 document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-draft-view],[data-set-leader]');
