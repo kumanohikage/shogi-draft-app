@@ -365,7 +365,9 @@ function renderLook() {
     $('theme-css').href = th.css ? `themes/${id}.css` : 'data:text/css,';
     $('bgfx').removeAttribute('src');
   }
-  st.classList.toggle('bg3d', !!th.bg && !EXPORT && !STATIC); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
+  st.classList.toggle('bg3d', !!th.bg && !EXPORT && !STATIC);
+  // 光の世界へ入るときの 3D の切り替えは、先に読み込んでおく(押した瞬間に待たないように)
+  if (ENTRY3D.has(th.entry) && !EXPORT && !PREVIEW && !STATIC && !$('entryfx').getAttribute('src')) $('entryfx').setAttribute('src', 'entry3d.html'); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
   const motion = !!th.bg && (!o.bgImage || o.bgMotion !== false); // 自分の背景画像の上にも動きを重ねる(なしも選べる)
   const src = motion && !EXPORT && !STATIC ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}${LITE ? '&lite=1' : ''}` : '';
   if (($('bgfx').getAttribute('src') || '') !== src) { $('bgfx').classList.remove('ready'); if (src) $('bgfx').setAttribute('src', src); else $('bgfx').removeAttribute('src'); }
@@ -379,11 +381,29 @@ function updateBg() {
 }
 addEventListener('message', (e) => { if ((e.data || {}).type === 'bg-ready' && e.source === $('bgfx').contentWindow) { $('bgfx').classList.add('ready'); updateBg(); } });
 // 光の世界(3D の抽選)へ入るときの切り替え。swap() で後ろを入れ替える(覆っている間に)
+// 3D で描く切り替え(entry3d.html)。読み込めていないときは平面の版(entry.js)で
+const ENTRY3D = new Set(['petals', 'band', 'shoji']);
+let entry3dReady = false;
+addEventListener('message', (e) => { if ((e.data || {}).type === 'entry3d-ready' && e.source === $('entryfx').contentWindow) entry3dReady = true; });
+function playEntry3d(kind, swap, colors) {
+  const f = $('entryfx');
+  return new Promise((resolve) => {
+    let swapped = false;
+    const doSwap = () => { if (!swapped) { swapped = true; swap(); } };
+    const finish = () => { removeEventListener('message', on); clearTimeout(safety); doSwap(); f.style.visibility = 'hidden'; resolve(); };
+    const on = (e) => { if (e.source !== f.contentWindow) return; const m = e.data || {}; if (m.type === 'entry-swap') doSwap(); else if (m.type === 'entry-end') finish(); };
+    const safety = setTimeout(finish, 8000); // 返事が無くても止まらないように
+    addEventListener('message', on);
+    f.style.visibility = 'visible';
+    f.contentWindow.postMessage({ type: 'entry-play', kind, colors }, '*');
+  });
+}
 async function playEntry(swap) {
   const kind = theme().entry, E = window.DraftEntry;
   if (!E || !E[kind] || PREVIEW) { swap(); return; }
   const L = S.lottery, colors = L ? L.leaders.map((id) => C.leaderById(S, id)?.color).filter(Boolean) : [];
   SE.entry();
+  if (ENTRY3D.has(kind) && entry3dReady) return playEntry3d(kind, swap, colors);
   await E[kind]($('entry'), swap, { colors });
 }
 function renderLogo() {
