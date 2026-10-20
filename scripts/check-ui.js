@@ -124,14 +124,13 @@ app.whenReady().then(async () => {
   await check('13-run-round2');
   // 6. 画像の登録: ドロップ → 調整画面 → 位置と大きさを変えて保存 → 開き直すと調整が残っている
   await tab('players');
-  await js("ui.playerId = S.players[0].id; render(); 0"); await wait(300); // 選手を選ぶと右のパネルに顔の欄
   const before = S.players[0].icon;
   await js(`(async () => {
     const c = document.createElement('canvas'); c.width = 200; c.height = 100;
     const g = c.getContext('2d'); g.fillStyle = '#c0261e'; g.fillRect(0, 0, 100, 100); g.fillStyle = '#1f63d6'; g.fillRect(100, 0, 100, 100);
     const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
     const dt = new DataTransfer(); dt.items.add(new File([blob], 'test.png', { type: 'image/png' }));
-    document.querySelector('#player-panel [data-icon]').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    document.querySelector('#players .item [data-icon]').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
   })()`);
   await wait(600);
   if (!(await js("document.getElementById('crop').open"))) { console.log('✗ 調整画面が開かない'); errors++; }
@@ -142,20 +141,41 @@ app.whenReady().then(async () => {
   const p0 = S.players[0];
   if (!p0.icon || p0.icon === before || !fs.existsSync(path.join(dataDir, 'images', p0.icon)) || !p0.iconSrc || !p0.iconCrop || p0.iconCrop.zoom !== 2) { console.log(`✗ 画像の保存に失敗 ${JSON.stringify(p0)}`); errors++; }
   else console.log(`✓ 画像を調整して保存: ${p0.icon}（元画像 ${p0.iconSrc}、調整 ${JSON.stringify(p0.iconCrop)}）`);
-  await js("document.querySelector('#player-panel [data-icon]').click()"); await wait(800);
+  await js("document.querySelector('#players .item [data-icon]').click()"); await wait(800);
   const re = await js("({ open: document.getElementById('crop').open, zoom: crop.zoom, x: Math.round(crop.x) })");
   if (!re.open || re.zoom !== 2 || re.x !== 40) { console.log(`✗ 開き直したときに調整が残っていない ${JSON.stringify(re)}`); errors++; }
   else console.log('✓ 開き直すと前の調整のまま');
   await js("document.getElementById('crop').close(); 0");
   await check('15-roster-image');
-  await tab('show'); await check('16-show');
+  await tab('draft'); await js("ui.draftView = 'look'; render(); syncThemePreviews(); 0"); await check('16-draft-look');
   await tab('leaders'); await check('17-leaders');
+  await js("openRosterDlg('setLeader', S.leaders[0].id); 0"); await wait(300);
+  const rl = await js("document.querySelectorAll('#roster-list [data-roster-pick]').length");
+  if (!rl) { console.log('✗ リーダーを選ぶ一覧に名簿の人が出ない'); errors++; } else console.log(`✓ リーダーを選ぶ一覧に名簿の${rl}人が並ぶ`);
+  await check('17b-roster-leader');
+  await js("document.getElementById('roster-dlg').close(); 0");
   await tab('draft'); await js("ui.draftView = 'setup'; render(); 0"); await check('18-draft-setup');
-  await js("ui.draftView = 'log'; render(); 0"); await check('18b-draft-log');
-  await tab('players'); await check('18c-player-panel');
-  await js("openLib('tours'); 0"); await wait(300); await check('18d-lib-tours');
-  await js("ui.libView = 'people'; ui.personId = lib.roster[0].id; renderLibView(); renderPeople(); 0"); await wait(500); await check('18e-lib-people');
+  await tab('players'); await check('18c-players');
+  await js("document.getElementById('tour-switch').click(); 0"); await wait(200); await check('18d-tour-menu');
+  const menuWrap = await js("[...document.querySelectorAll('#tour-menu button')].some((b) => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().height > 48)");
+  if (menuWrap) { console.log('✗ ドラフトの切り替えのボタンの文字があふれている'); errors++; }
+  await js("document.body.click(); document.getElementById('lib-dlg').showModal(); 0"); await wait(300); await check('18e-lib-drafts');
   await js("document.getElementById('lib-dlg').close(); 0");
+  // 進行表の場面をドラッグで並べ替え(2番目を1番目の上へ)
+  await tab('prog');
+  const order0 = await js("C.programOf(S).map((g) => g.id)");
+  await js(`(() => {
+    const rows = document.querySelectorAll('#prog-rail [data-drag-id]'), a = rows[1], b = rows[0], r = b.getBoundingClientRect(), dt = new DataTransfer();
+    a.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    b.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientY: r.top + 2 }));
+    b.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientY: r.top + 2 }));
+    a.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+  })()`);
+  await wait(400);
+  const order1 = await js("C.programOf(S).map((g) => g.id)");
+  if (order1[0] !== order0[1] || order1[1] !== order0[0]) { console.log(`✗ ドラッグで場面の順番が変わらない ${order0.slice(0, 3)} → ${order1.slice(0, 3)}`); errors++; }
+  else console.log('✓ ドラッグで場面の順番を変えられる');
+  await js(`act({ type: 'reorderProgram', id: '${order0[0]}', to: 0 }); 0`); await wait(300);
   await tab('prog'); await js("ui.selId = C.programOf(S)[1].id; render(); 0"); await check('19-scene-slide');
   await js("setView('live'); 0"); await wait(600); await check('20-live');
   await js("setView('edit'); ui.selId = null; render(); 0");

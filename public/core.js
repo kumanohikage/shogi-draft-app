@@ -165,7 +165,7 @@
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d', theme: 'gold', bgMotion: true, lotEntry: '', classLabel: 'クラス' };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d', theme: 'gold', bgMotion: true, lotEntry: '', classLabel: 'レート' };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
@@ -240,6 +240,14 @@
       case 'removeLeader':
         if (draftStarted(s)) throw new Error('ドラフトの途中はリーダーを削除できません');
         s.leaders = s.leaders.filter((l) => l.id !== action.id); delete s.noms[action.id]; break;
+      // ドラッグで並べ替え: id を to 番目へ
+      case 'reorderLeaders': {
+        if (draftStarted(s)) throw new Error('ドラフトの途中はチームの順番を変えられません');
+        const i = s.leaders.findIndex((l) => l.id === action.id), to = Math.max(0, Math.min(s.leaders.length - 1, action.to | 0));
+        if (i < 0 || i === to) break;
+        const [x] = s.leaders.splice(i, 1); s.leaders.splice(to, 0, x);
+        break;
+      }
       case 'moveLeader': {
         const i = s.leaders.findIndex((l) => l.id === action.id), j = i + action.dir;
         if (i >= 0 && j >= 0 && j < s.leaders.length) [s.leaders[i], s.leaders[j]] = [s.leaders[j], s.leaders[i]];
@@ -345,6 +353,14 @@
         s.program = programOf(s).filter((x) => x.id !== action.id);
         if (progIdxOf(s) > i) s.progIdx = progIdxOf(s) - 1;
         s.progIdx = Math.min(progIdxOf(s), s.program.length - 1);
+        break;
+      }
+      case 'reorderProgram': {
+        const p = [...programOf(s)], i = p.findIndex((x) => x.id === action.id), to = Math.max(0, Math.min(p.length - 1, action.to | 0));
+        if (i < 0 || i === to) break;
+        const cur = p[progIdxOf(s)];
+        const [x] = p.splice(i, 1); p.splice(to, 0, x);
+        s.program = p; s.progIdx = p.indexOf(cur);
         break;
       }
       case 'moveProgram': {

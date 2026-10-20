@@ -79,14 +79,14 @@
   .lotshead img { width: 100px !important; height: 100px !important; }
   .lotshead .pn { font-size: 64px !important; }
   .lotshead img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
-  .lotshead .pn { font: normal 76px var(--fd); color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00; }
+  .lotshead .pn { min-width: 0; white-space: nowrap; font: normal 76px var(--fd); color: #fff; text-shadow: 0 0 3px #5a2a00, 4px 4px 0 #5a2a00, -4px 4px 0 #5a2a00, 4px -4px 0 #5a2a00, -4px -4px 0 #5a2a00; }
   .lotshead .pk { padding: 8px 26px; border-radius: 999px; background: var(--pill-bg); color: var(--pill-fg); font: 900 34px var(--fb); }
   .lotsbody { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 60px 16px; }
   .lots { display: flex; gap: 36px; justify-content: center; flex-wrap: wrap; }
   .lot { width: 220px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
   .lot .face { position: relative; width: 220px; height: 220px; border-radius: 28px; background: var(--lc); box-shadow: 0 14px 30px rgba(0,0,0,.4), inset 0 -10px 0 rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; color: #fff; font: normal 120px var(--fd); text-shadow: 0 4px 0 rgba(0,0,0,.25); }
   /* 選んだ人の名前の枠: 選ぶ前(？)も選んだあとも同じ大きさ。変わるのは色だけ */
-  .lot .nm { flex: none; box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 60px; padding: 0 20px; border-radius: 12px; font: 900 34px/1 var(--fb); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); text-align: center; white-space: nowrap; }
+  .lot .nm { flex: none; max-width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 60px; padding: 0 20px; border-radius: 12px; font: 900 34px/1 var(--fb); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); text-align: center; white-space: nowrap; }
   .lot .cl { font: 900 30px var(--fb); color: var(--pill-fg); padding: 2px 18px; border-radius: 999px; background: rgba(20,14,8,.7); }
   .lot.taken .face { filter: saturate(.9); }
   .lot.taken .nm { background: #fffaf0; color: #2a1606; text-shadow: none; }
@@ -116,7 +116,7 @@
   .standwrap { position: absolute; inset: 0; }
   .standwrap .stand { position: absolute; left: 50%; bottom: 0; transform: translateX(calc(-50% + var(--sx, 0px))) translateY(var(--sy, 0px)) scale(var(--sk, 1)); transform-origin: 50% 100%; max-width: 1400px; height: 1000px; object-fit: contain; object-position: bottom; filter: drop-shadow(0 10px 30px rgba(0,0,0,.35)); }
   .standwrap .standicon { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); width: 560px; height: 560px; border-radius: 50%; object-fit: cover; border: 12px solid var(--c); box-shadow: 0 20px 50px rgba(0,0,0,.35); background: #fff; }
-  .standwrap .band { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); min-width: 1000px; padding: 22px 80px; box-sizing: border-box; text-align: center;
+  .standwrap .band { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); min-width: 1000px; max-width: 1760px; white-space: nowrap; padding: 22px 80px; box-sizing: border-box; text-align: center;
     background: linear-gradient(90deg, #f0b400, #ffe27a 50%, #f0b400); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 -8px 0 var(--c); font: 900 70px var(--fb); color: #1a1205; }
   .standwrap .tag { position: absolute; left: 50%; bottom: 236px; transform: translateX(-50%); padding: 10px 34px; border-radius: 999px; background: var(--pill-bg); color: var(--pill-fg); font: 900 36px var(--fb); white-space: nowrap; }
   .standwrap.enter .stand, .standwrap.enter .standicon { animation: standIn .6s cubic-bezier(.2,.9,.3,1) both; }
@@ -156,19 +156,18 @@
   .back .koma { width: 96px; height: 112px; background: linear-gradient(160deg, #f7dc9c, #c99a3c); clip-path: polygon(50% 0, 88% 20%, 100% 100%, 0 100%, 12% 20%);
     display: flex; align-items: center; justify-content: center; padding-top: 18px; box-sizing: border-box; font: 900 48px var(--fb); color: #1a0d00; }
   .back .wait { margin-top: 16px; color: #e8c88a; font: 900 24px var(--fb); letter-spacing: .2em; }
-  .back .who { position: absolute; top: 18px; left: 22px; color: #fff; font: 900 30px var(--fb); display: flex; align-items: center; gap: 10px; }
+  .back .who { position: absolute; top: 18px; left: 22px; right: 22px; color: #fff; font: 900 30px var(--fb); display: flex; align-items: center; gap: 10px; }
   .head { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--c); color: #fff; }
   .head img, .head .ava, .back .who img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,.3); border: 3px solid #fff; }
-  .head .tn { font: 900 34px var(--fb); text-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  .head .tn { flex: 1; min-width: 0; white-space: nowrap; font: 900 34px var(--fb); text-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  .back .wn { min-width: 0; white-space: nowrap; }
   .head .ln { font: 700 18px var(--fb); opacity: .9; }
   .nm { flex: 1; display: flex; align-items: center; justify-content: center; gap: 18px; padding: 0 22px 30px; } /* 下はハンコの分あける */
   .nm img { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 4px solid var(--c); flex: none; }
   .nm .nmt { display: flex; flex-direction: column; align-items: center; min-width: 0; }
   /* クラスか段位(入れたときだけ)。名前のあとの小さな札 */
-  .kl { display: inline-block; margin-right: 8px; padding: 0 8px; border-radius: 6px; border: 2px solid currentColor; font-style: normal; font-size: .9em; line-height: 1.3; }
-  .team li .kl { margin: 0 0 0 auto; font-size: 15px; }
-  .nm small { margin-top: 6px; font: 900 22px var(--fb); color: #7a5326; letter-spacing: .04em; }
-  .nm b { font: normal 52px var(--fd); color: #2a1606; line-height: 1.15; text-align: center; word-break: keep-all; overflow-wrap: anywhere; }
+  .nm small { white-space: nowrap; max-width: 100%; margin-top: 6px; font: 900 22px var(--fb); color: #7a5326; letter-spacing: .04em; }
+  .nm b { font: normal 52px var(--fd); color: #2a1606; line-height: 1.15; text-align: center; white-space: nowrap; max-width: 100%; }
   .stamp { position: absolute; right: 16px; bottom: 14px; padding: 4px 16px; border-radius: 10px; font: 900 24px var(--fb); color: #fff; transform: rotate(-6deg); }
   .stamp.ok { background: #c0261e; box-shadow: 0 0 0 3px #fff, 0 0 0 6px #c0261e; }
   .stamp.dup { background: #111; box-shadow: 0 0 0 3px #fff, 0 0 0 6px #111; }
@@ -180,12 +179,13 @@
   .team { width: 280px; background: #fffaf0; border-radius: 20px; overflow: hidden; box-shadow: 0 14px 30px rgba(0,0,0,.4); border: 5px solid var(--c); }
   .team .th { background: var(--c); color: #fff; padding: 16px 12px 12px; text-align: center; }
   .team .th img, .team .th .ava { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; border: 4px solid #fff; background: rgba(255,255,255,.3); display: inline-block; }
-  .team .th .tn { font: 900 26px var(--fb); margin-top: 6px; text-shadow: 0 2px 4px rgba(0,0,0,.4); }
+  .team .th .tn { white-space: nowrap; font: 900 26px var(--fb); margin-top: 6px; text-shadow: 0 2px 4px rgba(0,0,0,.4); }
   .team .th .ln { font: 700 17px var(--fb); opacity: .95; }
   .team ol { list-style: none; margin: 0; padding: 10px 12px 14px; }
   .team li { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 2px dashed #e8d4a4; font: 900 24px var(--fb); color: #2a1606; min-height: 58px; }
   .team li:last-child { border-bottom: 0; }
   .team li img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 3px solid var(--c); }
+  .team li .pnm { flex: 1; min-width: 0; white-space: nowrap; }
   .team li .r { font: 900 15px var(--fb); color: #fff; background: var(--c); border-radius: 6px; padding: 2px 6px; flex: none; }
   .team li.empty { color: #c9b48a; }
   .team li.new { animation: pop .6s cubic-bezier(.3,1.6,.5,1) both; }
@@ -205,6 +205,9 @@
   #trans { position: absolute; inset: 0; z-index: 50; opacity: 0; pointer-events: none; }
   #trans-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 51; display: none; pointer-events: none; }
   .scene.t-top { z-index: 10; }
+  /* 切り替えの途中: 出ていく写しの中は止める / 入ってくる場面の中の動きは、フェードが終わるまで待たせる */
+  .t-ghost * { animation: none !important; transition: none !important; }
+  .t-hold * { animation-play-state: paused !important; }
   @keyframes tSlideIn { from { transform: translateX(100%); } }
   @keyframes tSlideOut { to { transform: translateX(-100%); } }
   @keyframes tWipe { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }

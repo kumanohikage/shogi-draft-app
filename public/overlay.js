@@ -90,8 +90,25 @@ function render() {
   }
   lots3dVolume(audio);
   renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); renderAllIn(); renderLots(); playLottery(false);
+  fitNames();
   first = false;
 }
+/* 長い名前(「あーるてぃめっとうるとら」など)は、折り返さずに、枠に入る大きさまで文字を小さくする */
+const FIT_NAMES = '.nm b, .nm small, .head .tn, .back .wn, .team .th .tn, .team li .pnm, .standwrap .band, .lot .nm, .lotshead .pn';
+function fitNames() {
+  document.querySelectorAll(FIT_NAMES).forEach((el) => {
+    el.style.fontSize = ''; el.style.lineHeight = '';
+    const w = el.clientWidth; if (!w) return; // 出していない(大きさのない)ものは、出したときに合わせる
+    const jc = el.style.justifyContent; el.style.justifyContent = 'flex-start'; // 真ん中寄せだと、はみ出した分を測れないので
+    const cs = getComputedStyle(el), pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), sw = el.scrollWidth;
+    el.style.justifyContent = jc;
+    if (sw <= w + 1) return;
+    const base = parseFloat(cs.fontSize), lh = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    el.style.lineHeight = lh + 'px'; // 文字を小さくしても、行の高さ(枠の高さ)は変えない
+    el.style.fontSize = Math.max(base * 0.35, base * ((w - pad) / (sw - pad)) * 0.97) + 'px';
+  });
+}
+document.fonts.ready.then(() => { if (S) fitNames(); });
 
 /* ---------- 場面の切り替え ----------
  * 進行表の場面が変わったときだけ、設定のトランジションで切り替える(ドラフト中のボード・ルーレット・チーム表は一瞬で) */
@@ -112,6 +129,7 @@ function showScene(scene) {
   for (const k of SCENES) $('sc-' + k).classList.toggle('on', scene === k);
   if (!transBusy) bgLayer(SCENES.includes(scene));
   updateBg();
+  fitNames();
 }
 function sceneSwitch(scene) {
   const prog = C.progIdxOf(S), progChanged = prevProg !== null && prog !== prevProg;
@@ -150,6 +168,7 @@ async function runTransition(o) {
       ghost = fromEl.cloneNode(true);
       ghost.removeAttribute('id'); ghost.querySelectorAll('[id]').forEach((e) => e.removeAttribute('id'));
       ghost.querySelectorAll('iframe').forEach((e) => e.remove());
+      ghost.classList.add('t-ghost');
       fromEl.parentNode.insertBefore(ghost, fromEl);
       ghost.classList.add('on');
       out = ghost;
@@ -184,13 +203,13 @@ async function runTransition(o) {
         // 透明な場面へ: 前の場面を消してから、次の場面を出す(背景の層はそのまま残る)
         if (!fromBg) bgLayer(true, ms);
         if (out) { play(out, 'tFadeOut', ms / 2); await later(ms / 2); out.style.visibility = 'hidden'; }
-        to.classList.add('on', 't-top'); play(to, 'tFadeIn', out ? ms / 2 : ms);
+        to.classList.add('on', 't-top', 't-hold'); play(to, 'tFadeIn', out ? ms / 2 : ms);
         await later(out ? ms / 2 : ms);
         to.style.animation = ''; to.classList.remove('t-top');
       } else {
         // 不透明な場面へ: 前の場面の上に浮かび上がらせる(下の場面は最後まで出したままなので透けない)
         if (fromBg) bgLayer(true); else bgLayer(true, ms);
-        to.classList.add('on', 't-top'); play(to, 'tFadeIn', ms);
+        to.classList.add('on', 't-top', 't-hold'); play(to, 'tFadeIn', ms);
         await later(ms);
         to.style.animation = ''; to.classList.remove('t-top');
       }
@@ -198,7 +217,7 @@ async function runTransition(o) {
     } else if (o.transition === 'slide' || o.transition === 'wipe') {
       const to = toEl(), ease = 'cubic-bezier(.6,0,.3,1)';
       bgLayer(true, fromBg ? 0 : ms);
-      to.classList.add('on', 't-top');
+      to.classList.add('on', 't-top', 't-hold');
       play(to, o.transition === 'slide' ? 'tSlideIn' : 'tWipe', ms, ease);
       // 出ていく側も同じ速さで動かす(ワイプは、入ってくる線のところで切る)。重ならないので透けない・混ざらない
       if (out) play(out, o.transition === 'slide' ? 'tSlideOut' : 'tWipeOut', ms, ease);
@@ -224,6 +243,7 @@ async function runTransition(o) {
     if (ghost) ghost.remove();
     if (out) out.style.animation = '';
     if (fromEl) fromEl.style.visibility = '';
+    for (const k of SCENES) $('sc-' + k).classList.remove('t-hold');
     transBusy = false;
     showScene(cur()); // 切り替えの途中でまた場面が変わっていても合わせる
   }
@@ -239,9 +259,9 @@ function cardHtml(l, playerId, stamp, dup, pop, wait = W('cardWait')) {
   const p = playerId && C.playerById(S, playerId);
   return `<div class="card ${playerId ? 'open' : ''} ${dup ? 'dup' : ''}" data-id="${l.id}" style="--c:${esc(lc(l))}"><div class="in">
       <div class="face front"><div class="head">${l.icon ? `<img src="${img(l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div>
-        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && (p.note || p.klass) ? `<small>${p.klass ? `<em class="kl">${esc(p.klass)}</em>` : ''}${esc(p.note || '')}</small>` : ''}</div></div>
+        <div class="nm">${p && p.icon ? `<img src="${img(p.icon)}">` : ''}<div class="nmt"><b>${esc(p ? p.name : '')}</b>${p && p.note ? `<small>${esc(p.note)}</small>` : ''}</div></div>
         ${stamp ? `<div class="stamp ${stamp} ${pop ? 'pop' : ''}">${stamp === 'ok' ? W('stampOk') : W('stampDup')}</div>` : ''}</div>
-      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}${esc(C.teamLabel(S, l))}</div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
+      <div class="face back"><div class="who">${l.icon ? `<img src="${img(l.icon)}">` : ''}<span class="wn">${esc(C.teamLabel(S, l))}</span></div><div class="koma">指</div><div class="wait">${esc(wait)}</div></div>
     </div></div>`;
 }
 // めくる: 裏の状態から少し待って表へ(3D はめくっている間だけ)
@@ -536,7 +556,7 @@ function renderTeams() {
       const key = `${l.id}:${p.playerId}`; now.add(key);
       const pl = C.playerById(S, p.playerId);
       const d = isNew(key) ? k++ : -1;
-      return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}${esc(pl ? pl.name : '')}${pl && pl.klass ? `<em class="kl">${esc(pl.klass)}</em>` : ''}</li>`;
+      return `<li class="${d >= 0 ? 'new' : ''}" ${d >= 0 ? `style="animation-delay:${0.3 + d * 0.15}s"` : ''}><span class="r">${i + 1}巡</span>${pl && pl.icon ? `<img src="${img(pl.icon)}">` : ''}<span class="pnm">${esc(pl ? pl.name : '')}</span></li>`;
     }).join('');
     return `<div class="team" style="--c:${esc(lc(l))}"><div class="th">${l.teamLogo || l.icon ? `<img src="${img(l.teamLogo || l.icon)}">` : '<span class="ava"></span>'}<div class="tn">${esc(C.teamLabel(S, l))}</div></div><ol>${rows}</ol></div>`;
   }).join('');

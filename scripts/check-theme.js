@@ -9,7 +9,8 @@ const { start } = require('../server.js');
 app.commandLine.appendSwitch('mute-audio');
 const PORT = 5199;
 const [themeId = 'gold', lot = 'envelope', lotTimes = '1.2,3,8'] = process.argv.slice(2).filter((a) => !a.startsWith('-') && !a.endsWith('.js'));
-const OUT = path.join(__dirname, '../ui-check', `theme-${themeId}`);
+const LONG = process.argv.includes('--long'); // 長い名前で撮る
+const OUT = path.join(__dirname, '../ui-check', `theme-${themeId}${LONG ? '-long' : ''}`);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 app.whenReady().then(async () => {
@@ -20,7 +21,7 @@ app.whenReady().then(async () => {
   const win = new BrowserWindow({ width: 1920, height: 1080, show: false, useContentSize: true, webPreferences: { backgroundThrottling: false, offscreen: true } });
   win.webContents.setFrameRate(60);
   win.webContents.on('console-message', (e) => { if (e.level === 'error') console.log('  [画面]', e.message); });
-  await win.loadURL(`http://localhost:${PORT}/theme-check.html?theme=${themeId}&lot=${lot}&bare`);
+  await win.loadURL(`http://localhost:${PORT}/theme-check.html?theme=${themeId}&lot=${lot}&bare${LONG ? '&long' : ''}`);
   await wait(1500);
   const js = (c) => win.webContents.executeJavaScript(c);
   await js(`playing = false; clearTimeout(timer); document.getElementById('play').setAttribute('aria-pressed','false')`);

@@ -43,11 +43,11 @@ function render() {
   $('step-label').textContent = n.step >= 0 && n.step < F.STEPS.length ? F.STEPS[n.step] : '';
   const btn = (b, cls) => `<button type="button" class="${cls}" ${b.key ? `data-next="${b.key}"` : ''} ${b.arg ? `data-arg="${b.arg}"` : ''} ${b.off ? 'disabled aria-disabled="true"' : ''}>${b.label}</button>`;
   $('next').innerHTML = n.text || '';
-  // 下のバー: オレンジの左に「1つ戻す」(前へ系のボタンは無し)。ほかのサブ(おまかせ指名はお試しのときだけ)はその上に
+  // 下のバー: オレンジの左に「前の場面へ」(パソコンと同じ。操作の取り消しはパソコンの Ctrl+Z)。ほかのサブ(おまかせ指名はお試しのときだけ)はその上に
   const subs = (n.sub || []).filter((b) => b.key !== 'auto' || demo);
   $('subs').innerHTML = (n.choices ? `<div class="grid grid-cols-3 gap-2">${n.choices.map((b) => `<button type="button" data-next="${b.key}" data-arg="${b.arg}" class="${BTN_SUB} gap-2" ${b.off ? 'disabled aria-disabled="true"' : ''} aria-label="${b.label}を選ぶ"><span class="w-5 h-5 rounded-md bg-[var(--lc)]" style="--lc:${b.color}" aria-hidden="true"></span>${b.label}</button>`).join('')}</div>` : '') + subs.map((b) => btn(b, BTN_SUB)).join('');
   const main = n.main ? btn({ ...n.main, label: n.main.busy ? '演出中…' : n.main.label }, BTN_PRIMARY) : `<p class="h-14 flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
-  $('bar').innerHTML = `<div class="flex gap-2"><button type="button" id="undo" class="${BTN_SUB.replace('w-full h-11', 'flex-none h-14')} gap-1 px-3" ${canUndo ? '' : 'disabled aria-disabled="true"'} aria-label="1つ戻す"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>戻す</button><div class="flex-1 min-w-0">${main}</div></div>`;
+  $('bar').innerHTML = `<div class="flex gap-2"><button type="button" data-next="progPrev" class="${BTN_SUB.replace('w-full h-11', 'flex-none h-14')} gap-1 px-3" ${C.progIdxOf(S) > 0 ? '' : 'disabled aria-disabled="true"'} aria-label="前の場面へ"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>前の場面へ</button><div class="flex-1 min-w-0">${main}</div></div>`;
   $('scenes').innerHTML = SCENES.map(([k, t]) => `<button type="button" data-scene="${k}" aria-pressed="${S.scene === k || (k === 'roulette' && S.scene === 'lots')}" class="h-11 px-2 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${S.scene === k || (k === 'roulette' && S.scene === 'lots') ? 'bg-[var(--bg-page-alt)] border-primary-400 text-[var(--text-heading)]' : 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]'}">${t}</button>`).join('');
   renderNoms();
   renderTimer();
@@ -115,10 +115,6 @@ document.addEventListener('click', (e) => {
   else if (b.id === 'timer-start') act({ type: 'timer', cmd: 'start' });
   else if (b.id === 'timer-stop') act({ type: 'timer', cmd: 'stop' });
   else if (b.id === 'timer-reset') act({ type: 'timer', cmd: 'reset' });
-  else if (b.id === 'undo') {
-    if (undoCancelsLottery && !confirm('直前の抽選を取り消します。取り消したことは「抽選の記録」に残ります。よろしいですか？')) return;
-    ws.send(JSON.stringify({ type: 'undo' }));
-  }
 });
 document.addEventListener('change', (e) => {
   const t = e.target;
