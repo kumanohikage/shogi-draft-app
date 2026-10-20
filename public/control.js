@@ -6,7 +6,7 @@ const img = (f) => (f ? `/images/${encodeURIComponent(f)}` : '');
 const OVERLAY_URL = `${location.origin}/overlay`;
 
 let remoteInfo = { on: false };
-// 画面の状態: いまのタブ / 進行表の見せ方(edit 編集・live 本番) / 編集で選んでいる場面 / ドラフトのタブの見せ方(look 名前と見た目・setup 進め方) / 選手の絞り込み / 選んでいるチーム
+// 画面の状態: いまのタブ / 進行表の見せ方(edit 編集・live 本番) / 編集で選んでいる場面 / ドラフトのタブの見せ方(look 名前・見た目・音・setup 進め方) / 選手の絞り込み / 選んでいるチーム
 const ui = { tab: 'prog', view: 'edit', selId: null, draftView: 'look', filter: 'all', search: '', leaderId: null };
 let selectNewScene = 0; // 場面を足したとき、足した場面を選ぶための目印
 let lib = null; // ドラフト(大会)の一覧と名簿(サーバーから)
@@ -193,7 +193,7 @@ function renderFirstRun() {
     ${step(1, 'お試しで一通り動かしてみる', false, `<button type="button" data-demo class="${BTN_SUB}">お試しを始める</button>`)}
     ${step(2, 'チームを作る（リーダーを決める）', S.leaders.length > 0, `<button type="button" data-goto="leaders" class="${BTN_SUB}">チームへ</button>`)}
     ${step(3, 'エントリー選手を登録する', S.players.length > 0, `<button type="button" data-goto="players" class="${BTN_SUB}">選手へ</button>`)}
-    ${step(4, 'ドラフト名と見た目・進め方を決める', false, `<button type="button" data-goto="draft" class="${BTN_SUB}">ドラフトへ</button>`)}
+    ${step(4, 'ドラフトの名前・見た目・音・進め方を決める', false, `<button type="button" data-goto="draft" class="${BTN_SUB}">ドラフトへ</button>`)}
     ${step(5, 'OBS に配信画面を追加する', overlay.count > 0, `<button type="button" data-copy-url class="${BTN_SUB}">URL をコピー</button>`)}`;
 }
 // 選んだ場面の見出し: 種類・名前・外す・映す(並べ替えは左の一覧をドラッグ)
@@ -511,7 +511,7 @@ function renderPlayers() {
   }).join('') || `<p class="col-span-full text-base text-[var(--text-muted)] text-center py-16">${S.players.length ? '当てはまる選手はいません' : 'まだいません。上の欄に名前を入れて「まとめて追加」'}</p>`;
 }
 
-/* ---------- ドラフト: 名前と見た目 / ⚙ 進め方 ---------- */
+/* ---------- ドラフト: 名前・見た目・音 / ⚙ 進め方 ---------- */
 function renderDraftTab() {
   document.querySelectorAll('[data-draft-view]').forEach((b) => { const on = b.dataset.draftView === ui.draftView; b.setAttribute('aria-pressed', on); b.classList.toggle('bg-[var(--bg-page-alt)]', on); b.classList.toggle('text-[var(--text-heading)]', on); b.classList.toggle('text-[var(--text-muted)]', !on); });
   $('draft-look').classList.toggle('hidden', ui.draftView !== 'look');
@@ -757,7 +757,7 @@ $('csv-file').addEventListener('change', async (e) => {
   toast(`リーダー${r.leaders.length}人・選手${r.players.length}人を読み込みました`);
 });
 
-/* ---------- ドラフトのタブ: 名前と見た目 ---------- */
+/* ---------- ドラフトのタブ: 名前・見た目・音 ---------- */
 // 番組の CSV(名前・進め方・見た目・進行表)
 $('show-csv-out').addEventListener('click', () => {
   const blob = new Blob(['\uFEFF' + C.showToCSV(S)], { type: 'text/csv' });
@@ -875,7 +875,7 @@ $('trans-video-file').addEventListener('change', async (e) => {
 });
 
 /* ---------- テーマ ---------- */
-// 選べるテーマ(と、いま使っているテーマ)を、動く小さな画面つきで並べる。小さな画面は「名前と見た目」を開いているときだけ動かす
+// 選べるテーマ(と、いま使っているテーマ)を、動く小さな画面つきで並べる。小さな画面は「名前・見た目・音」を開いているときだけ動かす
 const TH = window.DraftThemes;
 function renderThemes(o) {
   // 試作のテーマも選べる(確かめて良かったものを正式に。試作には印)
@@ -1091,7 +1091,7 @@ const audioOf = () => Object.assign({}, C.DEFAULT_AUDIO, S.audio);
 const setAudio = (patch) => act({ type: 'setAudio', patch });
 function renderAudio() {
   const a = audioOf(), bgm = C.baseBgm(S);
-  // ドラフトの BGM: ドラフトのタブ(名前と見た目)と、音の窓(ショートカット)の2か所で同じものを選ぶ
+  // ドラフトの BGM: ドラフトのタブ(名前・見た目・音)と、音の窓(ショートカット)の2か所で同じものを選ぶ
   for (const sel of [$('bgm-track'), $('opt-bgm')]) {
     if (document.activeElement === sel) continue;
     const names = bgm && !bgmList.includes(bgm) ? [...bgmList, bgm] : bgmList;
