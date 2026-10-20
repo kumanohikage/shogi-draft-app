@@ -11,7 +11,7 @@ const Core = require('./public/core.js');
 // 人そのものの情報(名簿に入る)。それ以外(色・ひとこと・欠場・紹介文・チーム名…)は大会の情報
 const PERSON_KEYS = ['name', 'short', 'icon', 'iconSrc', 'iconCrop', 'stand', 'standSrc', 'standCrop', 'standScale', 'standX', 'standY'];
 // 大会で共有する設定(見た目)。ほかの設定(進め方・タイマー…)はイベントごと
-const TOURNAMENT_OPTIONS = ['bgImage', 'logoImage', 'titleMode', 'teamPrefix', 'leaderColors', 'transition', 'transSec', 'transVideo', 'transCut', 'fadeSec', 'theme', 'bgMotion'];
+const TOURNAMENT_OPTIONS = ['bgImage', 'logoImage', 'titleMode', 'teamPrefix', 'leaderColors', 'transition', 'transSec', 'transVideo', 'transCut', 'fadeSec', 'theme', 'bgMotion', 'lotEntry'];
 const EVENT_TYPES = { draft: 'ドラフト会議' };
 
 const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

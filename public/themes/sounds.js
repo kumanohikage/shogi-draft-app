@@ -10,8 +10,8 @@
     stamp: ({ tone, hiss, t }) => { tone('sine', 170, 48, t, 0.3, 0.95); hiss(t, 0.12, 0.45, 'highpass', 1500, 2500); tone('sawtooth', 659, 659, t + 0.02, 0.22, 0.07); tone('sawtooth', 988, 988, t + 0.02, 0.22, 0.05); },
     conflict: ({ tone, t }) => { for (let i = 0; i < 4; i++) tone('square', i % 2 ? 740 : 988, i % 2 ? 740 : 988, t + i * 0.14, 0.12, 0.09); tone('sine', 110, 45, t + 0.56, 0.8, 0.9); tone('sawtooth', 220, 210, t + 0.56, 0.9, 0.08); },
     pop: ({ tone, t }) => { tone('triangle', 1500, 2100, t, 0.08, 0.2); },
-    // 帯が走り抜ける(覆いきるのは約0.9秒): 風切りが近づいて、通り過ぎる
-    entry: ({ tone, hiss, t }) => { hiss(t, 0.95, 0.5, 'bandpass', 400, 5200, 1); tone('sine', 220, 1200, t + 0.3, 0.6, 0.1); hiss(t + 0.9, 0.9, 0.38, 'bandpass', 5000, 500, 1); },
+    // 帯が横切る: 風切りが近づいて、通り過ぎる
+    entry: ({ tone, hiss, t }) => { hiss(t, 0.55, 0.5, 'bandpass', 400, 5200, 1); tone('sine', 220, 1200, t, 0.5, 0.12); hiss(t + 0.55, 0.5, 0.35, 'bandpass', 5000, 600, 1); },
   });
 
   // ドラフト会議: 控えめな紙の音、静かな鐘と低い響き
@@ -31,8 +31,8 @@
     stamp: ({ tone, t }) => { pluck(tone, 784, t); pluck(tone, 1175, t + 0.08, 0.1); },
     conflict: ({ tone, t }) => { [1175, 988, 880, 784, 659, 587].forEach((f, i) => pluck(tone, f, t + i * 0.07, 0.11)); tone('sine', 147, 140, t + 0.4, 1.4, 0.3); },
     pop: ({ tone, t }) => { tone('sine', 2349, 2349, t, 0.3, 0.07); },
-    // 花吹雪: 風が強まりながら押し寄せ(覆いきるのは約1.5秒)、鈴が鳴り、そのまま吹き抜けていく
-    entry: ({ tone, hiss, t }) => { hiss(t, 1.6, 0.2, 'bandpass', 400, 2400, 0.5); hiss(t + 1.4, 2.0, 0.2, 'bandpass', 2400, 600, 0.5); [1568, 2093, 2637, 3136].forEach((f, i) => tone('sine', f, f, t + 1.45 + i * 0.09, 1.2, 0.05)); },
+    // 花吹雪: 何枚か通り過ぎる風の音 → ばっと吹き抜け(覆いきるのは約0.95秒)、鈴、短い余韻
+    entry: ({ tone, hiss, t }) => { hiss(t, 0.6, 0.12, 'bandpass', 900, 2200, 0.6); hiss(t + 0.55, 0.5, 0.32, 'bandpass', 500, 4200, 0.6); hiss(t + 0.95, 0.7, 0.2, 'bandpass', 4200, 800, 0.6); [2093, 2637, 3136].forEach((f, k) => tone('sine', f, f, t + 0.95 + k * 0.06, 0.8, 0.05)); },
   });
 
   // タイトル戦: 拍子木と太鼓
@@ -44,4 +44,6 @@
     pop: ({ tone, t }) => { tone('triangle', 1400, 1300, t, 0.05, 0.12); },
     entry: ({ tone, hiss, t }) => { hiss(t, 0.5, 0.3, 'lowpass', 500, 1600, 0.7); tone('sine', 180, 110, t + 0.55, 0.2, 0.6); hiss(t + 1.0, 0.85, 0.22, 'lowpass', 1500, 400, 0.7); },
   });
+  // 切り替えの種類ごとの音(テーマのおすすめの切り替えの音と同じもの)
+  for (const [kind, theme] of [['band', 'sports'], ['blackout', 'draft'], ['petals', 'sakura'], ['shoji', 'title']]) { const def = SE.themeSounds && SE.themeSounds(theme); if (def && def.entry) SE.defineEntry(kind, def.entry); }
 })();

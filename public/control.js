@@ -739,7 +739,12 @@ function renderShow() {
   if (document.activeElement !== $('in-title')) $('in-title').value = S.title;
   // 場面の切り替え: 動画のときは動画と入れ替える秒数、ほかは長さ
   $('opt-trans').value = o.transition;
-  $('trans-sec-f').classList.toggle('hidden', o.transition === 'none' || o.transition === 'video');
+  // 花吹雪・帯・障子・暗転は長さが決まっているので、長さの欄は出さない
+  $('trans-sec-f').classList.toggle('hidden', ['none', 'video', 'petals', 'band', 'shoji', 'blackout'].includes(o.transition));
+  // 抽選に入るとき: 先頭は「テーマのおすすめ（いまのテーマの切り替え）」
+  const rec = C.LOT_ENTRIES[TH.themeOf(o.theme).entry] || 'なし';
+  $('opt-lotentry').innerHTML = Object.entries(C.LOT_ENTRIES).map(([k, v]) => `<option value="${k}">${k ? v : `${v}（${rec}）`}</option>`).join('');
+  $('opt-lotentry').value = o.lotEntry || '';
   $('trans-video-f').classList.toggle('hidden', o.transition !== 'video');
   $('trans-cut-f').classList.toggle('hidden', o.transition !== 'video');
   if (document.activeElement !== $('opt-transsec')) $('opt-transsec').value = o.transSec;
@@ -798,6 +803,7 @@ document.addEventListener('change', (e) => {
   if (t.id === 'opt-prefix') setOption({ teamPrefix: t.value });
   else if (t.id === 'opt-trans') setOption({ transition: t.value });
   else if (t.id === 'opt-bgmotion') setOption({ bgMotion: t.checked });
+  else if (t.id === 'opt-lotentry') setOption({ lotEntry: t.value });
   else if (t.id === 'opt-transsec') setOption({ transSec: Math.max(0.2, Math.min(3, +t.value || 0.6)) });
   else if (t.id === 'opt-transcut') setOption({ transCut: Math.max(0, +t.value || 0) });
   else if (t.id === 'opt-fade') setOption({ fadeSec: Math.max(0, Math.min(2, +t.value || 0)) });

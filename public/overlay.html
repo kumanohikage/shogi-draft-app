@@ -85,10 +85,11 @@
   .lots { display: flex; gap: 36px; justify-content: center; flex-wrap: wrap; }
   .lot { width: 220px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
   .lot .face { position: relative; width: 220px; height: 220px; border-radius: 28px; background: var(--lc); box-shadow: 0 14px 30px rgba(0,0,0,.4), inset 0 -10px 0 rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; color: #fff; font: normal 120px var(--fd); text-shadow: 0 4px 0 rgba(0,0,0,.25); }
-  .lot .nm { font: 900 34px var(--fb); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); min-height: 50px; text-align: center; }
+  /* 選んだ人の名前の枠: 選ぶ前(？)も選んだあとも同じ大きさ。変わるのは色だけ */
+  .lot .nm { flex: none; box-sizing: border-box; display: flex; align-items: center; justify-content: center; height: 60px; padding: 0 20px; border-radius: 12px; font: 900 34px/1 var(--fb); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); text-align: center; white-space: nowrap; }
   .lot .cl { font: 900 30px var(--fb); color: var(--pill-fg); padding: 2px 18px; border-radius: 999px; background: rgba(20,14,8,.7); }
   .lot.taken .face { filter: saturate(.9); }
-  .lot.taken .nm { padding: 4px 20px; border-radius: 12px; background: #fffaf0; color: #2a1606; text-shadow: none; }
+  .lot.taken .nm { background: #fffaf0; color: #2a1606; text-shadow: none; }
   .lot.pop .face { animation: lotPop .45s cubic-bezier(.3,1.6,.5,1) both; }
   @keyframes lotPop { from { transform: scale(1.25); } }
   /* 封筒 */

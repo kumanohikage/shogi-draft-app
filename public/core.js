@@ -159,12 +159,12 @@
   //   くじを選ぶ方式では、抽選を始めた瞬間に当たりのくじを決めて隠し、リーダーの並び順にくじを選ぶ。当たりのくじを選んだリーダーが交渉権を得る
   // lotteryModes[巡-1]: 巡ごとの抽選の方式(なければ lotteryMode)
   // lotFx: 封筒・あみだくじの見せ方 = 3d のみ(2d のシンプル版はコードに残しているが選べない)
-  // theme: 配信画面のテーマ(themes.js) / bgMotion: 自分の背景画像の上にテーマの動きを重ねる
+  // theme: 配信画面のテーマ(themes.js) / bgMotion: 自分の背景画像の上にテーマの動きを重ねる / lotEntry: 抽選に入るときの切り替え('' はテーマのおすすめ)
   // leaderColors: 配信画面の枠にリーダーの色を使う(くじの色と紛らわしいときは外して落ち着いた色に統一)
   // flowRound: 巡のはじめに「第◯巡」の見出し(次へでタイマー開始) / fadeSec: 配信画面の切り替えのフェード(秒。0 でなし)
   // 各巡の流れ: flowWait(巡のはじめに待ち時間画面) / flowTeams(巡の終わりにチーム表) / flowStand(ピックアップの前に立ち絵)
   const DEFAULT_OPTIONS = { roundModes: [], orderStyle: 'snake', lotteryStyle: 'full', timerSec: 300, timerShow: true, timerAuto: true, waitImages: {}, waitImage: '',
-    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d', theme: 'gold', bgMotion: true };
+    bgImage: '', logoImage: '', titleMode: '', teamPrefix: 'チーム', transition: 'none', transSec: 0.6, transVideo: '', transCut: 0, flowWait: true, flowTeams: true, flowStand: true, flowRound: true, flowAllIn: true, fadeSec: 0.3, lotteryMode: 'wheel', lotteryModes: [], leaderColors: false, lotFx: '3d', theme: 'gold', bgMotion: true, lotEntry: '' };
   // 見出しにロゴ画像を出すか
   const useLogo = (s) => { const o = optionsOf(s); return !!o.logoImage && o.titleMode !== 'text'; };
   const waitImagesOf = (s, r = s.round) => { const o = optionsOf(s); const list = (o.waitImages || {})[r]; return list && list.length ? list : o.waitImage ? [o.waitImage] : []; };
@@ -517,7 +517,9 @@
   // 書式: 種類,項目,値,値,…  種類 = 大会 / 進め方 / 見た目 / 進行表。進行表の行は上から順に場面になる
   // 進行表の項目 = 場面の種類(ロゴ・文字の資料・ドラフト説明・画像の資料・リーダー紹介・ドラフト・最終チーム表・何も出さない)、値 = 場面の名前 …
   const yes = (v) => /^(する|出す|はい|true|1|on)$/i.test(String(v || '').trim());
-  const TRANSITIONS = { none: 'なし', fadeBlack: 'フェード（黒）', fadeWhite: 'フェード（白）', slide: 'スライド', wipe: 'ワイプ', video: '動画' };
+  const TRANSITIONS = { none: 'なし', fadeBlack: 'フェード（黒）', fadeWhite: 'フェード（白）', slide: 'スライド', wipe: 'ワイプ', petals: '花吹雪', band: '帯', shoji: '障子', blackout: '静かに暗転', video: '動画' };
+  // 抽選(光の世界)に入るときの切り替え。'' はテーマのおすすめ
+  const LOT_ENTRIES = { '': 'テーマのおすすめ', none: 'なし', blackout: '静かに暗転', band: '帯', petals: '花吹雪', shoji: '障子' };
   const SCENE_CSV = { logo: 'ロゴ', intro: 'リーダー紹介', draft: 'ドラフト', final: '最終チーム表', blank: '何も出さない' };
   function showToCSV(s) {
     const o = optionsOf(s), rows = [['種類', '項目', '値']];
@@ -531,7 +533,7 @@
     rows.push(['進め方', '巡のはじめの見出し', o.flowRound ? '出す' : '出さない'], ['進め方', '待ち時間の画面', o.flowWait ? '出す' : '出さない'], ['進め方', 'ピックアップ前の立ち絵', o.flowStand ? '出す' : '出さない'], ['進め方', '指名が出揃った画面', o.flowAllIn ? '出す' : '出さない'], ['進め方', '巡の終わりのチーム表', o.flowTeams ? '出す' : '出さない']);
     for (let r = 1; r <= s.rounds; r++) rows.push(['進め方', `待ち時間の画像（第${r}巡）`, ...((o.waitImages || {})[r] || [])]);
     rows.push(['見た目', '背景', o.bgImage], ['見た目', '名前の前につける文字', o.teamPrefix], ['見た目', 'リーダーの色を枠に使う', o.leaderColors ? 'する' : 'しない']);
-    { const Th = themesLib(); rows.push(['見た目', 'テーマ', Th ? Th.themeOf(o.theme).name : o.theme], ['見た目', '背景の上の動き', o.bgMotion === false ? 'なし' : 'あり']); }
+    { const Th = themesLib(); rows.push(['見た目', 'テーマ', Th ? Th.themeOf(o.theme).name : o.theme], ['見た目', '背景の上の動き', o.bgMotion === false ? 'なし' : 'あり'], ['見た目', '抽選に入るとき', LOT_ENTRIES[o.lotEntry || ''] || 'テーマのおすすめ']); }
     rows.push(['見た目', '場面の切り替え', TRANSITIONS[o.transition] || 'なし'], ['見た目', '切り替えの長さ（秒）', o.transSec], ['見た目', '切り替えの動画', o.transVideo], ['見た目', '動画で入れ替える秒数', o.transCut || '自動'], ['見た目', 'フェード（秒）', o.fadeSec]);
     for (const g of programOf(s)) {
       if (g.type !== 'slide') rows.push(['進行表', SCENE_CSV[g.type], g.label]);
@@ -576,6 +578,7 @@
         else if (key === 'リーダーの色を枠に使う') out.options.leaderColors = yes(v0);
         else if (key === 'テーマ') { const Th = themesLib(), id = Th && Object.keys(Th.THEMES).find((k) => Th.THEMES[k].name === v0 || k === v0); if (id) out.options.theme = id; }
         else if (key === '背景の上の動き') out.options.bgMotion = v0 !== 'なし';
+        else if (key === '抽選に入るとき') out.options.lotEntry = Object.keys(LOT_ENTRIES).find((k) => LOT_ENTRIES[k] === v0) ?? '';
         else if (key === '場面の切り替え') out.options.transition = Object.keys(TRANSITIONS).find((k) => TRANSITIONS[k] === v0) || 'none';
         else if (/^切り替えの長さ/.test(key)) out.options.transSec = Math.max(0.2, Math.min(3, +v0 || 0.6));
         else if (key === '切り替えの動画') out.options.transVideo = v0;
@@ -610,5 +613,5 @@
     return s;
   }
 
-  return { LOT_COLORS, LOTTERY_LABEL, lotteryModeOf, amidaEnd, amidaRungs, TRANSITIONS, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  return { LOT_COLORS, LOTTERY_LABEL, lotteryModeOf, amidaEnd, amidaRungs, TRANSITIONS, LOT_ENTRIES, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));

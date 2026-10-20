@@ -156,7 +156,12 @@
     SE[k] = function () { const t = THEME_SE[themeId]; if (t && t[k]) { if (!init()) return; return t[k]({ ctx, tone, hiss, t: ctx.currentTime }); } return base[k](); };
   }
   SE.setTheme = (id) => { themeId = id; };
+  SE.themeSounds = (id) => THEME_SE[id];
   SE.defineTheme = (id, sounds) => { THEME_SE[id] = sounds; };
+  // 切り替え(花吹雪・帯・障子・暗転)の音。選んだ切り替えの種類で鳴らす
+  const ENTRY_SE = {};
+  SE.defineEntry = (kind, fn) => { ENTRY_SE[kind] = fn; };
+  SE.entryOf = (kind) => { const f = ENTRY_SE[kind]; if (f && init()) f({ ctx, tone, hiss, t: ctx.currentTime }); };
 
   window.OverlayAudio = { SE, BGM };
 })();

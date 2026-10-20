@@ -123,7 +123,7 @@ function sceneSwitch(scene) {
   if (o.transition === 'video' && o.transVideo && !v.src.endsWith(encodeURIComponent(o.transVideo))) v.src = img(o.transVideo);
   if (EXPORT || PREVIEW || first || scene === shown) return showScene(scene);
   // くじの色を選んだあと、ルーレット(光の世界)へ: テーマの入り方で
-  if (shown === 'lots' && scene === 'roulette' && theme().entry !== 'none') { transBusy = true; return playEntry(() => { transBusy = false; showScene(cur()); transBusy = true; }).finally(() => { transBusy = false; if (shown !== cur()) showScene(cur()); }); }
+  if (shown === 'lots' && scene === 'roulette' && entryKind() !== 'none') { transBusy = true; return playEntry(() => { transBusy = false; showScene(cur()); transBusy = true; }).finally(() => { transBusy = false; if (shown !== cur()) showScene(cur()); }); }
   // 進行表の場面が変わったら設定のトランジション、それ以外(ボード ⇔ チーム表 など)は短いフェード
   if (progChanged && o.transition !== 'none') return runTransition(o);
   if (o.fadeSec > 0) return runTransition({ ...o, transition: 'fade', transSec: o.fadeSec });
@@ -132,7 +132,9 @@ function sceneSwitch(scene) {
 const cur = () => EXPORT || S.scene;
 const later = (ms) => new Promise((r) => setTimeout(r, ms));
 // 動いている 3D を出している場面(ルーレット・3D のくじ)。不透明
-const isLive = (k) => k === 'roulette' || (k === 'lots' && $('lots3d').style.display === 'block');
+// 3D のくじを見せているか(組み立て中は透明で置いているだけ)
+const lots3dShown = () => $('lots3d').style.display === 'block' && $('lots3d').style.opacity !== '0';
+const isLive = (k) => k === 'roulette' || (k === 'lots' && lots3dShown());
 // 3D の背景のテーマでは、背景のある場面は透明(後ろの背景の層が見えている)
 const seeThrough = (k) => !!theme().bg && !EXPORT && SCENES.includes(k) && !isLive(k);
 const play = (el, name, ms, ease = 'ease', delay = 0) => { el.style.animation = `${name} ${ms}ms ${ease} ${delay}ms both`; };
@@ -167,6 +169,10 @@ async function runTransition(o) {
       swap();
       t.style.transition = `opacity ${ms / 2}ms ease-out`; t.style.opacity = 0;
       await later(ms / 2);
+    } else if (ENTRY_KINDS.has(o.transition)) {
+      // 花吹雪・帯・障子・暗転: 覆いきったところで入れ替える
+      bgLayer(true);
+      await playEntry(swap, o.transition);
     } else if (o.transition === 'fade' || ((o.transition === 'slide' || o.transition === 'wipe') && !toEl())) {
       const to = toEl();
       if (!to) {
@@ -367,7 +373,7 @@ function renderLook() {
   }
   st.classList.toggle('bg3d', !!th.bg && !EXPORT && !STATIC);
   // 光の世界へ入るときの 3D の切り替えは、先に読み込んでおく(押した瞬間に待たないように)
-  if (ENTRY3D.has(th.entry) && !EXPORT && !PREVIEW && !STATIC && !$('entryfx').getAttribute('src')) $('entryfx').setAttribute('src', 'entry3d.html'); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
+  if ((ENTRY3D.has(entryKind()) || ENTRY3D.has(o.transition)) && !EXPORT && !PREVIEW && !STATIC && !$('entryfx').getAttribute('src')) $('entryfx').setAttribute('src', 'entry3d.html'); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
   const motion = !!th.bg && (!o.bgImage || o.bgMotion !== false); // 自分の背景画像の上にも動きを重ねる(なしも選べる)
   const src = motion && !EXPORT && !STATIC ? `bg3d.html?theme=${id}${o.bgImage ? '&over=1' : ''}${LITE ? '&lite=1' : ''}` : '';
   if (($('bgfx').getAttribute('src') || '') !== src) { $('bgfx').classList.remove('ready'); if (src) $('bgfx').setAttribute('src', src); else $('bgfx').removeAttribute('src'); }
@@ -375,34 +381,39 @@ function renderLook() {
 }
 // 3D の背景は、映している場面に背景があるときだけ描く(光の世界・何も出さない・OBS で映っていないときは止める)
 function updateBg() {
-  const f = $('bgfx'), covered = shown === 'roulette' || (shown === 'lots' && $('lots3d').style.display === 'block');
+  const f = $('bgfx'), covered = shown === 'roulette' || (shown === 'lots' && lots3dShown());
   const on = !!f.getAttribute('src') && $('bglayer').classList.contains('on') && !covered && presence.visible !== false;
   if (f.contentWindow) f.contentWindow.postMessage({ type: 'bg-run', on }, '*');
 }
 addEventListener('message', (e) => { if ((e.data || {}).type === 'bg-ready' && e.source === $('bgfx').contentWindow) { $('bgfx').classList.add('ready'); updateBg(); } });
 // 光の世界(3D の抽選)へ入るときの切り替え。swap() で後ろを入れ替える(覆っている間に)
 // 3D で描く切り替え(entry3d.html)。読み込めていないときは平面の版(entry.js)で
-const ENTRY3D = new Set(['petals', 'band', 'shoji']);
-let entry3dReady = false;
+const ENTRY3D = new Set(['petals', 'shoji']);
+const ENTRY_KINDS = new Set(['petals', 'band', 'shoji', 'blackout']); // 場面の切り替えでも使える
+// 抽選に入るときの切り替え: 設定で選んだもの、なければテーマのおすすめ
+const entryKind = () => C.optionsOf(S).lotEntry || theme().entry;
+let entry3dReady = false, entryActive = false; // entryActive: 切り替えが動いている間(3D の抽選の演出は、通り過ぎてから始める)
 addEventListener('message', (e) => { if ((e.data || {}).type === 'entry3d-ready' && e.source === $('entryfx').contentWindow) entry3dReady = true; });
 function playEntry3d(kind, swap, colors) {
   const f = $('entryfx');
   return new Promise((resolve) => {
     let swapped = false;
     const doSwap = () => { if (!swapped) { swapped = true; swap(); } };
-    const finish = () => { removeEventListener('message', on); clearTimeout(safety); doSwap(); f.style.visibility = 'hidden'; resolve(); };
-    const on = (e) => { if (e.source !== f.contentWindow) return; const m = e.data || {}; if (m.type === 'entry-swap') doSwap(); else if (m.type === 'entry-end') finish(); };
+    const finish = () => { removeEventListener('message', on); clearTimeout(safety); doSwap(); f.style.visibility = 'hidden'; entryActive = false; if (S) renderLots(); resolve(); };
+    const on = (e) => { if (e.source !== f.contentWindow) return; const m = e.data || {}; if (m.type === 'entry-swap') doSwap(); else if (m.type === 'entry-release') { entryActive = false; if (S) renderLots(); } else if (m.type === 'entry-end') finish(); };
     const safety = setTimeout(finish, 8000); // 返事が無くても止まらないように
     addEventListener('message', on);
+    entryActive = true;
     f.style.visibility = 'visible';
     f.contentWindow.postMessage({ type: 'entry-play', kind, colors }, '*');
   });
 }
-async function playEntry(swap) {
-  const kind = theme().entry, E = window.DraftEntry;
+async function playEntry(swap, kind = entryKind()) {
+  const E = window.DraftEntry;
   if (!E || !E[kind] || PREVIEW) { swap(); return; }
-  const L = S.lottery, colors = L ? L.leaders.map((id) => C.leaderById(S, id)?.color).filter(Boolean) : [];
-  SE.entry();
+  // 帯の色: 抽選なら競合したチーム、場面の切り替えなら全チーム
+  const L = S.lottery && !S.lottery.done ? S.lottery : null, colors = (L ? L.leaders.map((id) => C.leaderById(S, id)) : S.leaders).map((l) => l && l.color).filter(Boolean);
+  SE.entryOf(kind);
   if (ENTRY3D.has(kind) && entry3dReady) return playEntry3d(kind, swap, colors);
   await E[kind]($('entry'), swap, { colors });
 }
@@ -557,21 +568,31 @@ function renderLots() {
     : L.done && L.mode !== 'wheel' ? `${team(L.winner)} が交渉権を獲得`
     : L.phase === 'ready' ? (L.mode === 'wheel' ? 'ルーレットを回します' : fx3 ? (L.mode === 'amida' ? 'あみだくじで抽選します' : '封筒で抽選します') : `選んだ順に${L.mode === 'amida' ? 'たどります' : '開けます'}`)
     : L.mode === 'amida' ? `${team(L.leaders[L.opened - 1])} のくじをたどっています` : `${team(L.leaders[L.opened - 1])} の封筒`;
+  // 3D のくじは、色を選んでいる間に読み込んでおく(覆っている間に入れ替えたとき、まだ真っ黒にならないように)
+  if (fx3 && !$('lots3d').getAttribute('src')) $('lots3d').setAttribute('src', 'lots3d.html');
   let use3d = fx3 && L.phase === 'reveal';
   // 「抽選する」で光の世界へ: テーマの入り方で覆ってから 3D に切り替える(覆うまでは、くじを選ぶ画面のまま)
   if (use3d && entered !== L.id) {
-    if (live && theme().entry !== 'none' && !L.done) { if (!entering) { entering = true; playEntry(() => { entered = L.id; entering = false; renderLots(); }); } use3d = false; }
+    if (live && entryKind() !== 'none' && !L.done) { if (!entering) { entering = true; playEntry(() => { entered = L.id; entering = false; renderLots(); }); } use3d = false; }
     else entered = L.id;
   }
-  if (!use3d && lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots-reset' }, '*');
+  const lotsData = () => ({ id: L.id, mode: L.mode, lots: L.lots, owners: L.lots.map((_, i) => (owner(i) ? C.teamLabel(S, C.leaderById(S, owner(i))) : null)),
+    order: L.leaders.map((id) => L.picks[id]), opened: L.opened, done: L.done, winLot: L.winLot, amida: L.amida,
+    player: { name: p ? p.name : '', icon: p && p.icon ? img(p.icon) : '' }, note: $('lots-note').textContent });
+  // 3D の場面は、抽選を始める前(選び終わり〜光の世界へ入る切り替えの間)に組み立てておく。開けた数は0で送り、演出はまだ始めない
+  //   (入れ替えた瞬間に組み立てると、そこで画面が一瞬止まるため)
+  const prebuild = fx3 && !use3d && (L.phase === 'ready' || L.phase === 'reveal') && !L.done;
+  if (prebuild) lots3dSend({ ...lotsData(), opened: 0 });
+  else if (!use3d && lots3dReady) $('lots3d').contentWindow.postMessage({ type: 'lots-reset' }, '*');
   for (const id of ['lots-title', 'lots-head', 'lots-body', 'lots-note']) $(id).style.display = use3d ? 'none' : '';
-  $('lots3d').style.display = use3d ? 'block' : 'none';
+  // 組み立て中は透明のまま置いて描かせておく(display:none だと描かれず、見せた瞬間にまとめて準備して止まるため)
+  $('lots3d').style.display = use3d || prebuild ? 'block' : 'none';
+  $('lots3d').style.opacity = use3d ? '' : '0';
   updateBg();
   if (use3d) {
     if (!$('lots3d').getAttribute('src')) $('lots3d').setAttribute('src', 'lots3d.html');
-    lots3dSend({ id: L.id, mode: L.mode, lots: L.lots, owners: L.lots.map((_, i) => (owner(i) ? C.teamLabel(S, C.leaderById(S, owner(i))) : null)),
-      order: L.leaders.map((id) => L.picks[id]), opened: L.opened, done: L.done, winLot: L.winLot, amida: L.amida,
-      player: { name: p ? p.name : '', icon: p && p.icon ? img(p.icon) : '' }, note: $('lots-note').textContent });
+    // 切り替えの花びらなどが通り過ぎるまでは、組み立てた場面を見せるだけ(演出の始まりで一瞬止まるのを、動きの最中に見せない)
+    lots3dSend(entryActive ? { ...lotsData(), opened: 0 } : lotsData());
     lotsPrev = { id: L.id, picked, opened: L.opened, phase: L.phase };
     return;
   }

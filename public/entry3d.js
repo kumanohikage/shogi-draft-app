@@ -1,6 +1,6 @@
 // 光の世界(3D の抽選)へ入るときの切り替え(3D)。配信画面の一番手前に iframe で入る
 // 考え方: 画面を完全に覆う → 覆っている間に入れ替える(親へ entry-swap)→ 開ける(親へ entry-end)
-//   流れもの(桜の花吹雪・スポーツの帯)は止めずに通り抜ける: 少しずつ増えながら押し寄せ、覆い尽くし、そのまま流れ去る
+//   流れもの(桜の花吹雪)は止めずに通り抜ける: 少しずつ増えながら押し寄せ、覆い尽くし、そのまま流れ去る
 //   障子(タイトル戦)は閉まって開く
 // 安っぽくしない(ハトオーバーレイの知見): 奥行きの視差(手前ほど速く大きい)・被写界深度(ピントから外れるほどぼかす)・面の向きで明るさが変わる光
 // 動かしていないときは描かない。親から { type: 'entry-play', kind, colors }
@@ -32,105 +32,8 @@ function petalTexture() {
   return t;
 }
 
-/* ---------- 流れもの: 下地(覆いきる帯)＋粒(奥行きつき)。下地のふちは粒の下に隠れる ---------- */
-// 位置はすべて「画面の半幅を1とした横の座標」で決め、奥行きごとに実際の大きさへ直す。流れの位置 uC が全体を運ぶ
+/* ---------- 共通: 画面いっぱいの板(NDC)と、たくさんの板をまとめて描く部品 ---------- */
 const BACK_VERT = `varying vec2 vN; void main() { vN = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
-const BACK_FRAG = `
-uniform float uC, uCore, uEdge, uSlant, uDir, uRag;
-uniform vec3 uCol, uCol2;
-varying vec2 vN;
-float h(float x) { return fract(sin(x * 127.1) * 43758.5453); }
-float vnoise(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h(i), h(i + 1.0), f); }
-void main() {
-  float s = uDir * vN.x + vN.y * uSlant;
-  // ふちはまっすぐにせず、でこぼこに(花びらが集まったふちに見えるように)。前と後ろで形を変える
-  float r1 = (vnoise(vN.y * 5.0 + 3.1) * 0.7 + vnoise(vN.y * 13.0 + 7.7) * 0.3 - 0.5) * uRag;
-  float r2 = (vnoise(vN.y * 5.0 + 11.3) * 0.7 + vnoise(vN.y * 13.0 + 1.9) * 0.3 - 0.5) * uRag;
-  float a = smoothstep(uC - uCore - uEdge, uC - uCore, s + r1) * (1.0 - smoothstep(uC + uCore, uC + uCore + uEdge, s + r2));
-  vec3 col = mix(uCol2, uCol, vN.y * 0.5 + 0.5);
-  gl_FragColor = vec4(col * a, a);
-}`;
-function backing(cfg) {
-  const m = new THREE.ShaderMaterial({
-    vertexShader: BACK_VERT, fragmentShader: BACK_FRAG, transparent: true, depthTest: false, depthWrite: false, premultipliedAlpha: true,
-    uniforms: { uC: { value: 0 }, uCore: { value: cfg.core }, uEdge: { value: cfg.edge }, uRag: { value: cfg.rag || 0 }, uSlant: { value: cfg.slant || 0 }, uDir: { value: cfg.dir }, uCol: { value: hex(cfg.col[0]) }, uCol2: { value: hex(cfg.col[1]) } },
-  });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m);
-  mesh.frustumCulled = false; mesh.renderOrder = -10;
-  return mesh;
-}
-
-// 花びら: 3D で回る(縦にも横にも)。面の向きで明るさが変わる。左右に揺れて、少しずつ落ちる
-const PETAL_VERT = `
-uniform float uT, uC, uTanH, uAspect, uRefD, uPar, uFocus, uAperture, uDir;
-attribute vec4 aA; // 横の位置 u・縦の位置・奥行き・大きさ(px)
-attribute vec4 aB; // 回転の軸・回る速さ
-attribute vec4 aF; // 位相・揺れの幅・揺れの速さ・落ちる速さ
-attribute vec3 aTint;
-varying vec2 vUv; varying vec3 vTint; varying float vShade, vBlur, vA;
-vec3 rot(vec3 v, vec3 k, float a) { float c = cos(a), s = sin(a); return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c); }
-void main() {
-  float d = aA.z, g = pow(uRefD / d, uPar);
-  float xn = uDir * (aA.x + uC * g) + aF.y * sin(uT * aF.z + aF.x);
-  float yn = aA.y - aF.w * uT + aF.y * 0.6 * sin(uT * aF.z * 0.7 + aF.x * 1.7);
-  float hH = d * uTanH, hW = hH * uAspect;
-  vec3 c = vec3(xn * hW, yn * hH, -d);
-  float blur = clamp(abs(d - uFocus) * uAperture, 0.0, 3.2);
-  float grow = 1.0 + blur * 0.18;
-  float ws = aA.w / 1080.0 * 2.0 * hH * grow;
-  vec3 k = normalize(aB.xyz);
-  float ang = aF.x * 3.0 + aB.w * uT;
-  vec3 p = rot(vec3(position.xy * ws, 0.0), k, ang);
-  vec3 n = rot(vec3(0.0, 0.0, 1.0), k, ang);
-  vec3 L = normalize(vec3(0.35, 0.8, 0.5));
-  vShade = 0.86 + 0.24 * abs(dot(n, L)); // 光の当たる向きで明るく(影は灰色にせず桜色へ)
-  if (n.z < 0.0) vShade *= 0.95; // 裏は少し暗く
-  vBlur = blur; vA = 1.0 / (grow * grow);
-  vUv = uv; vTint = aTint;
-  gl_Position = projectionMatrix * vec4(c + p, 1.0);
-}`;
-const PETAL_FRAG = `
-uniform sampler2D uMap;
-varying vec2 vUv; varying vec3 vTint; varying float vShade, vBlur, vA;
-void main() {
-  vec4 t = texture2D(uMap, vUv, min(vBlur, 3.2));
-  vec2 dd = abs(vUv - 0.5);
-  t *= smoothstep(0.5, 0.42, max(dd.x, dd.y));
-  vec3 col = t.rgb * vTint;
-  col = vShade < 1.0 ? mix(col * vec3(0.93, 0.74, 0.82), col, smoothstep(0.86, 1.0, vShade)) : col * vShade;
-  gl_FragColor = vec4(col, t.a) * vA;
-}`;
-// 帯(スポーツ): 斜めの細長い板。光沢の筋と、縁の影
-const SLAB_VERT = `
-uniform float uT, uC, uTanH, uAspect, uRefD, uPar, uFocus, uAperture, uDir, uAng;
-attribute vec4 aA; // u・奥行き・幅(px)・濃さ
-attribute vec3 aTint;
-varying vec2 vUv; varying vec3 vTint; varying float vBlur, vA;
-void main() {
-  float d = aA.y, g = pow(uRefD / d, uPar);
-  float xn = uDir * (aA.x + uC * g);
-  float hH = d * uTanH, hW = hH * uAspect;
-  float blur = clamp(abs(d - uFocus) * uAperture, 0.0, 2.5);
-  vec2 sz = vec2(aA.z / 1080.0 * 2.0 * hH * (1.0 + blur * 0.1), hH * 3.2);
-  vec2 q = position.xy * sz;
-  float a = uAng * uDir;
-  q = vec2(q.x * cos(a) - q.y * sin(a), q.x * sin(a) + q.y * cos(a));
-  vBlur = blur; vA = aA.w; vUv = uv; vTint = aTint;
-  gl_Position = projectionMatrix * vec4(xn * hW + q.x, q.y, -d, 1.0);
-}`;
-const SLAB_FRAG = `
-varying vec2 vUv; varying vec3 vTint; varying float vBlur, vA;
-void main() {
-  float x = vUv.x;
-  float soft = 0.02 + vBlur * 0.06;
-  float edge = smoothstep(0.0, soft, x) * smoothstep(1.0, 1.0 - soft, x);
-  vec3 col = vTint * (0.82 + 0.28 * x);
-  col += vec3(1.0) * 0.35 * smoothstep(0.1, 0.16, x) * (1.0 - smoothstep(0.16, 0.24, x)); // 光沢の筋
-  col *= 1.0 - 0.25 * smoothstep(0.85, 1.0, x); // 縁の影
-  float a = edge * vA;
-  gl_FragColor = vec4(col * a, a);
-}`;
-
 function instanced(n, attrs, vert, frag, uniforms, extra = {}) {
   const g = new THREE.InstancedBufferGeometry();
   g.copy(new THREE.PlaneGeometry(1, 1));
@@ -141,60 +44,244 @@ function instanced(n, attrs, vert, frag, uniforms, extra = {}) {
   mesh.frustumCulled = false;
   return mesh;
 }
-// 密度の形に合わせて横の位置を選ぶ(先頭はまばらで少しずつ増え、芯はぎっしり、後ろはまた減る)
-function sampleU(dens, lo, hi) { for (;;) { const u = R(lo, hi); if (Math.random() < dens(u)) return u; } }
-
-// 流れの位置: はじめ少し加速、あとは同じ速さで通り抜ける(止まらない)
-const flow = (c0, c1, T) => (t) => { const s = Math.min(1, Math.max(0, t / T)); return c0 + (c1 - c0) * (0.82 * s + 0.18 * s * s * (3 - 2 * s)); };
-
-/* ---------- 桜: 右から花吹雪が少しずつ増えて押し寄せ、画面を覆い尽くし、そのまま左へ流れ去る ---------- */
+/* ---------- 桜: 何枚か右から左へ通り過ぎたと思ったら、ばっと花吹雪が目の前を通り過ぎ、余韻は短く、抽選の画面になっている ---------- */
+// 色の面は見せない。覆うのは目の前を通る特大の花びら(ぼけている)。そのすき間だけを、同じ速さで動く「ぼけた花びらの群れ」の下地で埋める
+// 花びらは1枚ずつ「右の端に入る時刻」を持つ。風の進み具合 C(t) で左へ運ばれ、手前ほど速く見える(視差)
+// 風の場(調べ: ~/research/wind-particles)
+//   ・全体を1つの sin で揺らすと、全部の花びらがそろって動き、水の波に見える(そろった動きは不自然: GPU Gems 3 ch.6)
+//   ・渦はカールノイズ(Bridson ら 2007)。ノイズのポテンシャルの回転で、場所ごとに違う渦ができる。大きな渦と小さな渦を重ね、場も時間で流れる
+//   ・突風: ゆっくりした変動と、短いでたらめなゆらぎ(風工学の乱流モデル)。流れの一部が一瞬だけ速く進む
+const WIND_GLSL = `
+float wh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float wn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1.0, 0.0)), f.x), mix(wh(i + vec2(0.0, 1.0)), wh(i + vec2(1.0, 1.0)), f.x), f.y); }
+// ポテンシャル: 大きな渦 → 小さな渦(小さいほど弱く、速く流れる)
+float wpsi(vec2 p, float t) {
+  vec2 p2 = mat2(0.80, 0.60, -0.60, 0.80) * p, p3 = mat2(0.36, -0.93, 0.93, 0.36) * p;
+  return wn(p * 1.2 + vec2(t * 0.9, t * 0.15)) * 0.62 + wn(p2 * 2.9 + vec2(t * 1.7, -t * 0.4) + 11.0) * 0.27 + wn(p3 * 6.3 + vec2(t * 2.6, t * 0.8) + 37.0) * 0.11;
+}
+// 渦の動き(カールノイズ): (∂ψ/∂y, -∂ψ/∂x)
+vec2 wcurl(vec2 p, float t) {
+  float e = 0.02;
+  float a = wpsi(p + vec2(0.0, e), t), b = wpsi(p - vec2(0.0, e), t);
+  float c = wpsi(p + vec2(e, 0.0), t), d = wpsi(p - vec2(e, 0.0), t);
+  return vec2(a - b, -(c - d)) / (2.0 * e);
+}
+// 突風のむら: 流れの向き(左)に、場所によって一瞬多く進む
+float wgust(vec2 p, float t) { return wn(vec2(p.x * 0.7 + t * 1.6, p.y * 0.5 + 3.0)) * 0.7 + wn(vec2(p.x * 2.2 + t * 4.0, p.y * 1.4 + 9.0)) * 0.3; }
+// 花びら1枚の位置(画面の半幅=1)を風でずらす。手前ほど大きく(視差)
+vec2 wind(vec2 q, float t, float g) {
+  vec2 p = vec2(q.x * 1.78, q.y);
+  vec2 v = wcurl(p, t);
+  float k = min(g, 1.7);
+  return vec2(v.x * 0.015 - wgust(p, t) * 0.16, v.y * 0.02) * k;
+}
+`;
+const SAKURA_VERT = `
+uniform float uT, uC, uTanH, uAspect, uFocus, uAperture, uV;
+attribute vec4 aA; // 中央を通るときの風の進み・縦の位置・奥行き・大きさ(px)
+attribute vec4 aB; // 回転の軸・回る速さ
+attribute vec4 aF; // 位相・揺れの幅・揺れの速さ・落ちる速さ
+attribute vec4 aTint; // 色・中央を通る時刻
+varying vec2 vUv; varying vec3 vTint; varying float vShade, vBlur, vA, vGlint;
+${WIND_GLSL}
+vec3 rot(vec3 v, vec3 k, float a) { float c = cos(a), s = sin(a); return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c); }
+void main() {
+  float d = aA.z, g = pow(14.0 / d, 0.5);
+  // 花びら1枚の揺れ: 決まった波(sin)にすると、どの花びらも同じ形に揺れて見える。花びらごとに違うでたらめな揺らぎにする
+  float wt = uT * aF.z * 0.9;
+  vec2 jit = vec2(wn(vec2(wt, aF.x * 13.1)) - 0.5, wn(vec2(wt * 0.8 + 5.0, aF.x * 7.7)) - 0.5) * 2.0 * aF.y * 0.7;
+  float xn = -g * (uC - aA.x) + jit.x;
+  float yn = aA.y - aF.w * (uT - aTint.w) + jit.y;
+  // 風: 場所ごとに違う渦と、突風のむら
+  vec2 w = wind(vec2(xn, yn), uT, g);
+  xn += w.x; yn += w.y;
+  float hH = d * uTanH, hW = hH * uAspect;
+  vec3 c = vec3(xn * hW, yn * hH, -d);
+  float blur = clamp(abs(d - uFocus) * uAperture, 0.0, 3.2);
+  float grow = 1.0 + blur * 0.18;
+  float ws = aA.w / 1080.0 * 2.0 * hH * grow;
+  vec3 k = normalize(aB.xyz);
+  float ang = aF.x * 3.0 + aB.w * uT;
+  vec3 p = rot(vec3(position.xy * ws, 0.0), k, ang);
+  vec3 n = rot(vec3(0.0, 0.0, 1.0), k, ang);
+  vec3 L = normalize(vec3(0.35, 0.8, 0.5));
+  vShade = 0.86 + 0.24 * abs(dot(n, L));
+  if (n.z < 0.0) vShade *= 0.95;
+  // 光を受ける向きになった瞬間に、きらっと明るく
+  vGlint = pow(abs(dot(n, normalize(L + vec3(0.0, 0.0, 1.0)))), 22.0);
+  // 速く流れる花びらは、流れる向きに少しのびる(動きのぶれ)。1コマで動く距離と花びらの大きさで決める
+  float move = 16.0 * g * uV / max(aA.w, 1.0);
+  float stretch = 1.0 + min(1.6, move * 0.5);
+  p.x *= stretch;
+  vBlur = blur; vA = 1.0 / (grow * grow) / sqrt(stretch);
+  vUv = uv; vTint = aTint.rgb;
+  gl_Position = projectionMatrix * vec4(c + p, 1.0);
+}`;
+const SAKURA_FRAG = `
+uniform sampler2D uMap;
+uniform float uAlpha;
+varying vec2 vUv; varying vec3 vTint; varying float vShade, vBlur, vA, vGlint;
+void main() {
+  vec4 t = texture2D(uMap, vUv, min(vBlur, 3.2));
+  vec2 dd = abs(vUv - 0.5);
+  t *= smoothstep(0.5, 0.42, max(dd.x, dd.y));
+  vec3 col = t.rgb * vTint;
+  col = vShade < 1.0 ? mix(col * vec3(0.93, 0.74, 0.82), col, smoothstep(0.86, 1.0, vShade)) : col * vShade;
+  col += vec3(1.0, 0.97, 0.98) * vGlint * 0.75 * t.a;
+  gl_FragColor = vec4(col, t.a) * vA * uAlpha;
+}`;
+// すき間を埋める下地: 目の前の花びらと同じ速さで横切る帯。中は色の面ではなく、ぼけた花びらが重なったようなむら
+const VEIL_FRAG = `
+uniform float uX, uCore, uRag, uT;
+varying vec2 vN;
+float h2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h2(i), h2(i + vec2(1, 0)), f.x), mix(h2(i + vec2(0, 1)), h2(i + vec2(1, 1)), f.x), f.y); }
+void main() {
+  vec2 q = vec2(vN.x * 1.78, vN.y);
+  float x = vN.x - uX;
+  float r = (n2(vec2(vN.y * 3.0, 1.7)) - 0.5) * uRag + (n2(vec2(vN.y * 9.0, 5.3)) - 0.5) * uRag * 0.4;
+  float a = smoothstep(-uCore - 0.12, -uCore, x + r) * (1.0 - smoothstep(uCore, uCore + 0.12, x - r));
+  // ぼけた花びらの重なり(大きな丸いむら)を、帯といっしょに流す
+  vec2 p = vec2(q.x - uX * 1.78, q.y);
+  float m = n2(p * 2.2) * 0.6 + n2(p * 5.0 + 3.0) * 0.4;
+  vec3 col = mix(vec3(0.98, 0.80, 0.87), vec3(1.0, 0.95, 0.97), smoothstep(0.25, 0.85, m));
+  gl_FragColor = vec4(col * a, a);
+}`;
+// 光の粒(玉ボケ): 足し算で重ねる。風に乗って流れ、またたく
+const BOKEH_VERT = `
+uniform float uT, uC, uTanH, uAspect;
+attribute vec4 aA; // 中央を通るときの風の進み・縦の位置・奥行き・大きさ(px)
+attribute vec4 aF; // 位相・またたきの速さ・落ちる速さ・明るさ
+attribute vec4 aTint; // 色・中央を通る時刻
+varying vec2 vUv; varying vec3 vCol;
+${WIND_GLSL}
+void main() {
+  float d = aA.z, g = pow(14.0 / d, 0.5);
+  float xn = -g * (uC - aA.x);
+  float yn = aA.y - aF.z * (uT - aTint.w);
+  vec2 w = wind(vec2(xn, yn), uT, g);
+  xn += w.x; yn += w.y;
+  float hH = d * uTanH, hW = hH * uAspect;
+  float ws = aA.w / 1080.0 * 2.0 * hH;
+  float tw = 0.55 + 0.45 * sin(uT * aF.y + aF.x);
+  vCol = aTint.rgb * aF.w * tw;
+  vUv = uv;
+  gl_Position = projectionMatrix * vec4(xn * hW + position.x * ws, yn * hH + position.y * ws, -d, 1.0);
+}`;
+const BOKEH_FRAG = `
+uniform sampler2D uMap;
+varying vec2 vUv; varying vec3 vCol;
+void main() { vec4 t = texture2D(uMap, vUv); gl_FragColor = vec4(vCol * t.a, 0.0); }`;
+// 目の前を通るときの、やわらかい光(白く光らせない。右上から差す桜色の光)
+const SHINE_FRAG = `
+uniform float uK;
+varying vec2 vN;
+void main() {
+  vec2 q = vec2((vN.x - 0.55) * 1.78, vN.y - 0.45);
+  float a = exp(-dot(q, q) * 0.9) * uK;
+  gl_FragColor = vec4(vec3(1.0, 0.9, 0.94) * a, 0.0);
+}`;
+function bokehTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const r = g.createRadialGradient(64, 64, 0, 64, 64, 60);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.25, 'rgba(255,255,255,.75)'); r.addColorStop(0.7, 'rgba(255,255,255,.22)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+function softPetalTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.filter = 'blur(1.5px)';
+  g.drawImage(petalTexture().image, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.premultiplyAlpha = true; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
 function sakura() {
   const scene = new THREE.Scene();
-  const CORE = 2.0, T = 3.4, REF = 26;
-  const back = backing({ core: CORE, edge: 0.14, rag: 0.5, dir: 1, col: ['#fde3eb', '#fff0f4'] });
-  scene.add(back);
-  // 先頭(左側の u)はまばら → 芯 → 後ろ。下地のふち(±CORE)には多めに重ねてふちを隠す
-  const dens = (u) => (u < -CORE ? Math.pow(Math.max(0, (u + 4.8) / (4.8 - CORE)), 1.8) : u > CORE ? Math.max(0, 1 - (u - CORE) / 1.7) : 1);
-  const layers = [[2900, [20, 36], [16, 34], 1.4], [1700, [9, 20], [28, 72], 1.2], [1900, [23, 29], [56, 130], 1.25, 'edge'], [170, [3.2, 9], [130, 320], 1.0]];
+  // 全体の長さ / 目の前を通る(覆いきる)時刻 / 花吹雪の本体が通り過ぎる時刻(ここで抽選の演出を始めてよい。残りの数枚は抽選の上を流れていく)
+  const T = 2.7, TP = 0.95, RELEASE = 1.75;
+  // 風の速さ: はじめから速い(花びらはさっと横切る)。ばっと来るところでさらに強く
+  const speed = (t) => 3.2 + 1.6 * Math.exp(-Math.pow((t - TP) / 0.3, 2));
+  const DT = 0.002, table = [0];
+  for (let t = DT; t <= T + 1; t += DT) table.push(table[table.length - 1] + speed(t) * DT);
+  const C = (t) => table[Math.max(0, Math.min(table.length - 1, Math.round(t / DT)))];
+  const gOf = (d) => Math.pow(14 / d, 0.5);
+  // 白っぽいもの〜濃い桜色まで混ぜる(桜色の背景の上でも花びらが見えるように)
+  const tint = () => [[1, 1, 1], [1, 0.93, 0.96], [0.98, 0.8, 0.88], [0.95, 0.7, 0.8], [1, 0.97, 0.98]][Math.floor(Math.random() * 5)];
+  // 右の端に入る時刻の分布: はじめは数枚ずつ、0.5秒ごろからどっと来る。通り過ぎたあとは少しだけ
+  // 終わりぎわは一斉に途切れさせず、だんだん減らして、最後は数枚がぽつぽつ遅れて流れる(切れ目が縦一列にそろわないように)
+  const rate = (e) => (e < 0.5 ? 0.06 : e < 0.85 ? 0.06 + 0.94 * ((e - 0.5) / 0.35) : Math.max(0, Math.exp(-(e - 0.85) / 0.16) * (1 - (e - 0.85) / 0.95)));
+  const enter = () => { for (;;) { const e = R(0, 1.8); if (Math.random() < rate(e)) return e; } };
   const list = [];
-  for (const [n, dr, sr, yr, edge] of layers) for (let i = 0; i < n; i++) {
-    const u = edge ? (Math.random() < 0.5 ? -1 : 1) * (CORE + R(-0.5, 0.4)) : sampleU(dens, -4.8, CORE + 1.7);
-    const tint = [[1, 0.95, 0.97], [1, 0.9, 0.94], [0.99, 0.84, 0.9], [1, 0.97, 0.98]][Math.floor(Math.random() * 4)];
-    list.push({ d: R(dr[0], dr[1]), a: [u, R(-yr, yr + 0.4), 0, R(sr[0], sr[1])], b: [R(-1, 1), R(-1, 1), R(-0.4, 1), R(2.5, 7)], f: [R(0, 6.3), R(0.01, 0.03), R(2, 5), R(0.05, 0.16)], tint });
-  }
-  list.sort((p, q) => q.d - p.d); // 奥から描く
-  const n = list.length, A = new Float32Array(n * 4), B = new Float32Array(n * 4), F = new Float32Array(n * 4), C = new Float32Array(n * 3);
-  list.forEach((p, i) => { p.a[2] = p.d; A.set(p.a, i * 4); B.set(p.b, i * 4); F.set(p.f, i * 4); C.set(p.tint, i * 3); });
-  const uni = { uT: { value: 0 }, uC: { value: 0 }, uTanH: { value: TANH }, uAspect: { value: 16 / 9 }, uRefD: { value: REF }, uPar: { value: 0.35 }, uFocus: { value: 15 }, uAperture: { value: 0.22 }, uDir: { value: 1 }, uMap: { value: petalTexture() } };
-  scene.add(instanced(n, { aA: [4, A], aB: [4, B], aF: [4, F], aTint: [3, C] }, PETAL_VERT, PETAL_FRAG, uni));
-  // 先頭が右の外 → 後ろが左の外へ
-  // 奥の花びらは遅く見える(視差)ので、終わりは奥の分まで抜けきるところまで
-  const pos = flow(4.8 + 1.15, -(CORE + 1.7 + 1.2) / 0.88, T);
-  return {
-    scene, duration: T, swapAt: null,
-    update(t) { const c = pos(t); uni.uT.value = t; uni.uC.value = c; back.material.uniforms.uC.value = c; this.covered = Math.abs(c) <= CORE - 1.02 - 0.25; },
+  const add = (n, dr, sr, opt = {}) => {
+    for (let i = 0; i < n; i++) {
+      const d = R(dr[0], dr[1]), g = gOf(d), size = R(sr[0], sr[1]);
+      const margin = (size / 1080) * 1.2;
+      // 中央を通るときの風の進み。入る時刻から、画面の半幅(＋花びらの大きさ)ぶん進んだところ
+      let cx;
+      for (let k = 0; k < 50; k++) { cx = opt.tau != null ? C(opt.tau()) : C(opt.enter ? opt.enter() : enter()) + (1 + margin) / g; if (opt.tau != null || cx + (1 + margin) / g <= C(T - 0.03)) break; }
+      const tau = table.findIndex((v) => v >= cx) * DT;
+      list.push({ d, a: [cx, R(opt.y?.[0] ?? -1.2, opt.y?.[1] ?? 1.5), d, size], b: [R(-1, 1), R(-1, 1), R(-0.4, 1), R(2.5, 7)], f: [R(0, 6.3), R(0.01, 0.03), R(2, 5), R(opt.fall?.[0] ?? 0.06, opt.fall?.[1] ?? 0.22)], t: [...(opt.tint ? opt.tint() : tint()), tau], soft: !!opt.soft, wall: !!opt.wall });
+    }
   };
-}
-
-/* ---------- スポーツ中継: チームカラーの板が奥行きをつけて斜めに走り抜け、覆い尽くし、そのまま抜ける ---------- */
-function band(colors) {
-  const scene = new THREE.Scene();
-  const CORE = 2.0, T = 1.9, REF = 14, SLANT = Math.tan(18 * Math.PI / 180) * 9 / 16;
-  const back = backing({ core: CORE, edge: 0.25, dir: -1, slant: SLANT, col: ['#13285e', '#0b1633'] });
-  scene.add(back);
-  const pal = [...colors, '#ffd400', '#ffffff', '#1f5bff', '#13285e'].map((h) => hex(h));
-  const dens = (u) => (u < -CORE ? Math.max(0, (u + 4.2) / (4.2 - CORE)) : u > CORE ? Math.max(0, 1 - (u - CORE) / 1.2) : 0.55);
-  const list = [];
-  for (let i = 0; i < 70; i++) list.push({ d: R(8, 22), u: sampleU(dens, -4.2, CORE + 1.2), w: R(90, 460), a: 1, c: pal[Math.floor(Math.random() * pal.length)] });
-  for (let i = 0; i < 26; i++) list.push({ d: R(5, 20), u: sampleU(dens, -4.2, CORE + 1.2), w: R(3, 9), a: 0.8, c: hex('#ffffff') }); // 細い光の線
-  for (let i = 0; i < 10; i++) list.push({ d: R(2.5, 5), u: (Math.random() < 0.5 ? -1 : 1) * CORE + R(-0.3, 0.3), w: R(260, 600), a: 1, c: pal[Math.floor(Math.random() * pal.length)] }); // 手前の大きな板(ぼける)
+  add(700, [14, 26], [24, 46]); // 奥
+  add(700, [7, 14], [44, 110]); // 中
+  add(800, [3.5, 8], [90, 260], { enter: () => R(0.45, 0.85), fall: [0.05, 0.12] }); // ばっと来る
+  // 目の前を通る花吹雪のかたまり(目がくらむほど)。くっきりした花びらをぎっしり、下地の帯と同じ時刻にそろえて通す
+  add(650, [3.0, 6.0], [160, 420], { tau: () => TP + R(-0.17, 0.17), y: [-1.1, 1.2], fall: [0.03, 0.08], wall: true });
+  // そのさらに手前を、大きくぼけた花びらが数枚
+  // (白いと光ったように見えるので、桜色だけ。少し透かす)
+  add(18, [1.5, 2.4], [700, 1300], { tau: () => TP + R(-0.15, 0.15), y: [-1.0, 1.0], fall: [0.02, 0.06], soft: true, tint: () => [[0.97, 0.78, 0.86], [0.94, 0.7, 0.8], [0.98, 0.84, 0.9]][Math.floor(Math.random() * 3)] });
   list.sort((p, q) => q.d - p.d);
-  const n = list.length, A = new Float32Array(n * 4), C = new Float32Array(n * 3);
-  list.forEach((p, i) => { A.set([p.u, p.d, p.w, p.a], i * 4); C.set([p.c.r, p.c.g, p.c.b], i * 3); });
-  const uni = { uT: { value: 0 }, uC: { value: 0 }, uTanH: { value: TANH }, uAspect: { value: 16 / 9 }, uRefD: { value: REF }, uPar: { value: 0.5 }, uFocus: { value: 12 }, uAperture: { value: 0.25 }, uDir: { value: -1 }, uAng: { value: -18 * Math.PI / 180 } };
-  scene.add(instanced(n, { aA: [4, A], aTint: [3, C] }, SLAB_VERT, SLAB_FRAG, uni));
-  const pos = flow((4.2 + 1 + SLANT) / 0.78, -(CORE + 1.2 + 1 + SLANT) / 0.78, T);
-  return { scene, duration: T, update(t) { const c = pos(t); uni.uT.value = t; uni.uC.value = c; back.material.uniforms.uC.value = c; this.covered = Math.abs(c) <= CORE - 1 - SLANT - 0.02; } };
+  const build = (items, tex) => {
+    const n = items.length, A = new Float32Array(n * 4), B = new Float32Array(n * 4), F = new Float32Array(n * 4), Tt = new Float32Array(n * 4);
+    items.forEach((p, i) => { A.set(p.a, i * 4); B.set(p.b, i * 4); F.set(p.f, i * 4); Tt.set(p.t, i * 4); });
+    const uni = { uT: { value: 0 }, uC: { value: 0 }, uV: { value: 0 }, uTanH: { value: TANH }, uAspect: { value: 16 / 9 }, uFocus: { value: 13 }, uAperture: { value: 0.22 }, uMap: { value: tex }, uAlpha: { value: 1 } };
+    const mesh = instanced(n, { aA: [4, A], aB: [4, B], aF: [4, F], aTint: [4, Tt] }, SAKURA_VERT, SAKURA_FRAG, uni);
+    return { mesh, uni };
+  };
+  const far = build(list.filter((p) => !p.soft && !p.wall), petalTexture());
+  const wall = build(list.filter((p) => p.wall), petalTexture());
+  // 下地の帯: 目の前の花びらと同じ奥行き(2.7)の速さで流れる
+  const gW = gOf(2.3), CP = C(TP), CORE = 1.6, RAG = 0.4;
+  const veil = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: BACK_VERT, fragmentShader: VEIL_FRAG, transparent: true, depthTest: false, depthWrite: false, premultipliedAlpha: true, uniforms: { uX: { value: 9 }, uCore: { value: CORE }, uRag: { value: RAG }, uT: { value: 0 } } }));
+  veil.frustumCulled = false;
+  const near = build(list.filter((p) => p.soft), softPetalTexture());
+  near.uni.uAlpha.value = 0.82;
+  // 光の粒: 奥は小さく強く、手前は大きくぼんやり。花びらと同じ風に乗る
+  const NB = 300, BA = new Float32Array(NB * 4), BF = new Float32Array(NB * 4), BT = new Float32Array(NB * 4);
+  for (let i = 0; i < NB; i++) {
+    const d = R(2.5, 30), g = gOf(d), near3 = d < 6;
+    const size = near3 ? R(90, 220) : R(10, 46) * (1 + (30 - d) / 30);
+    let cx; for (let k = 0; k < 50; k++) { cx = C(enter()) + 1.1 / g; if (cx + 1.1 / g <= C(T - 0.03)) break; }
+    const tau = table.findIndex((v) => v >= cx) * DT;
+    BA.set([cx, R(-1.2, 1.4), d, size], i * 4);
+    BF.set([R(0, 6.3), R(6, 16), R(0.03, 0.12), near3 ? R(0.08, 0.18) : R(0.35, 0.9)], i * 4);
+    BT.set([...[[1, 1, 1], [1, 0.9, 0.95], [1, 0.95, 0.88]][Math.floor(Math.random() * 3)], tau], i * 4);
+  }
+  const bUni = { uT: { value: 0 }, uC: { value: 0 }, uTanH: { value: TANH }, uAspect: { value: 16 / 9 }, uMap: { value: bokehTexture() } };
+  const bokeh = instanced(NB, { aA: [4, BA], aF: [4, BF], aTint: [4, BT] }, BOKEH_VERT, BOKEH_FRAG, bUni, { blending: THREE.AdditiveBlending });
+  const shine = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader: BACK_VERT, fragmentShader: SHINE_FRAG, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uK: { value: 0 } } }));
+  shine.frustumCulled = false;
+  // 奥の花びら → 下地の帯 → かたまり → 手前のぼけた花びら → 光の粒(花びらの間で光る) → やわらかい光
+  far.mesh.renderOrder = 0; veil.renderOrder = 1; wall.mesh.renderOrder = 2; near.mesh.renderOrder = 3; bokeh.renderOrder = 4; shine.renderOrder = 5;
+  scene.add(far.mesh, veil, wall.mesh, near.mesh, bokeh, shine);
+  return {
+    scene, duration: T, release: RELEASE, ratio: 0.75,
+    update(t) {
+      const c = C(t);
+      for (const m of [far, wall, near]) { m.uni.uT.value = t; m.uni.uC.value = c; m.uni.uV.value = speed(t); }
+      bUni.uT.value = t; bUni.uC.value = c;
+      shine.material.uniforms.uK.value = 0.32 * Math.exp(-Math.pow((t - TP - 0.05) / 0.25, 2));
+      const x = -gW * (c - CP);
+      veil.material.uniforms.uX.value = x;
+      // 帯の真ん中が画面の真ん中を過ぎたところ(前後に少し余裕があり、全部覆っている)で入れ替える
+      this.covered = t >= TP - 0.01;
+    },
+  };
 }
 
 /* ---------- タイトル戦: 木の枠と和紙の障子が閉まり(後ろから灯りが透ける)、開く ---------- */
@@ -256,16 +343,20 @@ function play(kind, colors) {
   cancelAnimationFrame(raf);
   if (cur) dispose(cur.scene);
   camera.position.set(0, 0, 0);
-  cur = kind === 'petals' ? sakura() : kind === 'band' ? band(colors || []) : kind === 'shoji' ? shoji() : null;
+  cur = kind === 'petals' ? sakura() : kind === 'shoji' ? shoji() : null;
+  // 桜はぼけた花びらばかりなので、少し粗く描いて軽くする
+  if (cur) { renderer.setPixelRatio(cur.ratio || 1); resize(); }
   if (!cur) { parent.postMessage({ type: 'entry-swap' }, '*'); parent.postMessage({ type: 'entry-end' }, '*'); return; }
   const t0 = performance.now();
-  let swapped = false;
+  let swapped = false, released = false;
   const tick = (now) => {
     const t = (now - t0) / 1000;
     cur.update(t);
     renderer.render(cur.scene, camera);
     // 覆いきってから入れ替える
     if (!swapped && cur.covered) { swapped = true; parent.postMessage({ type: 'entry-swap' }, '*'); }
+    // 本体が通り過ぎたら知らせる(後ろの演出を始めてよい)
+    if (cur.release && !released && t >= cur.release) { released = true; parent.postMessage({ type: 'entry-release' }, '*'); }
     if (t >= cur.duration) {
       if (!swapped) parent.postMessage({ type: 'entry-swap' }, '*');
       renderer.clear(); dispose(cur.scene); cur = null;
@@ -278,6 +369,6 @@ function play(kind, colors) {
 }
 addEventListener('message', (e) => { const m = e.data || {}; if (m.type === 'entry-play') play(m.kind, m.colors); });
 // 最初に一度ずつ組み立てておく(シェーダーを先に用意して、押した瞬間に引っかからないように)
-for (const k of ['petals', 'band', 'shoji']) { const s = k === 'petals' ? sakura() : k === 'band' ? band([]) : shoji(); s.update(0); renderer.compile(s.scene, camera); dispose(s.scene); }
+for (const k of ['petals', 'shoji']) { const s = k === 'petals' ? sakura() : shoji(); s.update(0); renderer.compile(s.scene, camera); dispose(s.scene); }
 renderer.clear();
 parent.postMessage({ type: 'entry3d-ready' }, '*');

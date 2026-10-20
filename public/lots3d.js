@@ -391,6 +391,8 @@ function clearWorld() {
 }
 function onData(d) {
   D = d;
+  // 前もって送られてきたとき(まだ開けていない)は、音の準備も先にしておく(演出を始めた瞬間に止まらないように)
+  if (!d.opened) sound.init();
   if (!world || world.id !== d.id || world.mode !== d.mode) {
     clearWorld();
     world = d.mode === 'amida' ? buildAmida(d) : buildEnvelope(d);

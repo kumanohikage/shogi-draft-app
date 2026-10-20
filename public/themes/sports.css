@@ -72,7 +72,7 @@
 /* くじの色を選ぶ: チームカラーは使わない(くじの色と紛れないように) */
 [data-theme="sports"] .lotshead .pn { font: normal 64px var(--fd); color: #fff; transform: skewX(-8deg); text-shadow: 6px 6px 0 var(--blue); }
 [data-theme="sports"] .lotshead img { border-radius: 8px; border-color: #fff; }
-[data-theme="sports"] .lotshead .pk, [data-theme="sports"] .lotsnote { border-radius: 0; clip-path: var(--cut); }
+[data-theme="sports"] .lotshead .pk, [data-theme="sports"] .lotsnote { border-radius: 0; clip-path: var(--cut); background: var(--yellow); color: var(--navy); }
 [data-theme="sports"] .lot .face { border-radius: 6px; box-shadow: 8px 8px 0 rgba(4,10,30,.55); }
 [data-theme="sports"] .lot .cl { border-radius: 0; background: var(--navy); color: #fff; clip-path: var(--cut); }
 [data-theme="sports"] .lot.taken .nm { border-radius: 0; background: #fff; color: var(--navy); clip-path: var(--cut); }
