@@ -618,8 +618,8 @@ $('add-players').addEventListener('click', () => {
 
 // お試しモード(本番とは別のデータで、ダミーの名簿を使う)
 const sendMode = (mode, fresh) => ws.send(JSON.stringify({ type: 'mode', mode, fresh }));
-$('demo-enter').addEventListener('click', () => { sendMode('demo'); selectTab('prog'); toast('お試しモードを始めました（本番のデータはそのまま残っています）'); });
-$('demo-exit').addEventListener('click', () => { sendMode('real'); toast('本番のデータに戻りました'); });
+$('demo-enter').addEventListener('click', () => { sendMode('demo'); selectTab('prog'); toast('お試しモードを始めました（もとのデータはそのまま残っています）'); });
+$('demo-exit').addEventListener('click', () => { sendMode('real'); toast('お試しをやめて、もとのデータに戻りました'); });
 $('demo-reset').addEventListener('click', () => { if (confirm('お試しの進行をすべて消して、最初からにしますか？')) sendMode('demo', true); });
 // 「次にやること」のボタン
 function doNext(key, arg) {
