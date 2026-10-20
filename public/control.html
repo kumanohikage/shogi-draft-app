@@ -39,7 +39,7 @@
       <!-- 音(BGM・音量): どの画面からでも開ける小さな窓 -->
       <div id="audio-pop" class="hidden absolute right-0 top-[52px] w-[360px] p-4 flex flex-col gap-4 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-xl shadow-xl">
         <div class="flex items-end gap-2">
-          <div class="leading-normal flex-1 min-w-0"><label for="bgm-track" class="block mb-2 text-xs text-[var(--text-muted)]">BGM</label>
+          <div class="leading-normal flex-1 min-w-0"><label for="bgm-track" class="block mb-2 text-xs text-[var(--text-muted)]">このドラフトの BGM</label>
             <div class="relative"><select id="bgm-track" class="appearance-none w-full h-11 pl-3 pr-10 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400/50"></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
           <button type="button" id="bgm-toggle" class="inline-flex items-center justify-center gap-2 h-11 pl-3 pr-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--bg-page-alt)] cursor-pointer disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50"></button>
         </div>
@@ -198,6 +198,11 @@
         <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-fade">フェード（秒）</label><input id="opt-fade" type="number" min="0" max="2" step="0.1" title="場面の切り替え以外（指名ボード ⇔ チーム表 など）。0 でなし" class="w-24 h-11 px-3 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50 caret-primary-400"></div>
         <input id="trans-video-file" type="file" accept="video/webm,video/mp4,.webm,.mp4" hidden aria-label="切り替えの動画">
       </div>
+    </div>
+    <h3 class="mt-10 mb-4 text-xl font-bold text-[var(--text-heading)]">音</h3>
+    <div class="flex flex-wrap items-end gap-6 p-4 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl">
+      <div class="leading-normal"><label class="block mb-2 text-xs text-[var(--text-muted)]" for="opt-bgm">BGM</label><div class="relative"><select id="opt-bgm" class="appearance-none w-72 h-11 pl-3 pr-10 text-sm bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-400/50"></select><svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></div>
+      <p class="pb-3 text-xs text-[var(--text-muted)]">場面ごとの曲は進行表で、音量と曲の追加は上の「音」から。</p>
     </div>
     </div>
         <!-- ⚙ 進め方(巡の数・巡ごとの設定・順番・抽選・時間・流れ) -->

@@ -93,7 +93,8 @@
   const progIdxOf = (s) => (s.progIdx ?? Math.max(0, programOf(s).findIndex((g) => g.type === 'draft')));
   const progItem = (s) => programOf(s)[progIdxOf(s)] || null;
   // いま流す BGM: 場面で決めていればその曲('-' は無音)、決めていなければ音のボタンで選んだ曲
-  const sceneBgm = (s) => { const g = progItem(s), a = Object.assign({}, DEFAULT_AUDIO, s.audio); return g && g.bgm ? (g.bgm === '-' ? '' : g.bgm) : a.bgm; };
+  const baseBgm = (s) => { const o = s.options || {}; return o.bgm != null ? o.bgm : Object.assign({}, DEFAULT_AUDIO, s.audio).bgm; }; // ドラフト(大会)の BGM。まだ決めていない古いデータは前の全体の曲
+  const sceneBgm = (s) => { const g = progItem(s); return g && g.bgm ? (g.bgm === '-' ? '' : g.bgm) : baseBgm(s); };
   const slideById = (s, id) => (s.slides || []).find((x) => x.id === id);
   // 名前の帯など: 「チーム」＋略称(なければフルネーム)。リーダー紹介だけはフルネーム
   const shortName = (l) => (l ? (l.short || '').trim() || l.name : '');
@@ -641,5 +642,5 @@
     return s;
   }
 
-  return { LOT_COLORS, LOTTERY_LABEL, lotteryModeOf, amidaEnd, amidaRungs, TRANSITIONS, LOT_ENTRIES, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
+  return { LOT_COLORS, LOTTERY_LABEL, lotteryModeOf, amidaEnd, amidaRungs, TRANSITIONS, LOT_ENTRIES, initialState, apply, showToCSV, showFromCSV, normalize, useLogo, sceneBgm, baseBgm, conflicts, allRevealed, pendingLeaders, roundComplete, draftComplete, pickOf, teamOf, leaderById, playerById, pickedIds, rosterToCSV, rosterFromCSV, parseCSV, LEADER_COLORS, DEFAULT_AUDIO, DEFAULT_OPTIONS, MAX_ROUNDS, MAX_LEADERS, optionsOf, roundMode, turnOrder, currentTurn, draftStarted, confirmKey, waitImagesOf, PROGRAM_TYPES, programOf, progIdxOf, progItem, slideById, teamLabel, shortName, sceneForItem, defaultSlides, ruleLines };
 }));

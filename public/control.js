@@ -1090,15 +1090,17 @@ $('timer-reset').addEventListener('click', () => act({ type: 'timer', cmd: 'rese
 const audioOf = () => Object.assign({}, C.DEFAULT_AUDIO, S.audio);
 const setAudio = (patch) => act({ type: 'setAudio', patch });
 function renderAudio() {
-  const a = audioOf(), sel = $('bgm-track');
-  if (document.activeElement !== sel) {
-    const names = a.bgm && !bgmList.includes(a.bgm) ? [...bgmList, a.bgm] : bgmList;
-    sel.innerHTML = '<option value="">（なし）</option>' + names.map((n) => `<option value="${esc(n)}" ${n === a.bgm ? 'selected' : ''}>${esc(n.replace(/.[^.]+$/, ''))}${bgmList.includes(n) ? '' : '（見つかりません）'}</option>`).join('');
+  const a = audioOf(), bgm = C.baseBgm(S);
+  // ドラフトの BGM: ドラフトのタブ(名前と見た目)と、音の窓(ショートカット)の2か所で同じものを選ぶ
+  for (const sel of [$('bgm-track'), $('opt-bgm')]) {
+    if (document.activeElement === sel) continue;
+    const names = bgm && !bgmList.includes(bgm) ? [...bgmList, bgm] : bgmList;
+    sel.innerHTML = '<option value="">（なし）</option>' + names.map((n) => `<option value="${esc(n)}" ${n === bgm ? 'selected' : ''}>${esc(n.replace(/.[^.]+$/, ''))}${bgmList.includes(n) ? '' : '（見つかりません）'}</option>`).join('');
   }
   $('bgm-toggle').innerHTML = a.bgmOn
     ? '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>BGMを止める'
     : '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>BGMを流す';
-  setDisabled($('bgm-toggle'), !a.bgm);
+  setDisabled($('bgm-toggle'), !bgm);
   for (const [id, v] of [['bgm-vol', a.bgmVol], ['se-vol', a.seVol], ['rl-vol', a.rlVol]]) {
     if (document.activeElement !== $(id)) $(id).value = v;
     $(id + '-v').textContent = v;
@@ -1110,7 +1112,7 @@ function renderAudio() {
     ? '抽選の演出の間は BGM がゆっくり消え、ほかの画面に戻るとゆっくり戻ります。'
     : '曲がまだありません。「曲を追加」で音声ファイルを選ぶか、メニューの「ファイル → BGMフォルダを開く」に入れてください。';
 }
-$('bgm-track').addEventListener('change', (e) => setAudio({ bgm: e.target.value, bgmOn: true }));
+for (const id of ['bgm-track', 'opt-bgm']) $(id).addEventListener('change', (e) => { setOption({ bgm: e.target.value }); setAudio({ bgmOn: true }); });
 $('bgm-toggle').addEventListener('click', () => setAudio({ bgmOn: !audioOf().bgmOn }));
 for (const [id, key] of [['bgm-vol', 'bgmVol'], ['se-vol', 'seVol'], ['rl-vol', 'rlVol']]) {
   $(id).addEventListener('input', (e) => { $(id + '-v').textContent = e.target.value; setAudio({ [key]: +e.target.value }); });

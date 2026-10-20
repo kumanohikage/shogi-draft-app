@@ -21,7 +21,7 @@ const PERSON_KEYS = ['name', 'short', 'icon', 'iconSrc', 'iconCrop', 'stand', 's
 // 大会での人の情報(リーダーも選手も運営も同じ)
 const ENTRANT_KEYS = ['note', 'intro', 'introMemo', 'absent', 'klass', 'title'];
 // 大会で共有する設定(見た目)。ほかの設定(進め方・タイマー…)はドラフトのもの
-const TOURNAMENT_OPTIONS = ['bgImage', 'logoImage', 'titleMode', 'teamPrefix', 'leaderColors', 'transition', 'transSec', 'transVideo', 'transCut', 'fadeSec', 'theme', 'bgMotion', 'lotEntry', 'classLabel'];
+const TOURNAMENT_OPTIONS = ['bgImage', 'logoImage', 'titleMode', 'teamPrefix', 'leaderColors', 'transition', 'transSec', 'transVideo', 'transCut', 'fadeSec', 'theme', 'bgMotion', 'lotEntry', 'classLabel', 'bgm'];
 // ドラフトの状態(配信をまたいで続く)。それ以外(いまの場面・進行表)は配信のもの
 const DRAFT_KEYS = ['rounds', 'round', 'noms', 'picks', 'lotteries', 'lottery', 'lotteryLog', 'timer', 'waitIdx', 'confirmedKey', 'busyUntil'];
 const EVENT_TYPES = { draft: 'ドラフト会議' };
