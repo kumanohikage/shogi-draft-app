@@ -100,7 +100,11 @@ app.whenReady().then(async () => {
   const icon = path.join(__dirname, 'build', 'icon.png');
   win = new BrowserWindow({ width: 1360, height: 900, title: 'ドラフト会議アプリ', backgroundColor: '#14100c', ...(fs.existsSync(icon) ? { icon } : {}), webPreferences: { contextIsolation: true } });
   win.loadURL(`http://localhost:${PORT}/control`);
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  // 画面から開くリンクは、ふつうのブラウザで開く。開くのは http / https だけ(ほかの種類の URL は、パソコンの別のアプリを動かせてしまうので開かない)
+  const webUrl = (url) => /^https?:\/\//i.test(url);
+  win.webContents.setWindowOpenHandler(({ url }) => { if (webUrl(url)) shell.openExternal(url); return { action: 'deny' }; });
+  // 管理画面の窓の中は、このアプリの画面から外へ移らない(リンクは上の決まりでブラウザへ)
+  win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(`http://localhost:${PORT}/`)) { e.preventDefault(); if (webUrl(url)) shell.openExternal(url); } });
   // 起動して少ししてから、新しい版を確認(メニューの「ヘルプ」でオフにできる)
   win.webContents.once('did-finish-load', () => { if (prefs.checkUpdates) setTimeout(() => checkUpdate(win, false), 3000); });
 });
