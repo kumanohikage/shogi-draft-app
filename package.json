@@ -1,6 +1,6 @@
 {
   "name": "draft-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "将棋のドラフト会議を1台のPCで進行・演出するアプリ",
   "main": "main.js",
@@ -25,7 +25,7 @@
     "@fontsource/yuji-syuku": "^5.3.1",
     "@fontsource/zen-maru-gothic": "^5.3.1",
     "axe-core": "^4.11.1",
-    "electron": "^43.1.1",
+    "electron": "^43.8.3",
     "electron-builder": "^26.15.3",
     "melta-ds-mcp": "^1.9.1",
     "tailwindcss": "^3.4.17",
@@ -55,7 +55,15 @@
     },
     "mac": {
       "icon": "build/icon-mac.png",
-      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
       "category": "public.app-category.utilities",
       "identity": "-",
       "hardenedRuntime": false,
