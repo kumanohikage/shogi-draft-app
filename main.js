@@ -7,6 +7,7 @@ const { start } = require('./server');
 
 const PORT = 5188;
 const OVERLAY_URL = `http://localhost:${PORT}/overlay`;
+const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdwnDA_wSGOq3aWtDHe5qtCHSGIJsPYO_ktHkcbxBT3eRp0IQ/viewform'; // 要望・不具合のフォーム(Google フォーム)
 
 // ポータブル版は exe の隣、それ以外はユーザーデータ領域に保存
 function resolveDataDir() {
@@ -39,6 +40,10 @@ function buildMenu(dataDir) {
       { role: 'toggleDevTools', label: '開発ツール' },
       { type: 'separator' },
       { role: 'resetZoom', label: 'ズームをリセット' }, { role: 'zoomIn', label: 'ズームイン' }, { role: 'zoomOut', label: 'ズームアウト' },
+    ] },
+    { label: 'ヘルプ', submenu: [
+      { label: '使い方(README)', click: () => shell.openExternal('https://github.com/kumanohikage/shogi-draft-app#readme') },
+      { label: '要望・不具合を送る', click: () => shell.openExternal(FEEDBACK_URL) },
     ] },
   ]));
 }

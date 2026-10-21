@@ -4,7 +4,7 @@
 
 Windows / Mac（試験的）・無料・インストール不要・オフラインで動きます。
 
-**[→ ダウンロード（Releases）](../../releases)**
+**[→ ダウンロード（Releases）](../../releases)** ・ [要望・不具合を送る](https://docs.google.com/forms/d/e/1FAIpQLSdwnDA_wSGOq3aWtDHe5qtCHSGIJsPYO_ktHkcbxBT3eRp0IQ/viewform)
 
 ![指名ボード](docs/images/overlay-board.jpg)
 
@@ -44,7 +44,7 @@ Windows / Mac（試験的）・無料・インストール不要・オフライ�
 
 ウイルス対策ソフトが誤って止めることもあります。**本番で使うパソコンで、前もって一度起動しておく**のがおすすめです。
 
-Mac 版はまだ試験的です。動かないところがあれば [Issues](../../issues) か X（[@kumanohikage](https://x.com/kumanohikage)）で教えてください。
+Mac 版はまだ試験的です。動かないところがあれば [要望・不具合のフォーム](https://docs.google.com/forms/d/e/1FAIpQLSdwnDA_wSGOq3aWtDHe5qtCHSGIJsPYO_ktHkcbxBT3eRp0IQ/viewform) で教えてください。
 
 ---
 
@@ -170,6 +170,7 @@ BGM はアプリに入っていません。「曲を追加」か、メニュー�
 | 右上に「× 配信画面なし」と出る | OBS にブラウザソースを追加する。開いていない間に抽選すると、演出なしで結果だけ出ます |
 | 「ポート 5188 が使用中です」と出る | アプリがすでに起動していないか確認 |
 | 操作を間違えた | Ctrl+Z で取り消し。場面を戻すときは「前の場面へ」 |
+| ほかにうまく動かない・こうしてほしい | [要望・不具合のフォーム](https://docs.google.com/forms/d/e/1FAIpQLSdwnDA_wSGOq3aWtDHe5qtCHSGIJsPYO_ktHkcbxBT3eRp0IQ/viewform) から送ってください（アカウント不要） |
 | スマホがつながらない | 同じ Wi-Fi か確認。会場の Wi-Fi で端末どうしの通信が禁止されているときは、スマホのテザリングにパソコンをつなぐ |
 
 ### データの保存場所
