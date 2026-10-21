@@ -45,6 +45,7 @@
       "demo.js"
     ],
     "win": {
+      "icon": "build/icon.png",
       "target": [
         "portable"
       ]
@@ -53,6 +54,7 @@
       "artifactName": "DraftApp-${version}.exe"
     },
     "mac": {
+      "icon": "build/icon-mac.png",
       "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }],
       "category": "public.app-category.utilities",
       "identity": "-",

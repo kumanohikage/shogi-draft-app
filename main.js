@@ -64,7 +64,9 @@ app.whenReady().then(async () => {
     app.quit(); return;
   }
   buildMenu(dataDir);
-  const win = new BrowserWindow({ width: 1360, height: 900, title: 'ドラフト会議アプリ', backgroundColor: '#14100c', webPreferences: { contextIsolation: true } });
+  // 開発中(npm run app)の窓のアイコン。配布版は exe・app に入ったアイコンを使う
+  const icon = path.join(__dirname, 'build', 'icon.png');
+  const win = new BrowserWindow({ width: 1360, height: 900, title: 'ドラフト会議アプリ', backgroundColor: '#14100c', ...(fs.existsSync(icon) ? { icon } : {}), webPreferences: { contextIsolation: true } });
   win.loadURL(`http://localhost:${PORT}/control`);
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 });
