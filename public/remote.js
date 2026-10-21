@@ -12,12 +12,14 @@ const BADGE = { ok: 'bg-emerald-500/[.12] text-emerald-300', lot: 'bg-amber-500/
 const badge = (k, t) => `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${BADGE[k]}">${t}</span>`;
 const SCENES = [['round', '巡の見出し'], ['board', '指名ボード'], ['roulette', '抽選'], ['teams', 'チーム表'], ['wait', '待ち時間'], ['blank', '出さない']];
 
+let boot = null;
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
   ws.onopen = () => { $('conn').textContent = '● 接続中'; $('conn').className = 'text-xs text-emerald-300'; };
   ws.onclose = () => { $('conn').textContent = '× 切断（再接続中…）'; $('conn').className = 'text-xs text-red-300'; setTimeout(connect, 1500); };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
+    if (m.type === 'boot') { if (boot && boot !== m.id) location.reload(); boot = m.id; return; } // アプリが起動し直したら、新しい画面を読み込む
     if (m.type === 'state') { S = m.state; canUndo = m.canUndo; undoCancelsLottery = !!m.undoCancelsLottery; demo = !!m.demo; render(); }
     else if (m.type === 'error') toast(m.message);
   };

@@ -114,6 +114,7 @@ function start(opts = {}) {
   const listBgm = () => fs.readdirSync(BGM).filter((f) => AUDIO_RE.test(f)).sort((a, b) => a.localeCompare(b, 'ja'));
 
   const wss = new WebSocket.Server({ server });
+  const BOOT = Date.now().toString(36) + Math.random().toString(36).slice(2, 6); // この起動の印
   const send = (ws, msg) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(msg));
   const allClients = () => [...wss.clients, ...(remote.wss ? remote.wss.clients : [])];
   const broadcast = (msg) => allClients().forEach((c) => send(c, msg));
@@ -204,6 +205,7 @@ function start(opts = {}) {
 
   wss.on('connection', (ws) => onConnection(ws, false));
   function onConnection(ws, isRemote) {
+    send(ws, { type: 'boot', id: BOOT }); // アプリを入れ替えて起動し直したら、開いたままの配信画面・スマホは読み込み直す
     send(ws, snapshot());
     send(ws, presence());
     if (!isRemote) { remoteInfo().then((i) => send(ws, i)); send(ws, store.library()); }

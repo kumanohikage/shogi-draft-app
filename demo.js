@@ -8,6 +8,7 @@ const FAMILY = ['香川', '桂木', '銀山', '金田', '飛田', '角谷', '王
 const GIVEN = ['あおい', 'ひかる', 'ゆう', 'みこと', 'そら', 'れん'];
 // 選手アイコンの地色(落ち着いた色を巡回)
 // ひとこと(段位や得意戦法の例)
+const RATES = ['初段', '1級', '二段', '2級', '三段', '四段']; // レート(画面には出さない)
 const NOTES = ['初段', '居飛車党', '振り飛車党', '二段', '1級', '四間飛車', '三段', '角換わり', '相掛かり', '中飛車', '2級', '矢倉'];
 const TONES = ['#8a6d4a', '#5f7a8a', '#7a5f8a', '#5f8a6d', '#8a5f5f', '#6d6d8a', '#8a7f5f', '#5f8a85'];
 
@@ -64,7 +65,7 @@ function makeDemoState(imgDir) {
     const n = players.length + 1;
     const icon = `demo_player_${String(n).padStart(2, '0')}.svg`;
     fs.writeFileSync(path.join(imgDir, icon), silhouette(TONES[(i + j) % TONES.length]));
-    players.push({ name: `${f} ${g}`, icon, note: NOTES[(i * 6 + j) % NOTES.length], klass: 'ABBCCD'[(i * 5 + j * 3) % 6] });
+    players.push({ name: `${f} ${g}`, icon, note: NOTES[(i * 6 + j) % NOTES.length], klass: RATES[(i * 5 + j * 3) % RATES.length] });
   }));
   let s = Core.initialState();
   s = Core.apply(s, { type: 'setTitle', title: 'お試しドラフト会議' });

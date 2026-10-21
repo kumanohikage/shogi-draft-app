@@ -48,12 +48,14 @@ if (obs) {
   addEventListener('obsSourceVisibleChanged', (e) => { presence.visible = !!e.detail.visible; sendPresence(); updateBg(); });
   addEventListener('obsSourceActiveChanged', (e) => { presence.active = !!e.detail.active; sendPresence(); });
 }
+let boot = null;
 function connect() {
   ws = new WebSocket(`ws://${location.host}`);
   ws.onopen = sendPresence;
   ws.onclose = () => setTimeout(connect, 1000);
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
+    if (m.type === 'boot') { if (boot && boot !== m.id) location.reload(); boot = m.id; return; } // アプリが起動し直したら、新しい画面を読み込む(OBS に古いページが残らないように)
     if (m.type === 'state') { S = PREVIEW_NEXT ? nextView(m.state) : m.state; render(); }
   };
 }
