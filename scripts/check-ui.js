@@ -148,6 +148,11 @@ app.whenReady().then(async () => {
   await js("document.getElementById('crop').close(); 0");
   await check('15-roster-image');
   await tab('draft'); await js("ui.draftView = 'look'; render(); syncThemePreviews(); 0"); await check('16-draft-look');
+  // 新しい版の知らせ(アプリ本体が呼ぶ帯)
+  await js("try { localStorage.removeItem('skipUpdate'); } catch {} window.showUpdate('9.9.9', '1.0.1', 'https://github.com/kumanohikage/shogi-draft-app/releases/latest'); 0"); await wait(200); await check('16b-update-banner');
+  await js("document.querySelector('[data-update-skip]').click(); window.showUpdate('9.9.9', '1.0.1', 'x'); 0");
+  if (await js("!!document.getElementById('update-banner')")) { console.log('✗ 「この版は知らせない」のあとも出る'); errors++; } else console.log('✓ 「この版は知らせない」で、その版は出なくなる');
+  await js("try { localStorage.removeItem('skipUpdate'); } catch {} 0");
   await tab('leaders'); await check('17-leaders');
   // 立ち絵: ホイールで大きさ(止まってから保存)
   const k0 = await js("+(C.leaderById(S, ui.leaderId).standScale || 1)");

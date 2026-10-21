@@ -83,6 +83,20 @@ function renderOverlayStatus() {
   el.textContent = text; el.className = `whitespace-nowrap text-xs ${cls}`; el.title = tip; // 詳しくはマウスを乗せると出る
 }
 
+/* ---------- 新しい版の知らせ(アプリ本体が GitHub の最新版を見て呼ぶ) ---------- */
+window.showUpdate = (v, cur, url) => {
+  try { if (localStorage.getItem('skipUpdate') === v) return; } catch { /* 知らせるだけ */ }
+  if ($('update-banner')) return;
+  const el = document.createElement('div');
+  el.id = 'update-banner';
+  el.setAttribute('role', 'status');
+  el.className = 'flex flex-wrap items-center gap-4 p-4 mb-6 bg-primary-500/[.12] border border-primary-500/40 rounded-lg';
+  el.innerHTML = `<p class="text-sm text-[var(--text-heading)]"><span class="font-bold text-primary-300">新しい版 ${esc(v)} が出ています</span>　いまは ${esc(cur)} です。直した内容はダウンロードのページで見られます。</p>
+    <div class="ml-auto flex gap-2"><button type="button" data-update-skip class="${BTN_SUB}">この版は知らせない</button><a href="${esc(url)}" target="_blank" rel="noopener" class="${BTN_PRIMARY}">ダウンロードのページを開く</a></div>`;
+  document.querySelector('main').prepend(el);
+  el.querySelector('[data-update-skip]').addEventListener('click', () => { try { localStorage.setItem('skipUpdate', v); } catch { /* 閉じるだけ */ } el.remove(); });
+};
+
 /* ---------- 抽選演出中は結果を伏せる ---------- */
 const hiddenPick = (p) => S.lottery && !S.lottery.done && p.playerId === S.lottery.playerId && p.by === 'lottery';
 
