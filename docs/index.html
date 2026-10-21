@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>将棋ドラフト会議アプリ</title>
+<meta name="description" content="指名の入力から重複の抽選、チーム発表まで。ドラフト会議の配信を1台のPCで進行できる無料アプリ。">
+<meta property="og:title" content="将棋ドラフト会議アプリ">
+<meta property="og:description" content="指名の入力から重複の抽選、チーム発表まで。ドラフト会議の配信を1台のPCで進行できる無料アプリ。">
+<meta property="og:image" content="media/teaser-poster.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="images/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  /* 色はアプリと同じ金×焦げ茶。明るさの帯をそろえ、いちばん明るい金はボタンと見出しの印だけに使う */
+  :root {
+    --bg: #17110b; --bg2: #211810; --card: #2a1f15; --line: #3d2e20;
+    --text: #efe4d2; --muted: #b9a68c; --head: #fff6e6;
+    --gold: #f0b54a; --gold2: #e0952e; --ink: #1d1209;
+    --radius: 18px; --max: 1120px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.85 "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  img, video { display: block; max-width: 100%; }
+  a { color: var(--gold); }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  h1, h2, h3 { color: var(--head); line-height: 1.35; margin: 0; }
+  h2 { font-size: clamp(26px, 3.4vw, 38px); font-weight: 900; letter-spacing: .02em; }
+  h3 { font-size: 19px; font-weight: 700; }
+  p { margin: 0; }
+  .lead { color: var(--muted); }
+
+  /* ヘッダー */
+  header { position: sticky; top: 0; z-index: 10; background: rgba(23,17,11,.88); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; gap: 16px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--head); text-decoration: none; font-weight: 700; }
+  .brand img { width: 32px; height: 32px; }
+  header nav { margin-left: auto; display: flex; gap: 22px; font-size: 14px; }
+  header nav a { color: var(--muted); text-decoration: none; }
+  header nav a:hover { color: var(--head); }
+  @media (max-width: 720px) { header nav { display: none; } }
+
+  /* ボタン: 主なボタンは1つ(ダウンロード)。ほかは文字のリンク */
+  .btn { display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 28px; border-radius: 14px; background: linear-gradient(120deg, #f6c35c, var(--gold2)); color: var(--ink); font-weight: 900; font-size: 17px; text-decoration: none; }
+  .btn:hover { filter: brightness(1.06); }
+  .btn svg { width: 20px; height: 20px; }
+  .textlink { color: var(--text); font-weight: 500; text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+  .textlink:hover { border-color: var(--gold); }
+
+  /* 最初の画面: 名前・何をするか・ダウンロード・動画 */
+  .hero { padding: 72px 0 40px; text-align: center; }
+  .hero .icon { width: 96px; height: 96px; margin: 0 auto 22px; }
+  .hero h1 { font-size: clamp(34px, 5.6vw, 62px); font-weight: 900; letter-spacing: .03em; }
+  .hero .lead { max-width: 640px; margin: 18px auto 0; font-size: clamp(16px, 2vw, 19px); }
+  .hero .cta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 14px 26px; margin-top: 32px; }
+  .hero .meta { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .video { margin: 48px auto 0; max-width: 1000px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.5); background: #000; }
+  .video video { width: 100%; aspect-ratio: 16 / 9; }
+
+  section { padding: 88px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  .sec-head { max-width: 680px; margin-bottom: 40px; }
+  .sec-head .lead { margin-top: 12px; }
+  .kicker { display: block; margin-bottom: 10px; color: var(--gold); font-size: 13px; font-weight: 700; letter-spacing: .14em; }
+
+  /* テーマ: 5つの見出しを並べ、選ぶと大きく出る */
+  .themes { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  .theme-main { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); background: #000; }
+  .theme-main img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+  .theme-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .theme-tabs button { all: unset; cursor: pointer; border-radius: 12px; overflow: hidden; border: 2px solid transparent; background: var(--card); }
+  .theme-tabs button[aria-pressed="true"] { border-color: var(--gold); }
+  .theme-tabs button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .theme-tabs img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+  .theme-tabs span { display: block; padding: 8px 10px; font-size: 13px; font-weight: 700; color: var(--head); }
+  .theme-tabs small { display: block; padding: 0 10px 10px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+  @media (max-width: 720px) { .theme-tabs { grid-template-columns: repeat(3, 1fr); } .theme-tabs small { display: none; } }
+
+  /* 機能: 見出し + 1文 + 画面。左右を入れ替えて並べる */
+  .feature { display: grid; grid-template-columns: 1fr 1.25fr; gap: 48px; align-items: center; }
+  .feature + .feature { margin-top: 72px; }
+  .feature:nth-child(even) .shot { order: -1; }
+  .feature .shot { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
+  .feature p { margin-top: 12px; color: var(--muted); }
+  .feature ul { margin: 14px 0 0; padding-left: 1.2em; color: var(--muted); }
+  @media (max-width: 860px) { .feature { grid-template-columns: 1fr; gap: 22px; } .feature:nth-child(even) .shot { order: 0; } }
+
+  /* 小さな特徴のカード */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { padding: 24px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
+  .card p { margin-top: 8px; color: var(--muted); font-size: 15px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  /* はじめかた */
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; list-style: none; margin: 0; padding: 0; }
+  .steps li { counter-increment: s; padding: 24px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); }
+  .steps li::before { content: counter(s); display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin-bottom: 12px; border-radius: 50%; background: var(--gold); color: var(--ink); font-weight: 900; }
+  .steps p { margin-top: 8px; color: var(--muted); font-size: 15px; }
+  .steps code { color: var(--head); background: var(--bg2); padding: 1px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; }
+  @media (max-width: 860px) { .steps { grid-template-columns: 1fr; } }
+
+  /* よくある質問 */
+  .faq details { border-bottom: 1px solid var(--line); padding: 18px 0; }
+  .faq summary { cursor: pointer; color: var(--head); font-weight: 700; list-style: none; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "＋"; float: right; color: var(--muted); }
+  .faq details[open] summary::after { content: "−"; }
+  .faq p { margin-top: 10px; color: var(--muted); }
+
+  /* ダウンロード(終わり) */
+  .download { text-align: center; }
+  .download .platforms { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 32px; margin-top: 18px; color: var(--muted); font-size: 14px; }
+
+  footer { padding: 40px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="images/icon.png" alt="">将棋ドラフト会議アプリ</a>
+    <nav aria-label="ページ内">
+      <a href="#themes">テーマ</a>
+      <a href="#features">できること</a>
+      <a href="#start">はじめかた</a>
+      <a href="#faq">よくある質問</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero wrap">
+    <img class="icon" src="images/icon.png" alt="">
+    <h1>将棋ドラフト会議アプリ</h1>
+    <p class="lead">指名の入力から重複の抽選、チーム発表まで。<br>ドラフト会議の配信を、1台のPCで進行できます。</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/kumanohikage/shogi-draft-app/releases">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+        無料でダウンロード
+      </a>
+      <a class="textlink" href="https://github.com/kumanohikage/shogi-draft-app#readme">使い方を読む</a>
+    </div>
+    <p class="meta">Windows 10 / 11 ・ Mac（試験的） ・ インストール不要 ・ オフラインで動作</p>
+    <div class="video">
+      <video src="media/teaser.mp4" poster="media/teaser-poster.jpg" controls playsinline preload="metadata"></video>
+    </div>
+  </div>
+
+  <section id="themes">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">THEMES</span>
+        <h2>配信画面は、5つのテーマから</h2>
+        <p class="lead">巡の見出しから、指名ボード、チーム表、抽選に入る瞬間の演出まで。テーマを選ぶだけで、番組まるごと着せ替えられます。</p>
+      </div>
+      <div class="themes">
+        <div class="theme-main"><img id="theme-main" src="images/theme-gold.jpg" alt="金の後光のテーマ"></div>
+        <div class="theme-tabs" role="group" aria-label="テーマ">
+          <button type="button" data-src="images/theme-gold.jpg" aria-pressed="true"><img src="images/theme-gold.jpg" alt=""><span>金の後光</span><small>にぎやかで明るい</small></button>
+          <button type="button" data-src="images/theme-sports.jpg" aria-pressed="false"><img src="images/theme-sports.jpg" alt=""><span>スポーツ中継</span><small>チームカラーで熱く</small></button>
+          <button type="button" data-src="images/theme-draft.jpg" aria-pressed="false"><img src="images/theme-draft.jpg" alt=""><span>ドラフト会議</span><small>白と紺で厳かに</small></button>
+          <button type="button" data-src="images/theme-sakura.jpg" aria-pressed="false"><img src="images/theme-sakura.jpg" alt=""><span>桜</span><small>やわらかい桜色</small></button>
+          <button type="button" data-src="images/theme-title.jpg" aria-pressed="false"><img src="images/theme-title.jpg" alt=""><span>タイトル戦</span><small>夜の対局室の和</small></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">FEATURES</span>
+        <h2>番組の進行まで、まかせられる</h2>
+      </div>
+
+      <div class="feature">
+        <div>
+          <h3>抽選は3種類。どれも公平に</h3>
+          <p>重複した指名は、ルーレット・封筒・あみだくじから巡ごとに選んで抽選します。演出は結果を盛り上げる飾りで、重複したリーダー全員が同じ確率。抽選はすべて記録に残ります。</p>
+        </div>
+        <div class="shot"><img src="images/overlay-roulette.jpg" alt="抽選ルーレット" loading="lazy"></div>
+      </div>
+
+      <div class="feature">
+        <div>
+          <h3>押すのはオレンジのボタンだけ</h3>
+          <p>オープニングからリーダー紹介、ドラフト、最終チーム表まで、進行表どおりに進みます。次に押すボタンが1つずつ出るので、流れに沿って押していくだけ。本番モードでは、映している場面・次の場面・自分用のメモだけになります。</p>
+        </div>
+        <div class="shot"><img src="images/control-live.png" alt="本番モードの管理画面" loading="lazy"></div>
+      </div>
+
+      <div class="feature">
+        <div>
+          <h3>指名ボードもチーム表も、そのまま配信に</h3>
+          <p>OBS にブラウザソースを1つ足すだけ。指名の公開、競合のハンコ、チーム表、リーダー紹介の立ち絵まで、場面に合わせて切り替わります。</p>
+        </div>
+        <div class="shot"><img src="images/overlay-board.jpg" alt="指名ボード" loading="lazy"></div>
+      </div>
+
+      <div class="grid" style="margin-top:72px">
+        <div class="card"><h3>スマホから操作</h3><p>同じ Wi-Fi で QR コードを読むだけ。指名の入力も、くじの色選びも手元で。</p></div>
+        <div class="card"><h3>お試しモード</h3><p>ダミーの名簿で、本番のデータを触らずに一通り試せます。</p></div>
+        <div class="card"><h3>オフラインで動く</h3><p>フォントも3D表示もアプリに入っています。会場のネットに左右されません。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="start">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="kicker">GET STARTED</span>
+        <h2>はじめかた</h2>
+      </div>
+      <ol class="steps">
+        <li><h3>ダウンロードして起動</h3><p>Windows は exe をダブルクリック。Mac は dmg を開いて「アプリケーション」へ。初回の警告は「詳細情報 → 実行」（Mac は「システム設定 → プライバシーとセキュリティ → このまま開く」）。</p></li>
+        <li><h3>お試しで動かしてみる</h3><p>右上の「お試し」で、ダミーの名簿で指名から抽選まで体験。終わったら「お試しをやめる」。</p></li>
+        <li><h3>OBS に配信画面を追加</h3><p>ブラウザソースに <code>http://localhost:5188/overlay</code>、幅 1920・高さ 1080。「OBSで音声を制御する」にチェック。</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap faq">
+      <div class="sec-head">
+        <span class="kicker">FAQ</span>
+        <h2>よくある質問</h2>
+      </div>
+      <details><summary>無料ですか？</summary><p>無料です。MIT ライセンスで公開しています。</p></details>
+      <details><summary>BGM は入っていますか？</summary><p>入っていません。お持ちの曲（mp3 / ogg / wav / m4a など）を「音」の「曲を追加」で入れてください。フリー素材を使うときは、それぞれの利用規約を守ってください。</p></details>
+      <details><summary>抽選の結果は本当にランダムですか？</summary><p>重複したリーダー全員から同じ確率で選びます（暗号用の乱数）。ルーレットや封筒の演出で確率は変わりません。くじを選ぶ方式も、どの順番で何を選んでも当たる確率は同じです。</p></details>
+      <details><summary>指名を間違えたら？</summary><p>Ctrl+Z で取り消せます。抽選の取り消しは確認が出て、取り消したことが記録に残ります。</p></details>
+      <details><summary>配信画面が映りません</summary><p>アプリを起動しているか、OBS のブラウザソースの URL が <code>http://localhost:5188/overlay</code> になっているかを確かめてください。アプリ右上が「● 表示中」ならつながっています。</p></details>
+      <details><summary>Mac で動きますか？</summary><p>試験的に Mac 版も用意しています（M1 以降と Intel）。動かないところがあれば教えてください。</p></details>
+    </div>
+  </section>
+
+  <section class="download">
+    <div class="wrap">
+      <h2>ドラフト会議の配信を、はじめよう</h2>
+      <div class="cta" style="display:flex;justify-content:center;margin-top:28px">
+        <a class="btn" href="https://github.com/kumanohikage/shogi-draft-app/releases">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>
+          無料でダウンロード
+        </a>
+      </div>
+      <div class="platforms"><span>Windows 10 / 11</span><span>Mac（M1 以降 / Intel・試験的）</span><span>MIT ライセンス</span></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>制作: 熊乃ヒカゲ（<a href="https://x.com/kumanohikage">@kumanohikage</a>）</span>
+    <a href="https://github.com/kumanohikage/shogi-draft-app">GitHub</a>
+    <a href="https://github.com/kumanohikage/shogi-draft-roulette-dx">抽選ルーレット（Web版）</a>
+  </div>
+</footer>
+
+<script>
+  // テーマ: 下の小さな見出しを選ぶと、上に大きく出す
+  const main = document.getElementById('theme-main');
+  document.querySelectorAll('.theme-tabs button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('.theme-tabs button').forEach((x) => x.setAttribute('aria-pressed', x === b));
+    main.src = b.dataset.src; main.alt = b.querySelector('span').textContent + 'のテーマ';
+  }));
+</script>
+</body>
+</html>
