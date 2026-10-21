@@ -1,6 +1,6 @@
 {
   "name": "draft-app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "将棋のドラフト会議を1台のPCで進行・演出するアプリ",
   "main": "main.js",
