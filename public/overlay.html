@@ -30,7 +30,9 @@
   .scene { position: absolute; inset: 0; opacity: 0; pointer-events: none; display: flex; flex-direction: column; }
   .scene.on { opacity: 1; }
   .bg { background: radial-gradient(ellipse at 50% 40%, #fff3c4 0%, #e8b84a 38%, #8a5a12 75%, #3a2408 100%); }
-  .bg::before { content: ''; position: absolute; inset: 0; opacity: .25;
+  /* 金の放射線は、場面の中身(見出し・カード)より必ず後ろに。場面ごとに重なりを閉じて、放射線を背景のすぐ上に置く */
+  .bg { isolation: isolate; }
+  .bg::before { content: ''; position: absolute; inset: 0; z-index: -1; opacity: .25;
     background: repeating-conic-gradient(from 0deg at 50% 40%, rgba(255,255,255,.9) 0 4deg, transparent 4deg 12deg); }
   h1 { position: relative; margin: 0; padding: 40px 0 24px; text-align: center; font: normal 64px var(--fd); color: #fff;
     text-shadow: 0 0 2px #5a2a00, 3px 3px 0 #5a2a00, -3px 3px 0 #5a2a00, 3px -3px 0 #5a2a00, -3px -3px 0 #5a2a00, 0 8px 0 #3a1a00, 0 0 30px rgba(255,200,80,.8); letter-spacing: .06em; }
