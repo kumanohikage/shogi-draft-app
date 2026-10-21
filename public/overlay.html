@@ -123,6 +123,7 @@
   .standwrap.enter .band { animation: bandIn .5s .15s cubic-bezier(.2,.9,.3,1) both; }
   @keyframes standIn { from { opacity: 0; transform: translateX(calc(-50% + var(--sx, 0px))) translateY(calc(var(--sy, 0px) + 40px)) scale(var(--sk, 1)); } }
   .standwrap .standicon { --sx: 0px; --sy: 0px; --sk: 1; }
+  .standwrap .noface { box-sizing: border-box; background: var(--c) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Ccircle cx='60' cy='46' r='22' fill='%23fff' fill-opacity='.85'/%3E%3Cpath d='M18 120c2-26 20-40 42-40s40 14 42 40z' fill='%23fff' fill-opacity='.85'/%3E%3C/svg%3E") center / cover; }
   @keyframes bandIn { from { opacity: 0; transform: translateX(-50%) scaleX(.6); } }
   #stand { position: absolute; inset: 0; opacity: 0; pointer-events: none; } /* 指名発表の前の立ち絵は動きなしで出す */
   #stand.on { opacity: 1; }

@@ -24,10 +24,11 @@ function script(themeId, lot) {
   let s = C.initialState();
   s.title = 'お試しドラフト会議';
   for (const [name, short] of LEADERS) s = A(s, { type: 'addLeader', name });
-  s.leaders.forEach((l, i) => { l.short = LEADERS[i][1]; l.intro = ['前期王者', '初参加', '居飛車の鬼', '振り飛車一筋', '', 'リベンジに燃える'][i]; });
+  s.leaders.forEach((l, i) => { l.icon = `demo_leader_${i + 1}.svg`; l.stand = `demo_stand_${i + 1}.svg`; l.short = LEADERS[i][1]; l.intro = ['前期王者', '初参加', '居飛車の鬼', '振り飛車一筋', '', 'リベンジに燃える'][i]; });
   s = A(s, { type: 'addPlayers', players: PLAYERS.map((name, i) => ({ name, note: NOTES[i] })) });
   s = A(s, { type: 'setOption', patch: { theme: themeId, lotteryModes: [lot, lot, lot], flowWait: false, flowStand: false, timerShow: true } });
   s.audio = Object.assign({}, s.audio, { bgm: '' });
+  s.players.forEach((p, i) => { p.icon = `demo_player_${String(i + 1).padStart(2, '0')}.svg`; });
   const P = s.players.map((p) => p.id), L = s.leaders.map((l) => l.id);
   const steps = [];
   const at = (name, sec, fn) => { s = fn(s); steps.push([name, s, sec]); };

@@ -49,22 +49,29 @@ const SCRIPTS = {
   G_end: 'これをもちまして、お試しドラフト会議を終了いたします。\n選手の皆さま、リーダーの皆さま、ご視聴いただいた皆さま、誠にありがとうございました。',
 };
 
+// お試しの画像の名前 → 絵(demo_leader_1.svg / demo_stand_1.svg / demo_player_01.svg)。当てはまらなければ null
+function demoImage(name) {
+  let m = /^demo_(leader|stand)_(\d+)\.svg$/.exec(name);
+  if (m) { const color = Core.LEADER_COLORS[(+m[2] - 1) % Core.LEADER_COLORS.length]; return m[1] === 'leader' ? silhouette(color) : standSvg(color); }
+  m = /^demo_player_(\d+)\.svg$/.exec(name);
+  if (m) { const n = +m[1] - 1, i = Math.floor(n / GIVEN.length), j = n % GIVEN.length; return silhouette(TONES[(i + j) % TONES.length]); }
+  return null;
+}
+
 // 画像を書き出して、お試し用の初期状態を返す
 function makeDemoState(imgDir) {
   fs.mkdirSync(imgDir, { recursive: true });
   const leaders = LEADERS.map((name, i) => {
     const color = Core.LEADER_COLORS[i % Core.LEADER_COLORS.length];
-    const icon = `demo_leader_${i + 1}.svg`;
-    fs.writeFileSync(path.join(imgDir, icon), silhouette(color));
-    const stand = `demo_stand_${i + 1}.svg`;
-    fs.writeFileSync(path.join(imgDir, stand), standSvg(color));
+    const icon = `demo_leader_${i + 1}.svg`, stand = `demo_stand_${i + 1}.svg`;
+    for (const n of [icon, stand]) fs.writeFileSync(path.join(imgDir, n), demoImage(n));
     return { name, short: name.split(' ')[0], color, icon, stand, intro: INTROS[i], introMemo: INTRO_MEMOS[i] };
   });
   const players = [];
   FAMILY.forEach((f, i) => GIVEN.forEach((g, j) => {
     const n = players.length + 1;
     const icon = `demo_player_${String(n).padStart(2, '0')}.svg`;
-    fs.writeFileSync(path.join(imgDir, icon), silhouette(TONES[(i + j) % TONES.length]));
+    fs.writeFileSync(path.join(imgDir, icon), demoImage(icon));
     players.push({ name: `${f} ${g}`, icon, note: NOTES[(i * 6 + j) % NOTES.length], klass: RATES[(i * 5 + j * 3) % RATES.length] });
   }));
   let s = Core.initialState();
@@ -74,4 +81,4 @@ function makeDemoState(imgDir) {
   return s;
 }
 
-module.exports = { makeDemoState };
+module.exports = { makeDemoState, demoImage };

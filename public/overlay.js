@@ -474,7 +474,7 @@ function fitSlide() {
 // 帯の名前: リーダー紹介はフルネーム、ほかは「チーム＋略称」
 function standHtml(l, tag, full) {
   return `<div class="standwrap" style="--c:${esc(lc(l))}">
-    ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="" style="--sk:${+l.standScale || 1};--sx:${+l.standX || 0}px;--sy:${+l.standY || 0}px">` : `<img class="standicon" src="${l.icon ? img(l.icon) : ''}" alt="">`}
+    ${l.stand ? `<img class="stand" src="${img(l.stand)}" alt="" style="--sk:${+l.standScale || 1};--sx:${+l.standX || 0}px;--sy:${+l.standY || 0}px">` : (l.icon ? `<img class="standicon" src="${img(l.icon)}" alt="">` : '<span class="standicon noface"></span>')}
     ${tag ? `<div class="tag">${esc(tag)}</div>` : ''}
     <div class="band">${esc(full ? l.name : C.teamLabel(S, l))}</div></div>`;
 }

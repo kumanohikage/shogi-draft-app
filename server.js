@@ -92,6 +92,8 @@ function start(opts = {}) {
     else file = path.join(PUB, path.normalize(p).replace(/^([/\\])+/, ''));
     if (!file.startsWith(PUB) && !file.startsWith(IMG) && !file.startsWith(BGM)) { res.writeHead(403); return res.end(); }
     fs.readFile(file, (err, buf) => {
+      // お試しの画像は、ファイルが無くても名前から作って出す(テーマの見本で使う)
+      if (err && p.startsWith('/images/')) { const svg = require('./demo').demoImage(path.basename(p)); if (svg) { err = null; buf = Buffer.from(svg); } }
       if (err) { res.writeHead(404); return res.end('not found'); }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
       res.end(buf);
