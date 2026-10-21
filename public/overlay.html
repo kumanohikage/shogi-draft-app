@@ -19,6 +19,9 @@
   #bglayer.on { opacity: 1; }
   #backdrop, #bgimg, #bgfx { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   #backdrop { background: radial-gradient(ellipse at 50% 40%, #fff3c4 0%, #e8b84a 38%, #8a5a12 75%, #3a2408 100%); }
+  /* 金の後光: 背景の層にも場面と同じ放射線(場面の切り替えで中身だけが入れ替わって見えるように) */
+  #backdrop::before { content: ''; position: absolute; inset: 0; opacity: .25; background: repeating-conic-gradient(from 0deg at 50% 40%, rgba(255,255,255,.9) 0 4deg, transparent 4deg 12deg); }
+  #stage.bg3d #backdrop::before, #stage.hasbg #backdrop::before, [data-theme]:not([data-theme="gold"]) #backdrop::before { display: none; }
   #bgimg, #bgfx { display: none; }
   #stage.hasbg #bgimg { display: block; background: var(--bgimg) center / cover no-repeat; }
   #stage.bg3d #bgfx.ready { display: block; background: transparent; }

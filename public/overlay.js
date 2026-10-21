@@ -93,7 +93,19 @@ function render() {
   lots3dVolume(audio);
   renderBoard(); renderTeams(); renderWait(); renderTimer(); renderLogo(); renderSlide(); renderIntro(); renderRound(); renderAllIn(); renderLots(); playLottery(false);
   fitNames();
+  preloadFonts();
   first = false;
+}
+// 名前や文言の字は、画面に出る前にフォントを読み込んでおく。フォントは字のまとまりごとに分かれていて、
+// 初めて出た瞬間に読み込むと、一瞬ほかのフォントで描かれる(「銀」「飛」だけ細く見えるなど)
+let fontText = '';
+function preloadFonts() {
+  const t = [S.title, W('round', 1), ...S.leaders.flatMap((l) => [l.name, l.short, l.teamName, l.intro, C.teamLabel(S, l)]), ...S.players.flatMap((p) => [p.name, p.note]), JSON.stringify(T.WORDS || {}), JSON.stringify(theme().words || {}), '0123456789第一二三四五巡指名開始入札完了交渉権確定競合残り物には福がある抽選'].join('');
+  if (t === fontText) return;
+  fontText = t;
+  const chars = [...new Set(t)].join(''), specs = new Set();
+  document.fonts.forEach((f) => specs.add(`${f.style} ${f.weight} 32px "${f.family.replace(/"/g, '')}"`));
+  specs.forEach((spec) => document.fonts.load(spec, chars).catch(() => {}));
 }
 /* 長い名前(「あーるてぃめっとうるとら」など)は、折り返さずに、枠に入る大きさまで文字を小さくする */
 const FIT_NAMES = '.nm b, .nm small, .head .tn, .back .wn, .team .th .tn, .team li .pnm, .standwrap .band, .lot .nm, .lotshead .pn';
@@ -157,6 +169,8 @@ const lots3dShown = () => $('lots3d').style.display === 'block' && $('lots3d').s
 const isLive = (k) => k === 'roulette' || (k === 'lots' && lots3dShown());
 // 3D の背景のテーマでは、背景のある場面は透明(後ろの背景の層が見えている)
 const seeThrough = (k) => !!theme().bg && !EXPORT && SCENES.includes(k) && !isLive(k);
+// 背景の層(#bglayer)が場面と同じ見た目か: 自分の背景画像を敷いているか、テーマの CSS が無い(金の後光。背景の層にも放射線を描く)
+const sameBackdrop = () => !EXPORT && ($('stage').classList.contains('hasbg') || !theme().css);
 const play = (el, name, ms, ease = 'ease', delay = 0) => { el.style.animation = `${name} ${ms}ms ${ease} ${delay}ms both`; };
 async function runTransition(o) {
   transBusy = true;
@@ -207,6 +221,13 @@ async function runTransition(o) {
         if (out) { play(out, 'tFadeOut', ms / 2); await later(ms / 2); out.style.visibility = 'hidden'; }
         to.classList.add('on', 't-top', 't-hold'); play(to, 'tFadeIn', out ? ms / 2 : ms);
         await later(out ? ms / 2 : ms);
+        to.style.animation = ''; to.classList.remove('t-top');
+      } else if (out && fromBg && sameBackdrop()) {
+        // 背景の層と同じ背景の場面どうし(金の後光・自分の背景画像): 前の中身を消してから次を出す(重ねると両方の中身が透けて見える)
+        bgLayer(true);
+        play(out, 'tFadeOut', ms / 2); await later(ms / 2); out.style.visibility = 'hidden';
+        to.classList.add('on', 't-top', 't-hold'); play(to, 'tFadeIn', ms / 2);
+        await later(ms / 2);
         to.style.animation = ''; to.classList.remove('t-top');
       } else {
         // 不透明な場面へ: 前の場面の上に浮かび上がらせる(下の場面は最後まで出したままなので透けない)
