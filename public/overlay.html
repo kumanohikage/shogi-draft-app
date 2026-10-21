@@ -139,12 +139,13 @@
   /* 見出しの下〜画面の下の真ん中に置く(数が多くても少なくても) */
   /* 見出しの下〜画面の下の真ん中に置く。人数が多くて入りきらないときだけ全体を縮める(fitArea) */
   .area { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 20px 40px 40px; box-sizing: border-box; }
-  .grid { display: grid; gap: 34px 40px; transition: opacity .4s; }
-  .grid.hide { opacity: 0; }
+  /* ピックアップの大きいカードと一覧は重ねて見せない: 消えるほうを先に(.25秒)、出るほうはそのあとから */
+  .grid { display: grid; gap: 34px 40px; transition: opacity .3s .25s; }
+  .grid.hide { opacity: 0; transition: opacity .25s; }
   /* ピックアップ公開: 1人のカードを大きく */
   /* 指名ボードと同じ枠(見出しの下〜画面の下)の真ん中に置く */
-  #spot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px 40px 40px; box-sizing: border-box; opacity: 0; transition: opacity .4s; pointer-events: none; }
-  #spot.on { opacity: 1; }
+  #spot { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px 40px 40px; box-sizing: border-box; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #spot.on { opacity: 1; transition: opacity .3s .25s; }
   #spot .spotcard { zoom: 1.75; }
   #spot .spotcard.enter { animation: spotIn .45s cubic-bezier(.3,1.4,.5,1) both; }
   @keyframes spotIn { from { transform: scale(.85); opacity: 0; } }
