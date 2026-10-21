@@ -440,6 +440,14 @@ function initStand(l) {
   box.addEventListener('pointerdown', (e) => { stand.drag = { x: e.clientX, y: e.clientY, sx: stand.x, sy: stand.y }; box.setPointerCapture(e.pointerId); });
   box.addEventListener('pointermove', (e) => { const d = stand.drag; if (!d) return; const k = 1920 / box.clientWidth; stand.x = d.sx + (e.clientX - d.x) * k; stand.y = d.sy + (e.clientY - d.y) * k; drawStand(); });
   box.addEventListener('pointerup', () => { if (stand.drag) save(); stand.drag = null; });
+  // マウスホイールで大きさ(つまみと同じ範囲)。止まってから保存
+  let wheelT = 0;
+  box.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    stand.k = Math.max(0.4, Math.min(2.5, stand.k * Math.pow(1.0015, -e.deltaY)));
+    $('stand-scale').value = stand.k; drawStand();
+    clearTimeout(wheelT); wheelT = setTimeout(save, 300);
+  }, { passive: false });
   $('stand-scale').addEventListener('input', (e) => { stand.k = +e.target.value; drawStand(); });
   $('stand-scale').addEventListener('change', save);
   $('stand-reset').addEventListener('click', () => { Object.assign(stand, { x: 0, y: 0, k: 1 }); $('stand-scale').value = 1; drawStand(); save(); });
@@ -467,7 +475,7 @@ function renderLeaderPanel(started) {
           <div class="flex-1 min-w-0"><label class="${LABEL}" for="n-${l.id}">名前</label><input id="n-${l.id}" type="text" data-lf="name" value="${esc(l.name)}" class="w-full ${INPUT}"></div>
           <div class="w-28"><label class="${LABEL}" for="s-${l.id}">略称</label><input id="s-${l.id}" type="text" data-lf="short" value="${esc(l.short || '')}" placeholder="${esc(l.name)}" maxlength="12" class="w-full ${INPUT}"></div></div></div>
       <div class="leading-normal"><span class="${LABEL}">立ち絵</span>
-        ${l.stand ? `<div id="stand-box" class="relative w-full aspect-video overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-page-alt)] cursor-move touch-none" title="ドラッグで位置を動かす">
+        ${l.stand ? `<div id="stand-box" class="relative w-full aspect-video overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-page-alt)] cursor-move touch-none" title="ドラッグで位置、ホイールで大きさ">
           <div id="stand-stage" class="absolute left-0 top-0 w-[1920px] h-[1080px] origin-top-left pointer-events-none" style="transform:scale(0)">
             <img id="stand-img" src="${img(l.stand)}" alt="" class="absolute left-1/2 bottom-0 h-[1000px] max-w-[1400px] object-contain object-bottom origin-bottom">
             <span class="absolute left-1/2 bottom-[70px] -translate-x-1/2 w-[1000px] h-[130px] rounded-md bg-amber-400/80" aria-hidden="true"></span>

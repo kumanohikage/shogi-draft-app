@@ -149,6 +149,12 @@ app.whenReady().then(async () => {
   await check('15-roster-image');
   await tab('draft'); await js("ui.draftView = 'look'; render(); syncThemePreviews(); 0"); await check('16-draft-look');
   await tab('leaders'); await check('17-leaders');
+  // 立ち絵: ホイールで大きさ(止まってから保存)
+  const k0 = await js("+(C.leaderById(S, ui.leaderId).standScale || 1)");
+  await js("document.getElementById('stand-box').dispatchEvent(new WheelEvent('wheel', { deltaY: -200, bubbles: true, cancelable: true })); 0");
+  await wait(800);
+  const k1 = await js("+(C.leaderById(S, ui.leaderId).standScale || 1)");
+  if (!(k1 > k0)) { console.log(`✗ ホイールで立ち絵が大きくならない ${k0} → ${k1}`); errors++; } else console.log(`✓ ホイールで立ち絵の大きさ ${k0} → ${k1}`);
   await js("openRosterDlg('setLeader', S.leaders[0].id); 0"); await wait(300);
   const rl = await js("document.querySelectorAll('#roster-list [data-roster-pick]').length");
   if (!rl) { console.log('✗ リーダーを選ぶ一覧に名簿の人が出ない'); errors++; } else console.log(`✓ リーダーを選ぶ一覧に名簿の${rl}人が並ぶ`);
