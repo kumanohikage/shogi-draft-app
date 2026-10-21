@@ -4,7 +4,7 @@
 
 Windows / Mac（試験的）・無料・インストール不要・オフラインで動きます。
 
-**[→ ダウンロード（Releases）](../../releases)** ・ [要望・不具合を送る](https://docs.google.com/forms/d/e/1FAIpQLSdwnDA_wSGOq3aWtDHe5qtCHSGIJsPYO_ktHkcbxBT3eRp0IQ/viewform)
+**[→ ダウンロード（Releases）](../../releases)** ・ [紹介ページ](https://kumanohikage.github.io/shogi-draft-app/) ・ [要望・不具合を送る](https://docs.google.com/forms/d/e/1FAIpQLSdwnDA_wSGOq3aWtDHe5qtCHSGIJsPYO_ktHkcbxBT3eRp0IQ/viewform)
 
 ![指名ボード](docs/images/overlay-board.jpg)
 
