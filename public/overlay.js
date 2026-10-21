@@ -24,7 +24,9 @@ const FORCE_THEME = new URLSearchParams(location.search).get('theme');
 const LITE = PREVIEW || new URLSearchParams(location.search).has('lite'); // 管理画面の小さな見本・プレビュー: 背景を軽く描く
 const STATIC = new URLSearchParams(location.search).has('static'); // Figma へ写すとき: 3D の背景を使わず、テーマの CSS の背景で
 const T = window.DraftThemes;
-const themeId = () => T.idOf(FORCE_THEME || C.optionsOf(S).theme);
+const wantTheme = () => T.idOf(FORCE_THEME || C.optionsOf(S).theme); // 設定で選んでいるテーマ
+let lookTheme = null, lookLoading = null; // 見た目(CSS)とフォントを読み込み終えて、いま描いているテーマ / 読み込み中のテーマ
+const themeId = () => lookTheme || wantTheme();
 const theme = () => T.themeOf(themeId());
 const W = (key, n) => T.word(themeId(), key, n); // テーマの文言
 // 次のプレビュー: オレンジのボタンを押したあとの画面(押せないときは進行表の次の場面)
@@ -99,13 +101,14 @@ function render() {
 // 名前や文言の字は、画面に出る前にフォントを読み込んでおく。フォントは字のまとまりごとに分かれていて、
 // 初めて出た瞬間に読み込むと、一瞬ほかのフォントで描かれる(「銀」「飛」だけ細く見えるなど)
 let fontText = '';
-function preloadFonts() {
-  const t = [S.title, W('round', 1), ...S.leaders.flatMap((l) => [l.name, l.short, l.teamName, l.intro, C.teamLabel(S, l)]), ...S.players.flatMap((p) => [p.name, p.note]), JSON.stringify(T.WORDS || {}), JSON.stringify(theme().words || {}), '0123456789第一二三四五巡指名開始入札完了交渉権確定競合残り物には福がある抽選'].join('');
-  if (t === fontText) return;
+function preloadFonts(force) {
+  const words = Object.values(T.THEMES).map((t) => JSON.stringify(t.words || {})).join('');
+  const t = [S.title, ...S.leaders.flatMap((l) => [l.name, l.short, l.teamName, l.intro, C.teamLabel(S, l)]), ...S.players.flatMap((p) => [p.name, p.note]), JSON.stringify(T.WORDS || {}), words, '0123456789第一二三四五巡指名開始入札完了交渉権確定競合残り物には福がある抽選'].join('');
+  if (t === fontText && !force) return Promise.resolve();
   fontText = t;
   const chars = [...new Set(t)].join(''), specs = new Set();
   document.fonts.forEach((f) => specs.add(`${f.style} ${f.weight} 32px "${f.family.replace(/"/g, '')}"`));
-  specs.forEach((spec) => document.fonts.load(spec, chars).catch(() => {}));
+  return Promise.all([...specs].map((spec) => document.fonts.load(spec, chars).catch(() => {})));
 }
 /* 長い名前(「あーるてぃめっとうるとら」など)は、折り返さずに、枠に入る大きさまで文字を小さくする */
 const FIT_NAMES = '.nm b, .nm small, .head .tn, .back .wn, .team .th .tn, .team li .pnm, .standwrap .band, .lot .nm, .lotshead .pn';
@@ -404,16 +407,37 @@ function titleHtml(small) {
   const o = C.optionsOf(S);
   return `${C.useLogo(S) ? `<img class="logo" src="${img(o.logoImage)}" alt="${esc(S.title)}">` : esc(S.title)}${small ? `<small>${esc(small)}</small>` : ''}`;
 }
+// テーマの CSS を、まだ効かせずに読み込む(media="print" で読み込み、替えるときに all にする)。フォントも先に読み込む
+function loadTheme(id) {
+  const th = T.themeOf(id);
+  const css = th.css ? new Promise((ok) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet'; link.media = 'print'; link.href = `themes/${id}.css`;
+    link.onload = link.onerror = () => ok(link);
+    document.head.appendChild(link);
+  }) : Promise.resolve(null);
+  return css.then((link) => Promise.race([preloadFonts(true, th), later(1500)]).then(() => link));
+}
+function applyTheme(id, link) {
+  lookTheme = id;
+  const st = $('stage'), th = T.themeOf(id), old = $('theme-css');
+  st.dataset.theme = id;
+  if (link) { link.media = 'all'; link.id = 'theme-css'; old.remove(); }
+  else old.href = th.css ? `themes/${id}.css` : 'data:text/css,';
+  $('bgfx').removeAttribute('src');
+}
 function renderLook() {
-  const o = C.optionsOf(S), st = $('stage'), id = themeId(), th = theme();
+  const o = C.optionsOf(S), st = $('stage');
   st.classList.toggle('hasbg', !!o.bgImage);
   st.style.setProperty('--bgimg', o.bgImage ? `url("${img(o.bgImage)}")` : 'none');
-  // テーマ: 見た目(CSS)と 3D の背景
-  if (st.dataset.theme !== id) {
-    st.dataset.theme = id;
-    $('theme-css').href = th.css ? `themes/${id}.css` : 'data:text/css,';
-    $('bgfx').removeAttribute('src');
+  // テーマ: 見た目(CSS)と 3D の背景。替えるときは、新しい CSS とフォントを読み込み終えてから、文言ごとまとめて替える
+  const want = wantTheme();
+  if (!lookTheme || EXPORT || STATIC) { if (lookTheme !== want) applyTheme(want, null); } // はじめと画像の書き出しはすぐ
+  else if (want !== lookTheme && want !== lookLoading) {
+    lookLoading = want;
+    loadTheme(want).then((link) => { if (lookLoading !== want) { if (link) link.remove(); return; } lookLoading = null; applyTheme(want, link); render(); });
   }
+  const id = themeId(), th = theme();
   st.classList.toggle('bg3d', !!th.bg && !EXPORT && !STATIC);
   // 光の世界へ入るときの 3D の切り替えは、先に読み込んでおく(押した瞬間に待たないように)
   if ((ENTRY3D.has(entryKind()) || ENTRY3D.has(o.transition)) && !EXPORT && !PREVIEW && !STATIC && !$('entryfx').getAttribute('src')) $('entryfx').setAttribute('src', 'entry3d.html'); // 画像の書き出しは 3D を待たず、テーマの CSS の背景で
