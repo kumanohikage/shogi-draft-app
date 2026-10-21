@@ -5,8 +5,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 let S = null, ws = null, canUndo = false, undoCancelsLottery = false, demo = false;
 
 const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400/50';
-const BTN_PRIMARY = `inline-flex items-center justify-center w-full h-14 px-4 text-lg font-bold bg-primary-500 text-slate-900 rounded-lg active:bg-primary-600 cursor-pointer disabled:opacity-40 disabled:cursor-default ${FOCUS}`;
-const BTN_SUB = `inline-flex items-center justify-center w-full h-11 px-4 text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-default ${FOCUS}`;
+const BTN_PRIMARY = `inline-flex items-center justify-center w-full min-w-0 h-14 px-4 whitespace-nowrap text-lg font-bold bg-primary-500 text-slate-900 rounded-lg active:bg-primary-600 cursor-pointer disabled:opacity-40 disabled:cursor-default ${FOCUS}`;
+const BTN_SUB = `inline-flex items-center justify-center w-full min-w-0 h-11 px-4 whitespace-nowrap text-[1rem] font-medium bg-[var(--bg-surface)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-default ${FOCUS}`;
 const INPUT = 'h-11 px-3 text-base bg-[var(--bg-page)] text-[var(--text-default)] border border-[var(--border-strong)] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400/50';
 const BADGE = { ok: 'bg-emerald-500/[.12] text-emerald-300', lot: 'bg-amber-500/[.12] text-amber-300', dup: 'bg-red-500/[.12] text-red-300', in: 'bg-primary-500/[.12] text-primary-300', wait: 'bg-[var(--bg-page-alt)] text-[var(--text-muted)]' };
 const badge = (k, t) => `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${BADGE[k]}">${t}</span>`;
@@ -28,6 +28,21 @@ const act = (action) => ws.send(JSON.stringify({ type: 'action', action }));
 function toast(t) { const el = $('toast'); el.textContent = t; el.className = 'fixed left-4 right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-30 px-4 py-3 rounded-lg shadow-xl text-sm border border-red-500/60 bg-[var(--bg-surface)] text-red-300'; clearTimeout(toast.t); toast.t = setTimeout(() => { el.className = 'hidden'; }, 5000); }
 function setDisabled(el, v) { el.disabled = v; if (v) el.setAttribute('aria-disabled', 'true'); else el.removeAttribute('aria-disabled'); }
 
+// ボタンの文字は改行しない。入りきらないときは、入る大きさまで文字を小さくする(いちばん小さくて6割)
+function fitButtons() {
+  document.querySelectorAll('button').forEach((b) => {
+    b.style.fontSize = '';
+    const w = b.clientWidth; if (!w) return;
+    const jc = b.style.justifyContent; b.style.justifyContent = 'flex-start'; // 真ん中寄せだと、はみ出した分を測れないので
+    const cs = getComputedStyle(b), pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), sw = b.scrollWidth;
+    b.style.justifyContent = jc;
+    if (sw <= w + 1) return;
+    const base = parseFloat(cs.fontSize);
+    b.style.fontSize = Math.max(base * 0.6, base * ((w - pad) / (sw - pad)) * 0.97) + 'px';
+  });
+}
+addEventListener('resize', () => { if (S) fitButtons(); });
+document.fonts.ready.then(() => { if (S) fitButtons(); });
 function render() {
   $('title').textContent = S.title || 'ドラフト会議';
   const done = C.draftComplete(S);
@@ -49,10 +64,11 @@ function render() {
   const subs = (n.sub || []).filter((b) => b.key !== 'auto' || demo);
   $('subs').innerHTML = (n.choices ? `<div class="grid grid-cols-3 gap-2">${n.choices.map((b) => `<button type="button" data-next="${b.key}" data-arg="${b.arg}" class="${BTN_SUB} gap-2" ${b.off ? 'disabled aria-disabled="true"' : ''} aria-label="${b.label}を選ぶ"><span class="w-5 h-5 rounded-md bg-[var(--lc)]" style="--lc:${b.color}" aria-hidden="true"></span>${b.label}</button>`).join('')}</div>` : '') + subs.map((b) => btn(b, BTN_SUB)).join('');
   const main = n.main ? btn({ ...n.main, label: n.main.busy ? '演出中…' : n.main.label }, BTN_PRIMARY) : `<p class="h-14 flex-1 flex items-center justify-center text-sm text-[var(--text-muted)]">${n.step >= 5 ? 'ドラフト終了' : '待っています'}</p>`;
-  $('bar').innerHTML = `<div class="flex gap-2"><button type="button" data-next="progPrev" class="${BTN_SUB.replace('w-full h-11', 'flex-none h-14')} gap-1 px-3" ${C.progIdxOf(S) > 0 ? '' : 'disabled aria-disabled="true"'} aria-label="前の場面へ"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>前の場面へ</button><div class="flex-1 min-w-0">${main}</div></div>`;
+  $('bar').innerHTML = `<div class="flex gap-2"><button type="button" data-next="progPrev" class="${BTN_SUB.replace('w-full min-w-0 h-11', 'flex-none h-14')} gap-1 px-3" ${C.progIdxOf(S) > 0 ? '' : 'disabled aria-disabled="true"'} aria-label="前の場面へ"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>前の場面へ</button><div class="flex-1 min-w-0">${main}</div></div>`;
   $('scenes').innerHTML = SCENES.map(([k, t]) => `<button type="button" data-scene="${k}" aria-pressed="${S.scene === k || (k === 'roulette' && S.scene === 'lots')}" class="h-11 px-2 rounded-lg text-sm font-medium border cursor-pointer ${FOCUS} ${S.scene === k || (k === 'roulette' && S.scene === 'lots') ? 'bg-[var(--bg-page-alt)] border-primary-400 text-[var(--text-heading)]' : 'bg-[var(--bg-surface)] border-[var(--border-default)] text-[var(--text-muted)]'}">${t}</button>`).join('');
   renderNoms();
   renderTimer();
+  fitButtons();
 }
 
 // 指名: 公開前の人だけ選べる(管理画面と同じ決まり)
