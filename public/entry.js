@@ -127,6 +127,9 @@
     const paper = 'background-color:#f3ead6;background-image:linear-gradient(#5a3d22,#5a3d22),linear-gradient(90deg,#5a3d22,#5a3d22),repeating-linear-gradient(90deg,transparent 0 158px,#6b4a2b 158px 166px),repeating-linear-gradient(0deg,transparent 0 172px,#6b4a2b 172px 180px),radial-gradient(ellipse at 50% 40%,rgba(255,250,235,.9),rgba(230,214,180,.6));background-size:100% 26px,26px 100%,auto,auto,auto;background-repeat:no-repeat,no-repeat,repeat,repeat,no-repeat;background-position:0 0,0 0,13px 0,0 13px,0 0;box-shadow:inset 0 0 0 26px #4a3019,0 0 40px rgba(0,0,0,.6)';
     const L = div(el, `position:absolute;top:0;bottom:0;left:0;width:960px;${paper};transform:translateX(-100%)`);
     const R = div(el, `position:absolute;top:0;bottom:0;right:0;width:960px;${paper};transform:translateX(100%)`);
+    // 丸い引手(3D の版と同じ: 扉の幅 960px を 900mm とみて外寸 約75mm。真鍮の縁に黒いくぼみ)
+    const pull = 'position:absolute;top:calc(50% + 46px);width:72px;height:72px;margin-top:-36px;border-radius:50%;background:radial-gradient(circle,#0d0805 0 52%,#9a7a44 53% 58%,#241710 59% 86%,#9a7a44 87% 100%);box-shadow:0 2px 4px rgba(0,0,0,.35)';
+    div(L, `${pull};right:34px`); div(R, `${pull};left:52px`); // 格子のマスの真ん中に(左右の扉で格子の並びが違う)
     const close = 'cubic-bezier(.55,0,.25,1)';
     await Promise.all([anim(L, [{ transform: 'translateX(-100%)' }, { transform: 'translateX(0)' }], 560, close), anim(R, [{ transform: 'translateX(100%)' }, { transform: 'translateX(0)' }], 560, close)]);
     swap();
