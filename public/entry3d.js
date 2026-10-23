@@ -308,18 +308,14 @@ function shoji() {
     bar(PW, F, 0, PH / 2 - F / 2, 0.2); bar(PW, F, 0, -PH / 2 + F / 2, 0.2); bar(F, PH, -PW / 2 + F / 2, 0, 0.2); bar(F, PH, PW / 2 - F / 2, 0, 0.2);
     for (let i = 1; i < 4; i++) bar(0.035, PH, -PW / 2 + (PW * i) / 4, 0); // 組子(縦)
     for (let i = 1; i < 6; i++) bar(PW, 0.035, 0, -PH / 2 + (PH * i) / 6); // 組子(横)
-    // 引手(丸): 実物は外寸 60〜75mm。障子1枚の幅(約 PW)を 900mm とみて、外寸 約75mm(直径 0.34)。
-    // 真鍮の縁に、黒い漆のくぼみ。横の組子に乗らないよう、マス目の真ん中(真ん中の段のひとつ下)に
-    const hx = sign * -(PW / 2 - 0.42), hy = -PH / 12;
-    const metal = new THREE.MeshStandardMaterial({ color: '#9a7a44', roughness: 0.32, metalness: 0.85 });
-    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 48), new THREE.MeshStandardMaterial({ color: '#241710', roughness: 0.4, metalness: 0.5 }));
-    plate.rotation.x = Math.PI / 2; plate.position.set(hx, hy, 0.02); grp.add(plate);
-    const rimRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.018, 12, 64), metal);
-    rimRing.position.set(hx, hy, 0.035); grp.add(rimRing);
-    const bowl = new THREE.Mesh(new THREE.CircleGeometry(0.11, 48), new THREE.MeshStandardMaterial({ color: '#0d0805', roughness: 0.6, metalness: 0.2 }));
-    bowl.position.set(hx, hy, 0.034); grp.add(bowl);
-    const innerRing = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.008, 8, 48), metal);
-    innerRing.position.set(hx, hy, 0.036); grp.add(innerRing);
+    // 引手: 障子は紙ではなく、閉じ合わせる側の縦框に掘り込む(丸い引手は襖のもの)。
+    // 障子1枚の幅(約 PW)を 900mm とみて、幅 約18mm・高さ 約75mm の細長いくぼみ。真鍮の縁に黒いくぼみ
+    const capsule = (w, h) => { const s = new THREE.Shape(), r = w / 2; s.absarc(0, h / 2 - r, r, 0, Math.PI, false); s.absarc(0, -h / 2 + r, r, Math.PI, Math.PI * 2, false); return new THREE.ShapeGeometry(s, 16); };
+    const hx = sign * -(PW / 2 - F / 2), hy = -PH / 24;
+    const rimPull = new THREE.Mesh(capsule(0.085, 0.34), new THREE.MeshStandardMaterial({ color: '#9a7a44', roughness: 0.32, metalness: 0.85 }));
+    rimPull.position.set(hx, hy, 0.202); grp.add(rimPull);
+    const pit = new THREE.Mesh(capsule(0.06, 0.31), new THREE.MeshStandardMaterial({ color: '#0d0805', roughness: 0.6, metalness: 0.2 }));
+    pit.position.set(hx, hy, 0.204); grp.add(pit);
     grp.position.z = -D;
     scene.add(grp);
     return grp;
